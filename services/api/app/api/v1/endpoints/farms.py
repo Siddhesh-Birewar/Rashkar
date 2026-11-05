@@ -504,3 +504,8 @@ async def get_farm_soil_history(
     """
     _get_farm_and_verify_owner(farm_id, current_user, db)
     return spatial_soil_service.get_profile_history(db, str(farm_id))
+
+
+# Sub-router for farm-specific weather & climate intelligence
+from cropnet.services.api.app.api.v1.endpoints import weather
+router.include_router(weather.router, prefix="/{farm_id}/weather", tags=["Farm Weather & Climate"])
