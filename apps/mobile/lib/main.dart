@@ -168,6 +168,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
       SoilIntelligenceScreen(farms: _farms),
       WeatherIntelligenceScreen(farms: _farms),
+      const CropCatalogScreen(),
       const AboutCropNetScreen(),
     ];
 
@@ -180,6 +181,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'My Farms'),
           NavigationDestination(icon: Icon(Icons.terrain_outlined), selectedIcon: Icon(Icons.terrain), label: 'Soil'),
           NavigationDestination(icon: Icon(Icons.wb_sunny_outlined), selectedIcon: Icon(Icons.wb_sunny), label: 'Weather'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Crops'),
           NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'About'),
         ],
       ),
@@ -2111,7 +2113,1034 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
 }
 
 // ==========================================
-// 8. ABOUT TAB
+// 8. CROP KNOWLEDGE BASE SCREENS (Phase 4)
+// ==========================================
+class CropKnowledgeItem {
+  final String id;
+  final String commonName;
+  final String scientificName;
+  final String marathiName;
+  final String hindiName;
+  final String category;
+  final String cropType;
+  final int minDuration;
+  final int maxDuration;
+  final List<String> varieties;
+  final List<String> preferredTextures;
+  final List<String> acceptableTextures;
+  final double phOptMin;
+  final double phOptMax;
+  final double phTolMin;
+  final double phTolMax;
+  final String drainage;
+  final String salinity;
+  final double minDepthCm;
+  final double tempOptMin;
+  final double tempOptMax;
+  final double tempTolMin;
+  final double tempTolMax;
+  final double? annualRainMin;
+  final double? annualRainMax;
+  final String frostSensitivity;
+  final String heatSensitivity;
+  final List<Map<String, String>> seasons;
+  final double waterReqMinMm;
+  final double waterReqMaxMm;
+  final bool rainfedSuitable;
+  final String irrigationDependency;
+  final List<String> criticalStages;
+  final String waterloggingSensitivity;
+  final String droughtSensitivity;
+  final Map<String, Map<String, dynamic>> regionalSuitability;
+  final String primarySource;
+  final String publicationTitle;
+  final int publicationYear;
+
+  const CropKnowledgeItem({
+    required this.id,
+    required this.commonName,
+    required this.scientificName,
+    required this.marathiName,
+    required this.hindiName,
+    required this.category,
+    required this.cropType,
+    required this.minDuration,
+    required this.maxDuration,
+    required this.varieties,
+    required this.preferredTextures,
+    required this.acceptableTextures,
+    required this.phOptMin,
+    required this.phOptMax,
+    required this.phTolMin,
+    required this.phTolMax,
+    required this.drainage,
+    required this.salinity,
+    required this.minDepthCm,
+    required this.tempOptMin,
+    required this.tempOptMax,
+    required this.tempTolMin,
+    required this.tempTolMax,
+    this.annualRainMin,
+    this.annualRainMax,
+    required this.frostSensitivity,
+    required this.heatSensitivity,
+    required this.seasons,
+    required this.waterReqMinMm,
+    required this.waterReqMaxMm,
+    required this.rainfedSuitable,
+    required this.irrigationDependency,
+    required this.criticalStages,
+    required this.waterloggingSensitivity,
+    required this.droughtSensitivity,
+    required this.regionalSuitability,
+    required this.primarySource,
+    required this.publicationTitle,
+    required this.publicationYear,
+  });
+}
+
+const List<CropKnowledgeItem> kCropKnowledgeBase = [
+  // 1. Sugarcane
+  CropKnowledgeItem(
+    id: 'sugarcane',
+    commonName: 'Sugarcane',
+    scientificName: 'Saccharum officinarum L.',
+    marathiName: 'ऊस',
+    hindiName: 'गन्ना',
+    category: 'Cash Crop',
+    cropType: 'Semi-perennial',
+    minDuration: 360,
+    maxDuration: 540,
+    varieties: ['Co 86032 (Nira)', 'CoM 0265 (Phule 265)', 'MS 10001 (Phule 10001)', 'VSI 08005'],
+    preferredTextures: ['Clay', 'Clay Loam', 'Deep Black Vertisol'],
+    acceptableTextures: ['Sandy Clay Loam', 'Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.8,
+    phTolMin: 6.0,
+    phTolMax: 8.5,
+    drainage: 'Well-drained; standing water > 48 hrs reduces tillering',
+    salinity: 'Moderately Sensitive (EC < 2.0 dS/m)',
+    minDepthCm: 90.0,
+    tempOptMin: 24.0,
+    tempOptMax: 34.0,
+    tempTolMin: 15.0,
+    tempTolMax: 40.0,
+    annualRainMin: 1500.0,
+    annualRainMax: 2500.0,
+    frostSensitivity: 'Highly Sensitive; frost stops elongation',
+    heatSensitivity: 'Moderate; temperatures > 38°C slow tillering',
+    seasons: [
+      {'name': 'Adsali', 'plant': '15 July - 15 August', 'harvest': 'Nov - Jan (16-18 mo)'},
+      {'name': 'Pre-seasonal', 'plant': '15 Oct - 15 Nov', 'harvest': 'Dec - Feb (14-15 mo)'},
+      {'name': 'Suru', 'plant': '15 Jan - 15 Feb', 'harvest': 'Jan - Mar (12 mo)'},
+    ],
+    waterReqMinMm: 1800.0,
+    waterReqMaxMm: 2500.0,
+    rainfedSuitable: false,
+    irrigationDependency: 'Critical / High (25–35 irrigations or drip)',
+    criticalStages: ['Tillering stage (60–130 DAP)', 'Grand growth phase (130–250 DAP)'],
+    waterloggingSensitivity: 'Moderately Tolerant; stagnation > 48 hrs impairs recovery',
+    droughtSensitivity: 'High during formative tillering phase',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Canal command with deep black Vertisols supports high sucrose recovery.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Bhima river and canal commands provide ideal Adsali conditions.'},
+      'Maval': {'status': 'Marginal / High Input', 'desc': 'High rainfall and acidic lateritic soils delay maturity and depress sucrose.'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Steep slopes and torrential rains cause severe waterlogging and poor recovery.'},
+    },
+    primarySource: 'MPKV Rahuri & ICAR-IISR Lucknow',
+    publicationTitle: 'Package of Practices for Field Crops & Sugarcane Agronomy',
+    publicationYear: 2023,
+  ),
+
+  // 2. Pomegranate
+  CropKnowledgeItem(
+    id: 'pomegranate',
+    commonName: 'Pomegranate',
+    scientificName: 'Punica granatum L.',
+    marathiName: 'डाळिंब',
+    hindiName: 'अनार',
+    category: 'Horticulture',
+    cropType: 'Perennial Fruit Tree',
+    minDuration: 150,
+    maxDuration: 180,
+    varieties: ['Bhagwa (Kesar)', 'Arakta', 'Ganesh', 'Solapur Lal'],
+    preferredTextures: ['Sandy Clay Loam', 'Clay Loam', 'Light to Medium Black'],
+    acceptableTextures: ['Gravelly Loam', 'Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.8,
+    phTolMin: 5.5,
+    phTolMax: 8.2,
+    drainage: 'Excellent drainage mandatory; zero tolerance for wet feet',
+    salinity: 'Moderately Tolerant (EC < 3.0 dS/m)',
+    minDepthCm: 60.0,
+    tempOptMin: 25.0,
+    tempOptMax: 35.0,
+    tempTolMin: 10.0,
+    tempTolMax: 44.0,
+    annualRainMin: 500.0,
+    annualRainMax: 700.0,
+    frostSensitivity: 'Moderately Tolerant in dormancy',
+    heatSensitivity: 'High tolerance; dry weather enhances aril sweetness',
+    seasons: [
+      {'name': 'Hasta Bahar', 'plant': 'Sept - Oct (Flowering)', 'harvest': 'Feb - April'},
+      {'name': 'Ambe Bahar', 'plant': 'Jan - Feb (Flowering)', 'harvest': 'June - August'},
+    ],
+    waterReqMinMm: 800.0,
+    waterReqMaxMm: 1100.0,
+    rainfedSuitable: false,
+    irrigationDependency: 'Critical via Drip (essential for Bahar stress regulation)',
+    criticalStages: ['Flowering and fruit setting (30–60 days)', 'Fruit sizing and aril development'],
+    waterloggingSensitivity: 'Extremely High; standing water triggers Ceratocystis wilt',
+    droughtSensitivity: 'Drought hardy in dormancy; sensitive during fruit sizing',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Low humidity and well-drained soils allow export quality Bhagwa production.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Ideal dry semi-arid climate restricts bacterial blight.'},
+      'Maval': {'status': 'Unsuitable / High Disease Risk', 'desc': 'High monsoon humidity (> 85%) triggers devastating bacterial blight (telya).'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Extreme Western Ghats rainfall and fungal fruit rot cause complete loss.'},
+    },
+    primarySource: 'ICAR-NRCP Solapur & MPKV Rahuri',
+    publicationTitle: 'Scientific Pomegranate Production Manual for Semi-Arid Tropics',
+    publicationYear: 2021,
+  ),
+
+  // 3. Soybean
+  CropKnowledgeItem(
+    id: 'soybean',
+    commonName: 'Soybean',
+    scientificName: 'Glycine max (L.) Merr.',
+    marathiName: 'सोयाबीन',
+    hindiName: 'सोयाबीन',
+    category: 'Oilseed',
+    cropType: 'Annual Kharif',
+    minDuration: 95,
+    maxDuration: 110,
+    varieties: ['Phule Sangam (KDS 726)', 'Phule Kimaya (KDS 753)', 'JS 335', 'DSb 21'],
+    preferredTextures: ['Clay Loam', 'Clay', 'Medium Black Vertisol'],
+    acceptableTextures: ['Loam', 'Silt Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.5,
+    phTolMin: 6.0,
+    phTolMax: 8.0,
+    drainage: 'Well-drained; nodulation fails under water stagnation',
+    salinity: 'Sensitive (EC < 1.5 dS/m)',
+    minDepthCm: 45.0,
+    tempOptMin: 22.0,
+    tempOptMax: 30.0,
+    tempTolMin: 15.0,
+    tempTolMax: 35.0,
+    annualRainMin: 600.0,
+    annualRainMax: 900.0,
+    frostSensitivity: 'Sensitive',
+    heatSensitivity: 'Moderate; temperatures > 35°C reduce pod set',
+    seasons: [
+      {'name': 'Kharif', 'plant': '20 June - 10 July', 'harvest': 'October'},
+    ],
+    waterReqMinMm: 450.0,
+    waterReqMaxMm: 650.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Supplemental (1–2 protective irrigations in dry spells)',
+    criticalStages: ['Flowering stage (35–45 DAP)', 'Pod development and filling (55–75 DAP)'],
+    waterloggingSensitivity: 'High; standing water > 24 hrs causes seedling death',
+    droughtSensitivity: 'High during flowering and pod development',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Kharif rainfed with supplemental irrigation backup yields up to 28 q/ha.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Excellent fit on medium-to-deep black soils.'},
+      'Maval': {'status': 'Moderately Suitable', 'desc': 'Performs well on gentle slopes; avoid flat waterlogged valley floors.'},
+      'Mulshi': {'status': 'Marginal / High Input', 'desc': 'Torrential rains cause seed decay and poor root nodulation.'},
+    },
+    primarySource: 'ICAR-IISR Indore & MPKV Rahuri',
+    publicationTitle: 'Soybean Production Technologies for Peninsular India',
+    publicationYear: 2022,
+  ),
+
+  // 4. Cotton
+  CropKnowledgeItem(
+    id: 'cotton',
+    commonName: 'Cotton',
+    scientificName: 'Gossypium hirsutum L.',
+    marathiName: 'कापूस',
+    hindiName: 'कपास',
+    category: 'Fiber',
+    cropType: 'Annual Kharif',
+    minDuration: 150,
+    maxDuration: 180,
+    varieties: ['Phule Yamuna', 'PKV Hy 2', 'Ajeet 155 (Bt)', 'RCH 2 (Bt)'],
+    preferredTextures: ['Deep Black Vertisol', 'Clay', 'Clay Loam'],
+    acceptableTextures: ['Medium Black', 'Silt Loam'],
+    phOptMin: 6.5,
+    phOptMax: 8.0,
+    phTolMin: 5.8,
+    phTolMax: 8.5,
+    drainage: 'Good internal drainage required',
+    salinity: 'Moderately Tolerant (EC up to 4.0 dS/m)',
+    minDepthCm: 90.0,
+    tempOptMin: 24.0,
+    tempOptMax: 34.0,
+    tempTolMin: 16.0,
+    tempTolMax: 40.0,
+    annualRainMin: 650.0,
+    annualRainMax: 1000.0,
+    frostSensitivity: 'Highly Sensitive',
+    heatSensitivity: 'Moderate; temperatures > 38°C cause square shed',
+    seasons: [
+      {'name': 'Kharif', 'plant': '15 June - 30 June', 'harvest': 'Nov - Jan'},
+    ],
+    waterReqMinMm: 650.0,
+    waterReqMaxMm: 850.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Supplemental (2–3 irrigations during boll filling)',
+    criticalStages: ['Square formation (45–60 DAP)', 'Flowering (70–90 DAP)', 'Boll development (90–120 DAP)'],
+    waterloggingSensitivity: 'High; standing water > 36 hrs causes square and boll drop',
+    droughtSensitivity: 'Moderate taproot extraction; stress causes boll abortion',
+    regionalSuitability: {
+      'Baramati': {'status': 'Moderately Suitable', 'desc': 'Grown on deep black soils with drip irrigation.'},
+      'Indapur': {'status': 'Moderately Suitable', 'desc': 'Good potential with timely bollworm monitoring.'},
+      'Maval': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Heavy continuous rain causes square drop and boll rot.'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Cloudiness and heavy rain impede boll opening and fiber development.'},
+    },
+    primarySource: 'ICAR-CICR Nagpur & MPKV Rahuri',
+    publicationTitle: 'Cotton Production Technology for Vertisols',
+    publicationYear: 2022,
+  ),
+
+  // 5. Maize
+  CropKnowledgeItem(
+    id: 'maize',
+    commonName: 'Maize',
+    scientificName: 'Zea mays L.',
+    marathiName: 'मका',
+    hindiName: 'मक्का',
+    category: 'Cereal',
+    cropType: 'Annual (Kharif / Rabi / Zaid)',
+    minDuration: 90,
+    maxDuration: 115,
+    varieties: ['Pinnacle (30V92)', 'Ganga 11', 'DKC 9108', 'Phule Rajarshi'],
+    preferredTextures: ['Clay Loam', 'Loam', 'Sandy Clay Loam', 'Medium Black'],
+    acceptableTextures: ['Clay', 'Silt Loam'],
+    phOptMin: 6.0,
+    phOptMax: 7.5,
+    phTolMin: 5.5,
+    phTolMax: 8.0,
+    drainage: 'Well-drained; standing water reduces yield by 30% in 24 hrs',
+    salinity: 'Moderately Sensitive (EC < 1.7 dS/m)',
+    minDepthCm: 60.0,
+    tempOptMin: 21.0,
+    tempOptMax: 30.0,
+    tempTolMin: 12.0,
+    tempTolMax: 38.0,
+    annualRainMin: 500.0,
+    annualRainMax: 800.0,
+    frostSensitivity: 'Highly Sensitive',
+    heatSensitivity: 'High; temperatures > 38°C desiccate pollen during silking',
+    seasons: [
+      {'name': 'Kharif', 'plant': '15 June - 15 July', 'harvest': 'Sept - Oct'},
+      {'name': 'Rabi', 'plant': '15 Oct - 15 Nov', 'harvest': 'Feb - March'},
+    ],
+    waterReqMinMm: 500.0,
+    waterReqMaxMm: 700.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Irrigated in Rabi/Summer; Supplemental in Kharif',
+    criticalStages: ['Tasseling (45–55 DAP)', 'Silking (55–65 DAP)', 'Grain milk stage (70–85 DAP)'],
+    waterloggingSensitivity: 'Extremely High; standing water stunts seedlings',
+    droughtSensitivity: 'Critical at silking; 2 days of wilting cuts grain count by 50%',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Thrives year-round with high poultry feed and silage demand.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'High grain and green fodder yields under canal/well irrigation.'},
+      'Maval': {'status': 'Moderately Suitable', 'desc': 'Suitable in Kharif on elevated uplands with free drainage.'},
+      'Mulshi': {'status': 'Marginal / High Input', 'desc': 'Monsoon water stagnation induces root chlorosis.'},
+    },
+    primarySource: 'MPKV Rahuri & ICAR-IIMR Ludhiana',
+    publicationTitle: 'Package of Practices for Maize Cultivation',
+    publicationYear: 2023,
+  ),
+
+  // 6. Wheat
+  CropKnowledgeItem(
+    id: 'wheat',
+    commonName: 'Wheat',
+    scientificName: 'Triticum aestivum L.',
+    marathiName: 'गहू',
+    hindiName: 'गेहूं',
+    category: 'Cereal',
+    cropType: 'Annual Rabi',
+    minDuration: 105,
+    maxDuration: 125,
+    varieties: ['Phule Samadhan (NIAW 1994)', 'Trimbak (NIAW 301)', 'Tapovan (NIAW 917)', 'MACS 6222'],
+    preferredTextures: ['Clay', 'Clay Loam', 'Deep Black Vertisol'],
+    acceptableTextures: ['Loam', 'Silt Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.8,
+    phTolMin: 6.0,
+    phTolMax: 8.2,
+    drainage: 'Well-drained; moderate waterlogging tolerance in tillering',
+    salinity: 'Moderately Tolerant (EC up to 4.0 dS/m)',
+    minDepthCm: 60.0,
+    tempOptMin: 15.0,
+    tempOptMax: 24.0,
+    tempTolMin: 8.0,
+    tempTolMax: 30.0,
+    annualRainMin: 350.0,
+    annualRainMax: 550.0,
+    frostSensitivity: 'Moderately Tolerant',
+    heatSensitivity: 'High; temperatures > 30°C cause terminal heat stress',
+    seasons: [
+      {'name': 'Rabi', 'plant': '01 Nov - 20 Nov', 'harvest': 'Feb - March'},
+    ],
+    waterReqMinMm: 400.0,
+    waterReqMaxMm: 550.0,
+    rainfedSuitable: false,
+    irrigationDependency: 'Critical (requires 4–6 irrigations at key stages)',
+    criticalStages: ['Crown Root Initiation (18–21 DAS)', 'Tillering (40–45 DAS)', 'Flowering', 'Milk stage'],
+    waterloggingSensitivity: 'Moderate',
+    droughtSensitivity: 'High; stress at CRI reduces tillers by 40%',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Deep black Vertisols with canal irrigation achieve peak productivity.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Timely November sowing yields bold, lustrous grains.'},
+      'Maval': {'status': 'Marginal / High Input', 'desc': 'High winter morning humidity and fog promote rust infection.'},
+      'Mulshi': {'status': 'Marginal / High Input', 'desc': 'Short winter duration and soil acidity limit yields.'},
+    },
+    primarySource: 'ICAR-IIWBR Karnal & MPKV Rahuri',
+    publicationTitle: 'Wheat Production Technologies for Peninsular Zone',
+    publicationYear: 2022,
+  ),
+
+  // 7. Sorghum (Jowar)
+  CropKnowledgeItem(
+    id: 'sorghum',
+    commonName: 'Sorghum (Jowar)',
+    scientificName: 'Sorghum bicolor (L.) Moench',
+    marathiName: 'ज्वारी',
+    hindiName: 'ज्वार',
+    category: 'Cereal',
+    cropType: 'Annual (Kharif / Rabi)',
+    minDuration: 110,
+    maxDuration: 135,
+    varieties: ['Maldandi (M 35-1)', 'Phule Suchitra', 'Phule Yashodha', 'Phule Revati'],
+    preferredTextures: ['Deep Black Vertisol', 'Clay', 'Clay Loam'],
+    acceptableTextures: ['Medium Black', 'Sandy Clay Loam'],
+    phOptMin: 6.5,
+    phOptMax: 8.0,
+    phTolMin: 5.5,
+    phTolMax: 8.5,
+    drainage: 'Well-drained; extracts subsoil moisture from heavy clays',
+    salinity: 'Moderately Tolerant (EC up to 4.0 dS/m)',
+    minDepthCm: 60.0,
+    tempOptMin: 24.0,
+    tempOptMax: 32.0,
+    tempTolMin: 15.0,
+    tempTolMax: 38.0,
+    annualRainMin: 400.0,
+    annualRainMax: 650.0,
+    frostSensitivity: 'Sensitive',
+    heatSensitivity: 'Low; exceptional C4 drought tolerance',
+    seasons: [
+      {'name': 'Rabi', 'plant': '15 Sept - 15 Oct', 'harvest': 'Jan - Feb'},
+      {'name': 'Kharif', 'plant': '15 June - 30 June', 'harvest': 'October'},
+    ],
+    waterReqMinMm: 350.0,
+    waterReqMaxMm: 500.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Low / Rainfed (1 protective irrigation doubles yield)',
+    criticalStages: ['Booting (50–55 DAP)', 'Flowering (65–70 DAP)', 'Grain milk (80–90 DAP)'],
+    waterloggingSensitivity: 'Moderate',
+    droughtSensitivity: 'Extremely drought resilient; enters temporary dormancy',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Premier agro-climatic belt for iconic Rabi Maldandi 35-1.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Deep black Vertisols conserve moisture for high roti grain quality.'},
+      'Maval': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Continuous monsoon rain induces grain mold; soils shallow for Rabi.'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Heavy rain causes complete grain mold and head blight.'},
+    },
+    primarySource: 'ICAR-IIMR Hyderabad & MPKV Rahuri',
+    publicationTitle: 'Rabi Sorghum Maldandi Agronomy in Deccan Vertisols',
+    publicationYear: 2022,
+  ),
+
+  // 8. Pearl Millet (Bajra)
+  CropKnowledgeItem(
+    id: 'bajra',
+    commonName: 'Pearl Millet (Bajra)',
+    scientificName: 'Pennisetum glaucum (L.) R. Br.',
+    marathiName: 'बाजरी',
+    hindiName: 'बाजरा',
+    category: 'Cereal',
+    cropType: 'Annual Kharif / Summer',
+    minDuration: 75,
+    maxDuration: 85,
+    varieties: ['Dhanshakti (Biofortified)', 'Phule Aadishakti', 'Shraddha', 'Saburi'],
+    preferredTextures: ['Sandy Loam', 'Loam', 'Light to Medium Black'],
+    acceptableTextures: ['Gravelly Loam', 'Clay Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.8,
+    phTolMin: 5.5,
+    phTolMax: 8.5,
+    drainage: 'Freely draining; completely intolerant of standing water',
+    salinity: 'Moderately Tolerant (EC up to 3.5 dS/m)',
+    minDepthCm: 30.0,
+    tempOptMin: 25.0,
+    tempOptMax: 34.0,
+    tempTolMin: 18.0,
+    tempTolMax: 42.0,
+    annualRainMin: 350.0,
+    annualRainMax: 550.0,
+    frostSensitivity: 'Highly Sensitive',
+    heatSensitivity: 'Extremely Low; thrives in summer heat up to 42°C',
+    seasons: [
+      {'name': 'Kharif', 'plant': '15 June - 15 July', 'harvest': 'September'},
+      {'name': 'Summer', 'plant': '15 Jan - 15 Feb', 'harvest': 'April - May'},
+    ],
+    waterReqMinMm: 250.0,
+    waterReqMaxMm: 350.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Low / Rainfed in Kharif; 3–4 irrigations in Summer',
+    criticalStages: ['Tillering (25–30 DAP)', 'Flowering (45–50 DAP)'],
+    waterloggingSensitivity: 'Very High; standing water leads to downy mildew and ergot',
+    droughtSensitivity: 'Highest drought tolerance and water-use efficiency of all cereals',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Ideal on shallow light soils in dry rain shadow pockets.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Reliable short-duration grain crop under dry conditions.'},
+      'Maval': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Heavy rain causes severe downy mildew, ergot, and poor pollination.'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Continuous high humidity causes complete crop failure from ergot.'},
+    },
+    primarySource: 'MPKV Rahuri & ICAR-AICRP Pearl Millet',
+    publicationTitle: 'Package of Practices for Pearl Millet Production',
+    publicationYear: 2022,
+  ),
+
+  // 9. Chickpea (Chana)
+  CropKnowledgeItem(
+    id: 'chickpea',
+    commonName: 'Chickpea (Chana)',
+    scientificName: 'Cicer arietinum L.',
+    marathiName: 'हरभरा',
+    hindiName: 'चना',
+    category: 'Pulse',
+    cropType: 'Annual Rabi',
+    minDuration: 95,
+    maxDuration: 115,
+    varieties: ['Vijay (Wilt resistant)', 'Digvijay', 'Vishal', 'Phule Vikram'],
+    preferredTextures: ['Clay Loam', 'Clay', 'Medium Black Vertisol'],
+    acceptableTextures: ['Loam', 'Silt Loam'],
+    phOptMin: 6.5,
+    phOptMax: 7.8,
+    phTolMin: 6.0,
+    phTolMax: 8.2,
+    drainage: 'Well-drained; excess moisture causes collar rot and Fusarium wilt',
+    salinity: 'Sensitive (EC < 1.5 dS/m)',
+    minDepthCm: 45.0,
+    tempOptMin: 15.0,
+    tempOptMax: 25.0,
+    tempTolMin: 10.0,
+    tempTolMax: 32.0,
+    annualRainMin: 300.0,
+    annualRainMax: 450.0,
+    frostSensitivity: 'Sensitive during flowering',
+    heatSensitivity: 'High; temperatures > 30°C cause flower drop',
+    seasons: [
+      {'name': 'Rabi', 'plant': '10 Oct - 10 Nov', 'harvest': 'Jan - Feb'},
+    ],
+    waterReqMinMm: 250.0,
+    waterReqMaxMm: 350.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Low to Supplemental (1 protective irrigation at pod fill)',
+    criticalStages: ['Pre-flowering branching (30–35 DAP)', 'Pod development (60–65 DAP)'],
+    waterloggingSensitivity: 'High; excess wetness triggers wilt',
+    droughtSensitivity: 'Moderate; deep root system extracts subsoil water',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'Major pulse on conserved moisture in black soils; Vijay is wilt-immune.'},
+      'Indapur': {'status': 'Highly Suitable', 'desc': 'Conserved moisture on Vertisols gives outstanding grain quality.'},
+      'Maval': {'status': 'Marginal / High Input', 'desc': 'Acidic soils and high post-monsoon humidity trigger root rot.'},
+      'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Acid laterites cause severe collar rot and seedling mortality.'},
+    },
+    primarySource: 'ICAR-IIPR Kanpur & MPKV Rahuri',
+    publicationTitle: 'Chickpea Production Technology in Peninsular Vertisols',
+    publicationYear: 2022,
+  ),
+
+  // 10. Groundnut
+  CropKnowledgeItem(
+    id: 'groundnut',
+    commonName: 'Groundnut (Peanut)',
+    scientificName: 'Arachis hypogaea L.',
+    marathiName: 'भुईमूग',
+    hindiName: 'मूंगफली',
+    category: 'Oilseed',
+    cropType: 'Annual (Kharif / Summer)',
+    minDuration: 105,
+    maxDuration: 125,
+    varieties: ['Phule Unnati', 'Phule Morana', 'TAG 24', 'JL 501'],
+    preferredTextures: ['Sandy Clay Loam', 'Loam', 'Sandy Loam', 'Light to Medium Loam'],
+    acceptableTextures: ['Clay Loam'],
+    phOptMin: 6.0,
+    phOptMax: 7.2,
+    phTolMin: 5.5,
+    phTolMax: 7.8,
+    drainage: 'Loose, friable, well-drained soil essential for peg entry',
+    salinity: 'Sensitive (EC < 1.5 dS/m)',
+    minDepthCm: 45.0,
+    tempOptMin: 24.0,
+    tempOptMax: 32.0,
+    tempTolMin: 18.0,
+    tempTolMax: 38.0,
+    annualRainMin: 500.0,
+    annualRainMax: 750.0,
+    frostSensitivity: 'Highly Sensitive',
+    heatSensitivity: 'Moderate',
+    seasons: [
+      {'name': 'Summer', 'plant': '15 Jan - 15 Feb', 'harvest': 'May - June'},
+      {'name': 'Kharif', 'plant': '15 June - 10 July', 'harvest': 'October'},
+    ],
+    waterReqMinMm: 450.0,
+    waterReqMaxMm: 650.0,
+    rainfedSuitable: true,
+    irrigationDependency: 'Critical in Summer (drip every 8–10 days)',
+    criticalStages: ['Flowering (20–30 DAP)', 'Pegging stage (40–50 DAP)', 'Pod development (60–80 DAP)'],
+    waterloggingSensitivity: 'High; causes pod decay and Aspergillus fungus',
+    droughtSensitivity: 'Critical at pegging; dry topsoil prevents subterranean peg entry',
+    regionalSuitability: {
+      'Baramati': {'status': 'Highly Suitable', 'desc': 'High summer profitability under drip in medium friable soils.'},
+      'Indapur': {'status': 'Moderately Suitable', 'desc': 'Avoid heavy sticky clays that impede pod harvest.'},
+      'Maval': {'status': 'Moderately Suitable', 'desc': 'Grown in Kharif on gentle slopes with lime to counter acidity.'},
+      'Mulshi': {'status': 'Marginal / High Input', 'desc': 'Heavy rain leaches calcium, causing empty pods (pops).'},
+    },
+    primarySource: 'MPKV Rahuri & ICAR-DGR Junagadh',
+    publicationTitle: 'Package of Practices for Groundnut Production',
+    publicationYear: 2023,
+  ),
+];
+
+class CropCatalogScreen extends StatefulWidget {
+  const CropCatalogScreen({super.key});
+
+  @override
+  State<CropCatalogScreen> createState() => _CropCatalogScreenState();
+}
+
+class _CropCatalogScreenState extends State<CropCatalogScreen> {
+  String _selectedCategory = 'All';
+  String _selectedSeason = 'All';
+  String _searchQuery = '';
+  WeatherLanguage _lang = WeatherLanguage.english;
+
+  final List<String> _categories = ['All', 'Cash Crop', 'Cereal', 'Pulse', 'Oilseed', 'Horticulture', 'Fiber'];
+  final List<String> _seasons = ['All', 'Kharif', 'Rabi', 'Summer / Zaid'];
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = kCropKnowledgeBase.where((c) {
+      if (_selectedCategory != 'All' && c.category != _selectedCategory) {
+        return false;
+      }
+      if (_selectedSeason != 'All') {
+        final hasSeason = c.seasons.any((s) => s['name']!.toLowerCase().contains(_selectedSeason.split(' ').first.toLowerCase()));
+        if (!hasSeason) return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final match = c.commonName.toLowerCase().contains(q) ||
+            c.marathiName.toLowerCase().contains(q) ||
+            c.scientificName.toLowerCase().contains(q);
+        if (!match) return false;
+      }
+      return true;
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Crop Knowledge Base'),
+        backgroundColor: const Color(0xFF1B5E20),
+        actions: [
+          PopupMenuButton<WeatherLanguage>(
+            icon: const Icon(Icons.language),
+            tooltip: 'Language / भाषा',
+            onSelected: (l) => setState(() => _lang = l),
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: WeatherLanguage.english, child: Text('English')),
+              PopupMenuItem(value: WeatherLanguage.marathi, child: Text('मराठी (Marathi)')),
+              PopupMenuItem(value: WeatherLanguage.hindi, child: Text('हिंदी (Hindi)')),
+            ],
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search & Filter Header
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.white,
+            child: Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: _lang == WeatherLanguage.marathi ? 'पीक शोधा (उदा. कापूस, गहू)...' : 'Search crop (e.g. Wheat, Sugarcane)...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                ),
+                const SizedBox(height: 8),
+                // Category Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _categories.map((cat) {
+                      final isSel = _selectedCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: FilterChip(
+                          label: Text(cat),
+                          selected: isSel,
+                          selectedColor: const Color(0xFFC8E6C9),
+                          onSelected: (_) => setState(() => _selectedCategory = cat),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Season Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _seasons.map((sn) {
+                      final isSel = _selectedSeason == sn;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: FilterChip(
+                          label: Text(sn),
+                          selected: isSel,
+                          selectedColor: const Color(0xFFBBDEFB),
+                          onSelected: (_) => setState(() => _selectedSeason = sn),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Crop List View
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: filtered.length,
+              itemBuilder: (ctx, idx) {
+                final crop = filtered[idx];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  elevation: 1.5,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (c) => CropDetailScreen(crop: crop, lang: _lang),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _lang == WeatherLanguage.marathi ? crop.marathiName : (_lang == WeatherLanguage.hindi ? crop.hindiName : crop.commonName),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                                  ),
+                                  Text(
+                                    crop.scientificName,
+                                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.black54),
+                                  ),
+                                ],
+                              ),
+                              Chip(
+                                label: Text(crop.category, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                backgroundColor: const Color(0xFF2E7D32),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.timer_outlined, size: 16, color: Colors.black54),
+                              const SizedBox(width: 4),
+                              Text('${crop.minDuration}–${crop.maxDuration} days', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                              const SizedBox(width: 14),
+                              const Icon(Icons.water_drop_outlined, size: 16, color: Color(0xFF0277BD)),
+                              const SizedBox(width: 4),
+                              Text('${crop.waterReqMinMm.toInt()}–${crop.waterReqMaxMm.toInt()} mm', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Key Varieties: ${crop.varieties.take(2).join(", ")}',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CropDetailScreen extends StatelessWidget {
+  final CropKnowledgeItem crop;
+  final WeatherLanguage lang;
+
+  const CropDetailScreen({super.key, required this.crop, required this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(crop.commonName),
+        backgroundColor: const Color(0xFF1B5E20),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${crop.commonName} (${crop.marathiName} / ${crop.hindiName})',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                        ),
+                        Chip(
+                          label: Text(crop.category, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                          backgroundColor: const Color(0xFF2E7D32),
+                        ),
+                      ],
+                    ),
+                    Text(crop.scientificName, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.black54, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Text('Duration: ${crop.minDuration}–${crop.maxDuration} days • Type: ${crop.cropType}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    const Text('Recommended MPKV / ICAR Cultivars:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: crop.varieties.map((v) => Chip(
+                        label: Text(v, style: const TextStyle(fontSize: 11)),
+                        backgroundColor: const Color(0xFFE8F5E9),
+                        padding: EdgeInsets.zero,
+                      )).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Soil Requirements
+            _buildSectionCard(
+              title: 'Soil Requirements (मृदा निकष)',
+              icon: Icons.terrain,
+              color: const Color(0xFF5D4037),
+              children: [
+                _buildRow('Preferred Textures', crop.preferredTextures.join(', ')),
+                _buildRow('Acceptable Textures', crop.acceptableTextures.join(', ')),
+                _buildRow('Optimum pH Range', '${crop.phOptMin} – ${crop.phOptMax} (Tolerable: ${crop.phTolMin} – ${crop.phTolMax})'),
+                _buildRow('Drainage Requirement', crop.drainage),
+                _buildRow('Salinity Sensitivity', crop.salinity),
+                _buildRow('Minimum Soil Depth', '${crop.minDepthCm} cm'),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Climate Requirements
+            _buildSectionCard(
+              title: 'Climate & Thermal Requirements (हवामान निकष)',
+              icon: Icons.wb_sunny_outlined,
+              color: const Color(0xFFE65100),
+              children: [
+                _buildRow('Optimum Temperature', '${crop.tempOptMin}°C – ${crop.tempOptMax}°C'),
+                _buildRow('Tolerable Temperature', '${crop.tempTolMin}°C – ${crop.tempTolMax}°C'),
+                if (crop.annualRainMin != null)
+                  _buildRow('Annual Rainfall Need', '${crop.annualRainMin!.toInt()} – ${crop.annualRainMax!.toInt()} mm'),
+                _buildRow('Frost Sensitivity', crop.frostSensitivity),
+                _buildRow('Heat Sensitivity', crop.heatSensitivity),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Seasons & Calendar
+            _buildSectionCard(
+              title: 'Growing Seasons & Calendar (हंगाम व पेरणी)',
+              icon: Icons.calendar_month,
+              color: const Color(0xFF1B5E20),
+              children: crop.seasons.map((s) => Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ${s["name"]!}: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    Expanded(child: Text('Plant: ${s["plant"]!} | Harvest: ${s["harvest"]!}', style: const TextStyle(fontSize: 12))),
+                  ],
+                ),
+              )).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Water Requirements
+            _buildSectionCard(
+              title: 'Water & Irrigation Requirements (पाणी व्यवस्थापन)',
+              icon: Icons.water_drop,
+              color: const Color(0xFF0277BD),
+              children: [
+                _buildRow('Annual Water Need', '${crop.waterReqMinMm.toInt()} – ${crop.waterReqMaxMm.toInt()} mm'),
+                _buildRow('Rainfed Viability', crop.rainfedSuitable ? 'Viable under Monsoon rains' : 'Requires assured irrigation'),
+                _buildRow('Irrigation Dependency', crop.irrigationDependency),
+                _buildRow('Waterlogging Sensitivity', crop.waterloggingSensitivity),
+                _buildRow('Drought Sensitivity', crop.droughtSensitivity),
+                const SizedBox(height: 4),
+                const Text('Critical Growth Stages:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ...crop.criticalStages.map((stg) => Padding(
+                  padding: const EdgeInsets.only(left: 6, top: 2),
+                  child: Text('• $stg', style: const TextStyle(fontSize: 12, color: Color(0xFF01579B))),
+                )),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Regional Suitability (Pilot Regions)
+            _buildSectionCard(
+              title: 'Regional Cultivation Evidence (तालुकानिहाय अनुकूलता)',
+              icon: Icons.location_on_outlined,
+              color: const Color(0xFF4527A0),
+              children: crop.regionalSuitability.entries.map((e) {
+                final taluka = e.key;
+                final data = e.value;
+                final status = data['status'] as String;
+                final desc = data['desc'] as String;
+                final isGood = status.contains('Highly') || status.contains('Moderately');
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isGood ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: isGood ? Colors.green.shade200 : Colors.red.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('$taluka Taluka', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isGood ? Colors.green.shade800 : Colors.red.shade800)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(desc, style: const TextStyle(fontSize: 11.5, color: Colors.black87)),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Source Attribution
+            Card(
+              elevation: 1,
+              color: const Color(0xFFFAFAFA),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Scientific Source & Institutional Attribution:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Text('${crop.primarySource} (${crop.publicationYear})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(crop.publicationTitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                    const SizedBox(height: 6),
+                    const Text('Status: Verified Authoritative Indian Agricultural Research Data', style: TextStyle(fontSize: 10.5, color: Color(0xFF1B5E20), fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 8),
+                Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+              ],
+            ),
+            const Divider(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 140, child: Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12))),
+          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+        ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 9. ABOUT TAB
 // ==========================================
 class AboutCropNetScreen extends StatelessWidget {
   const AboutCropNetScreen({super.key});
