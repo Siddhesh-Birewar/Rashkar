@@ -26,6 +26,8 @@ class FarmModel(Base):
     geometry_geojson = Column(JSON, nullable=False)
     calculated_area_hectares = Column(Float, nullable=False)
     calculated_area_acres = Column(Float, nullable=False)
+    centroid_latitude = Column(Float, nullable=True)
+    centroid_longitude = Column(Float, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

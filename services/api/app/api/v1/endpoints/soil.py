@@ -1,8 +1,12 @@
 import uuid
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from shapely.geometry import Polygon
 from pydantic import BaseModel
+
+from cropnet.services.api.app.core.database import get_db
+from cropnet.services.api.app.models.soil_and_farm import FarmModel
 
 from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile
 from cropnet.services.api.app.schemas.farm import GeoJSONPolygonGeometry
@@ -102,13 +106,22 @@ async def get_pilot_coverage_matrix() -> Dict[str, Any]:
 @router.post("/farms/{farm_id}/profile", response_model=UnifiedSoilProfile)
 async def generate_soil_profile_for_farm(
     farm_id: uuid.UUID,
-    current_user: CurrentUser = Depends(get_current_user)
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Generate unified soil profile snapshot for a registered farm.
     Validates farm ownership before extracting geospatial data.
     """
     farm = _FARM_STORAGE.get(farm_id)
+    if not farm:
+        db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
+        if db_farm:
+            farm = {
+                "owner_id": uuid.UUID(db_farm.owner_id),
+                "geometry": db_farm.geometry_geojson,
+                "taluka": db_farm.taluka
+            }
     if not farm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
