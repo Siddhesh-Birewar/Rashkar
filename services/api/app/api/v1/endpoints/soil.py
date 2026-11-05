@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
 
-from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile
+from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile, SoilLayerInfo
 from cropnet.services.api.app.schemas.farm import GeoJSONPolygonGeometry
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.services.spatial_extractor import SpatialSoilService
@@ -49,6 +49,137 @@ async def list_providers():
         LocalRasterProvider()
     ]
     return [p.get_capabilities() for p in providers]
+
+
+@router.get("/layers", response_model=List[SoilLayerInfo])
+async def list_soil_layers():
+    """
+    Metadata catalogue of all operational and derived soil layers.
+    Includes resolution, supported depth intervals, units, and scientific restrictions.
+    """
+    return [
+        SoilLayerInfo(
+            parameter_key="ph",
+            display_name="Soil pH (H2O)",
+            unit="pH",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="Soil pH measured in H2O solution. Calibrated using digital soil mapping ensembles."
+        ),
+        SoilLayerInfo(
+            parameter_key="soc",
+            display_name="Soil Organic Carbon",
+            unit="g/kg",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="Mass fraction of organic carbon in fine earth."
+        ),
+        SoilLayerInfo(
+            parameter_key="sand_percent",
+            display_name="Sand Fraction",
+            unit="%",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="Particle size 50 - 2000 um."
+        ),
+        SoilLayerInfo(
+            parameter_key="silt_percent",
+            display_name="Silt Fraction",
+            unit="%",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="Particle size 2 - 50 um."
+        ),
+        SoilLayerInfo(
+            parameter_key="clay_percent",
+            display_name="Clay Fraction",
+            unit="%",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="Particle size < 2 um."
+        ),
+        SoilLayerInfo(
+            parameter_key="soil_texture_class",
+            display_name="USDA Soil Texture Class",
+            unit="class",
+            source="Derived via USDA Triangle",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=True,
+            scientific_note="Derived deterministically from Sand, Silt, and Clay fractions."
+        ),
+        SoilLayerInfo(
+            parameter_key="total_nitrogen",
+            display_name="Total Nitrogen",
+            unit="g/kg",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="IMPORTANT: Total Nitrogen is NOT available mineral nitrogen (NH4+/NO3-)."
+        ),
+        SoilLayerInfo(
+            parameter_key="cation_exchange_capacity",
+            display_name="Cation Exchange Capacity (CEC)",
+            unit="cmol(c)/kg",
+            source="ISRIC SoilGrids 2.0",
+            dataset_version="2.0.0",
+            spatial_resolution="250m",
+            supported_depth_intervals=["0-5cm", "5-15cm"],
+            is_derived=False,
+            scientific_note="CEC of fine earth fraction at pH 7."
+        ),
+        SoilLayerInfo(
+            parameter_key="available_nitrogen",
+            display_name="Available Mineral Nitrogen (N)",
+            unit="kg/ha",
+            source="None (Physical Test Required)",
+            dataset_version="N/A",
+            spatial_resolution="N/A",
+            supported_depth_intervals=["0-15cm"],
+            is_derived=False,
+            scientific_note="NOT AVAILABLE from digital rasters. Requires laboratory soil testing."
+        ),
+        SoilLayerInfo(
+            parameter_key="available_phosphorus",
+            display_name="Available Phosphorus (P2O5)",
+            unit="kg/ha",
+            source="None (Physical Test Required)",
+            dataset_version="N/A",
+            spatial_resolution="N/A",
+            supported_depth_intervals=["0-15cm"],
+            is_derived=False,
+            scientific_note="NOT AVAILABLE from digital rasters. Requires laboratory soil testing."
+        ),
+        SoilLayerInfo(
+            parameter_key="available_potassium",
+            display_name="Available Potassium (K2O)",
+            unit="kg/ha",
+            source="None (Physical Test Required)",
+            dataset_version="N/A",
+            spatial_resolution="N/A",
+            supported_depth_intervals=["0-15cm"],
+            is_derived=False,
+            scientific_note="NOT AVAILABLE from digital rasters. Requires laboratory soil testing."
+        )
+    ]
 
 
 @router.get("/pilot-coverage")
@@ -138,8 +269,11 @@ async def generate_soil_profile_for_farm(
     profile = spatial_service.generate_farm_soil_profile(
         farm_id=str(farm_id),
         polygon=poly,
-        taluka=farm.get("taluka")
+        taluka=farm.get("taluka"),
+        depth="0-5cm",
+        farm_area_hectares=farm.get("calculated_area_hectares")
     )
+    spatial_service.save_profile(db, profile)
     return profile
 
 

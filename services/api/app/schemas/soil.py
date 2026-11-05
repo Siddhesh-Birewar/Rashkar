@@ -91,6 +91,32 @@ class UnifiedSoilProfile(BaseModel):
         description="Mandatory farmer-facing disclaimer."
     )
     
+    # Provenance and Metadata
+    source_dataset: str = Field(
+        default="ISRIC SoilGrids 2.0",
+        description="Primary dataset used for spatial extraction"
+    )
+    dataset_version: str = Field(
+        default="2.0.0",
+        description="Version of primary soil dataset"
+    )
+    spatial_resolution: str = Field(
+        default="250m",
+        description="Cell size or mapping scale"
+    )
+    depth_interval: str = Field(
+        default="0-5cm",
+        description="Target depth interval (e.g. 0-5cm or 5-15cm)"
+    )
+    spatial_representativeness_warning: Optional[str] = Field(
+        None,
+        description="Notice if farm boundary is smaller than raster pixel resolution"
+    )
+    soil_texture_class: Optional[str] = Field(
+        None,
+        description="USDA Soil Texture Classification derived from Sand, Silt, and Clay percentages"
+    )
+    
     # Primary Soil Parameters
     ph: Optional[SoilParameterObservation] = None
     organic_carbon: Optional[SoilParameterObservation] = None
@@ -113,3 +139,47 @@ class UnifiedSoilProfile(BaseModel):
     total_requested_parameters: int = 0
     available_parameters_count: int = 0
     data_completeness_ratio: float = 0.0
+
+
+class SoilAnalyseRequest(BaseModel):
+    """
+    Request payload to trigger soil analysis for a farm boundary.
+    """
+    force_refresh: bool = Field(
+        default=False,
+        description="Whether to bypass database cache and re-extract from public GIS raster provider"
+    )
+    depth: str = Field(
+        default="0-5cm",
+        description="Depth interval to query (e.g. '0-5cm' or '5-15cm')"
+    )
+
+
+class SoilProfileSummary(BaseModel):
+    """
+    Lightweight summary of a soil profile for history listings.
+    """
+    profile_id: str
+    farm_id: str
+    created_at: datetime
+    version: int
+    depth_interval: str
+    source_dataset: str
+    is_map_derived: bool
+    soil_texture_class: Optional[str] = None
+    data_completeness_ratio: float
+
+
+class SoilLayerInfo(BaseModel):
+    """
+    Metadata information for an available GIS soil layer.
+    """
+    parameter_key: str
+    display_name: str
+    unit: str
+    source: str
+    dataset_version: str
+    spatial_resolution: str
+    supported_depth_intervals: List[str]
+    is_derived: bool = False
+    scientific_note: Optional[str] = None

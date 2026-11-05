@@ -6,12 +6,17 @@ from sqlalchemy.orm import Session
 from shapely.geometry import Polygon
 
 from cropnet.services.api.app.schemas.farm import FarmCreate, FarmUpdate, FarmResponse
+from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile, SoilAnalyseRequest
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
-from cropnet.services.api.app.services.spatial_extractor import calculate_polygon_area
+from cropnet.services.api.app.services.spatial_extractor import (
+    calculate_polygon_area,
+    SpatialSoilService
+)
 
 router = APIRouter()
+spatial_soil_service = SpatialSoilService()
 
 # Memory cache for fast lookups & test resilience
 _FARM_STORAGE: dict[uuid.UUID, dict] = {}
@@ -389,3 +394,113 @@ async def delete_farm(
         del _FARM_STORAGE[farm_id]
 
     return None
+
+
+def _get_farm_and_verify_owner(farm_id: uuid.UUID, current_user: CurrentUser, db: Session) -> dict:
+    """
+    Lookup farm from memory cache or database and verify caller ownership.
+    """
+    farm = _FARM_STORAGE.get(farm_id)
+    if not farm:
+        try:
+            db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
+            if db_farm:
+                farm = {
+                    "id": uuid.UUID(db_farm.id),
+                    "owner_id": uuid.UUID(db_farm.owner_id),
+                    "name": db_farm.name,
+                    "village": db_farm.village,
+                    "taluka": db_farm.taluka,
+                    "district": db_farm.district,
+                    "state": db_farm.state,
+                    "geometry": db_farm.geometry_geojson,
+                    "calculated_area_hectares": db_farm.calculated_area_hectares,
+                    "calculated_area_acres": db_farm.calculated_area_acres,
+                }
+        except Exception:
+            pass
+
+    if not farm:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Farm {farm_id} not found"
+        )
+    if farm["owner_id"] != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this farm"
+        )
+    return farm
+
+
+@router.post("/{farm_id}/soil/analyse", response_model=UnifiedSoilProfile)
+async def analyse_farm_soil(
+    farm_id: uuid.UUID,
+    payload: SoilAnalyseRequest = SoilAnalyseRequest(),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger or retrieve farm-specific soil intelligence extraction.
+    - Uses cached profile if force_refresh=False.
+    - If no cache or force_refresh=True, extracts raster properties from SoilGrids WCS.
+    - Derives USDA Soil Texture Classification (e.g. Clay, Clay Loam).
+    - Checks spatial representativeness for parcels < 6.25 ha.
+    - Strictly preserves unverified available NPK as null.
+    - Persists profile snapshot and parameters to PostgreSQL database.
+    """
+    farm = _get_farm_and_verify_owner(farm_id, current_user, db)
+
+    # 1. Return cached profile if available and not forcing refresh
+    if not payload.force_refresh:
+        cached = spatial_soil_service.get_latest_profile(db, str(farm_id), depth=payload.depth)
+        if cached:
+            return cached
+
+    # 2. Extract live from polygon boundary
+    coords = farm["geometry"]["coordinates"][0]
+    poly = Polygon(coords)
+    profile = spatial_soil_service.generate_farm_soil_profile(
+        farm_id=str(farm_id),
+        polygon=poly,
+        taluka=farm.get("taluka"),
+        depth=payload.depth,
+        farm_area_hectares=farm.get("calculated_area_hectares")
+    )
+
+    # 3. Persist profile and parameter observations
+    spatial_soil_service.save_profile(db, profile)
+    return profile
+
+
+@router.get("/{farm_id}/soil", response_model=UnifiedSoilProfile)
+async def get_farm_soil_profile(
+    farm_id: uuid.UUID,
+    depth: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve latest soil intelligence profile for a farm.
+    """
+    _get_farm_and_verify_owner(farm_id, current_user, db)
+    profile = spatial_soil_service.get_latest_profile(db, str(farm_id), depth=depth)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No soil profile has been generated for farm {farm_id} yet. Please run soil analysis first."
+        )
+    return profile
+
+
+@router.get("/{farm_id}/soil/history", response_model=List[UnifiedSoilProfile])
+async def get_farm_soil_history(
+    farm_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve complete historical record of soil intelligence runs for a farm.
+    """
+    _get_farm_and_verify_owner(farm_id, current_user, db)
+    return spatial_soil_service.get_profile_history(db, str(farm_id))
