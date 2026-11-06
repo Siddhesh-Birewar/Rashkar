@@ -90,6 +90,20 @@ def upgrade() -> None:
         existing_type=sa.Float(),
         nullable=True
     )
+    op.alter_column(
+        "crop_climate_requirements",
+        "frost_sensitivity",
+        existing_type=sa.String(length=150),
+        type_=sa.Text(),
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_climate_requirements",
+        "heat_sensitivity",
+        existing_type=sa.String(length=150),
+        type_=sa.Text(),
+        existing_nullable=False,
+    )
     op.add_column(
         "crop_climate_requirements",
         sa.Column("temp_reproductive_max_c", sa.Float(), nullable=True)
@@ -120,6 +134,27 @@ def upgrade() -> None:
         "annual_water_requirement_mm_max",
         existing_type=sa.Float(),
         nullable=True
+    )
+    op.alter_column(
+        "crop_water_requirements",
+        "irrigation_dependency",
+        existing_type=sa.String(length=50),
+        type_=sa.String(length=255),
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_water_requirements",
+        "waterlogging_sensitivity",
+        existing_type=sa.String(length=150),
+        type_=sa.Text(),
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_water_requirements",
+        "drought_sensitivity",
+        existing_type=sa.String(length=150),
+        type_=sa.Text(),
+        existing_nullable=False,
     )
     op.add_column(
         "crop_water_requirements",
@@ -236,6 +271,30 @@ def downgrade() -> None:
     op.drop_column("crop_water_requirements", "daily_water_table")
     op.alter_column(
         "crop_water_requirements",
+        "drought_sensitivity",
+        existing_type=sa.Text(),
+        type_=sa.String(length=150),
+        postgresql_using="SUBSTRING(drought_sensitivity FROM 1 FOR 150)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_water_requirements",
+        "waterlogging_sensitivity",
+        existing_type=sa.Text(),
+        type_=sa.String(length=150),
+        postgresql_using="SUBSTRING(waterlogging_sensitivity FROM 1 FOR 150)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_water_requirements",
+        "irrigation_dependency",
+        existing_type=sa.String(length=255),
+        type_=sa.String(length=50),
+        postgresql_using="SUBSTRING(irrigation_dependency FROM 1 FOR 50)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_water_requirements",
         "annual_water_requirement_mm_max",
         existing_type=sa.Float(),
         nullable=False
@@ -252,6 +311,22 @@ def downgrade() -> None:
     op.drop_column("crop_climate_requirements", "evidence_status")
     op.drop_column("crop_climate_requirements", "temp_reproductive_min_mean_c")
     op.drop_column("crop_climate_requirements", "temp_reproductive_max_c")
+    op.alter_column(
+        "crop_climate_requirements",
+        "heat_sensitivity",
+        existing_type=sa.Text(),
+        type_=sa.String(length=150),
+        postgresql_using="SUBSTRING(heat_sensitivity FROM 1 FOR 150)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "crop_climate_requirements",
+        "frost_sensitivity",
+        existing_type=sa.Text(),
+        type_=sa.String(length=150),
+        postgresql_using="SUBSTRING(frost_sensitivity FROM 1 FOR 150)",
+        existing_nullable=False,
+    )
     op.alter_column(
         "crop_climate_requirements",
         "temp_tolerable_max_c",
