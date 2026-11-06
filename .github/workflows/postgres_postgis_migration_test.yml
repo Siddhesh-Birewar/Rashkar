@@ -10,6 +10,7 @@ on:
 jobs:
   postgres-17-migration-lifecycle:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -36,10 +37,12 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install system geospatial dependencies
+      - name: Install system geospatial libraries
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev libgeos-dev libproj-dev
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libgeos-dev libproj-dev
 
       - name: Install Python dependencies
         run: |
