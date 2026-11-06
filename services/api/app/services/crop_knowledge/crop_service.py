@@ -307,11 +307,15 @@ class CropKnowledgeService:
                             ph_optimum_max=s.ph_optimum_max,
                             ph_tolerable_min=s.ph_tolerable_min,
                             ph_tolerable_max=s.ph_tolerable_max,
+                            ph_context_notes=getattr(s, "ph_context_notes", None),
+                            best_suited_soil_textures=getattr(s, "best_suited_soil_textures", None),
                             drainage_requirement=s.drainage_requirement,
                             salinity_sensitivity=s.salinity_sensitivity,
                             min_soil_depth_cm=s.min_soil_depth_cm,
                             optimum_organic_carbon_g_kg=s.optimum_organic_carbon_g_kg,
                             water_holding_capacity_pref=s.water_holding_capacity_pref,
+                            evidence_status=getattr(s, "evidence_status", "derived"),
+                            unverified_parameters=getattr(s, "unverified_parameters", None),
                             source_id=s.source_id
                         )
 
@@ -328,7 +332,9 @@ class CropKnowledgeService:
                             humidity_preference=cl.humidity_preference,
                             frost_sensitivity=cl.frost_sensitivity,
                             heat_sensitivity=cl.heat_sensitivity,
+                            thermal_threshold_context=getattr(cl, "thermal_threshold_context", None),
                             solar_radiation_requirement=cl.solar_radiation_requirement,
+                            evidence_status=getattr(cl, "evidence_status", "derived"),
                             source_id=cl.source_id
                         )
 
@@ -355,6 +361,9 @@ class CropKnowledgeService:
                             rainfed_suitable=w.rainfed_suitable,
                             irrigation_dependency=w.irrigation_dependency,
                             critical_growth_stages=w.critical_growth_stages,
+                            daily_water_table=getattr(w, "daily_water_table", None),
+                            irrigation_stages_detail=getattr(w, "irrigation_stages_detail", None),
+                            evidence_status=getattr(w, "evidence_status", "derived"),
                             waterlogging_sensitivity=w.waterlogging_sensitivity,
                             drought_sensitivity=w.drought_sensitivity,
                             source_id=w.source_id
@@ -367,6 +376,7 @@ class CropKnowledgeService:
                             suitability_status=r.suitability_status,
                             agronomic_rationale=r.agronomic_rationale,
                             limiting_factors=r.limiting_factors,
+                            evidence_status=getattr(r, "evidence_status", "regional_screening"),
                             source_id=r.source_id
                         )
                         for r in crop.regional_suitability

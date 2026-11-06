@@ -69,13 +69,17 @@ class CropSoilRequirementModel(Base):
     acceptable_textures = Column(JSON, nullable=False) # Tolerable texture classes
     ph_optimum_min = Column(Float, nullable=False)
     ph_optimum_max = Column(Float, nullable=False)
-    ph_tolerable_min = Column(Float, nullable=False)
+    ph_tolerable_min = Column(Float, nullable=True) # Nullable for crops where lower tolerable limit is unverified
     ph_tolerable_max = Column(Float, nullable=False)
+    ph_context_notes = Column(Text, nullable=True) # Textual provenance explaining pH bounds and specific soil associations
+    best_suited_soil_textures = Column(JSON, nullable=True) # Textures where best-suited pH strictly applies e.g. ["Deep Loam", "Silty Clay Loam"]
     drainage_requirement = Column(Text, nullable=False)
     salinity_sensitivity = Column(Text, nullable=False)
     min_soil_depth_cm = Column(Float, nullable=False)
     optimum_organic_carbon_g_kg = Column(Float, nullable=True)
     water_holding_capacity_pref = Column(String(100), nullable=True)
+    evidence_status = Column(String(50), default="derived", nullable=True)
+    unverified_parameters = Column(JSON, nullable=True)
     source_id = Column(String(50), ForeignKey("agricultural_knowledge_sources.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -99,7 +103,9 @@ class CropClimateRequirementModel(Base):
     humidity_preference = Column(String(150), nullable=True)
     frost_sensitivity = Column(Text, nullable=False)
     heat_sensitivity = Column(Text, nullable=False)
+    thermal_threshold_context = Column(Text, nullable=True) # Explanatory context for thermal sensitivity e.g. reproductive stage vs vegetative
     solar_radiation_requirement = Column(String(150), nullable=True)
+    evidence_status = Column(String(50), default="derived", nullable=True)
     source_id = Column(String(50), ForeignKey("agricultural_knowledge_sources.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -135,11 +141,14 @@ class CropWaterRequirementModel(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     crop_id = Column(String(50), ForeignKey("crop_catalog.id"), nullable=False, unique=True, index=True)
-    annual_water_requirement_mm_min = Column(Float, nullable=False)
-    annual_water_requirement_mm_max = Column(Float, nullable=False)
+    annual_water_requirement_mm_min = Column(Float, nullable=True) # Nullable where universal mm is unsupported
+    annual_water_requirement_mm_max = Column(Float, nullable=True)
     rainfed_suitable = Column(Boolean, nullable=False)
     irrigation_dependency = Column(String(255), nullable=False) # Critical / High, Supplemental, Low / Rainfed
     critical_growth_stages = Column(JSON, nullable=False)
+    daily_water_table = Column(JSON, nullable=True) # Stage/Bahar/Age-specific daily irrigation (L/tree/day)
+    irrigation_stages_detail = Column(JSON, nullable=True) # Separate source-grounded irrigation schedules
+    evidence_status = Column(String(50), default="derived", nullable=True)
     waterlogging_sensitivity = Column(Text, nullable=False)
     drought_sensitivity = Column(Text, nullable=False)
     source_id = Column(String(50), ForeignKey("agricultural_knowledge_sources.id"), nullable=True)
@@ -161,6 +170,7 @@ class CropRegionalSuitabilityModel(Base):
     suitability_status = Column(String(100), nullable=False) # Highly Suitable, Moderately Suitable, Marginal / High Input, Unsuitable
     agronomic_rationale = Column(Text, nullable=False)
     limiting_factors = Column(JSON, nullable=True)
+    evidence_status = Column(String(50), default="regional_screening", nullable=True) # verified_regional_evidence, regional_screening, requires_regional_validation
     source_id = Column(String(50), ForeignKey("agricultural_knowledge_sources.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

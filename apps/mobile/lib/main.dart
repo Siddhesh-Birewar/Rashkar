@@ -2130,8 +2130,10 @@ class CropKnowledgeItem {
   final List<String> acceptableTextures;
   final double phOptMin;
   final double phOptMax;
-  final double phTolMin;
+  final double? phTolMin;
   final double phTolMax;
+  final String? phContextNotes;
+  final List<String>? bestSuitedSoilTextures;
   final String drainage;
   final String salinity;
   final double minDepthCm;
@@ -2143,6 +2145,7 @@ class CropKnowledgeItem {
   final double? annualRainMax;
   final String frostSensitivity;
   final String heatSensitivity;
+  final String? thermalThresholdContext;
   final List<Map<String, String>> seasons;
   final double waterReqMinMm;
   final double waterReqMaxMm;
@@ -2171,8 +2174,10 @@ class CropKnowledgeItem {
     required this.acceptableTextures,
     required this.phOptMin,
     required this.phOptMax,
-    required this.phTolMin,
+    this.phTolMin,
     required this.phTolMax,
+    this.phContextNotes,
+    this.bestSuitedSoilTextures,
     required this.drainage,
     required this.salinity,
     required this.minDepthCm,
@@ -2184,6 +2189,7 @@ class CropKnowledgeItem {
     this.annualRainMax,
     required this.frostSensitivity,
     required this.heatSensitivity,
+    this.thermalThresholdContext,
     required this.seasons,
     required this.waterReqMinMm,
     required this.waterReqMaxMm,
@@ -2267,9 +2273,10 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     preferredTextures: ['Sandy Clay Loam', 'Clay Loam', 'Light to Medium Black'],
     acceptableTextures: ['Gravelly Loam', 'Loam'],
     phOptMin: 6.5,
-    phOptMax: 7.8,
-    phTolMin: 5.5,
-    phTolMax: 8.2,
+    phOptMax: 7.0,
+    phTolMin: null,
+    phTolMax: 8.5,
+    phContextNotes: 'Optimum pH 6.5–7.0; tolerates up to 8.5 under good management. Lower tolerable limit is unverified (ICAR-NRCP & MANAGE 2022, p. 9).',
     drainage: 'Excellent drainage mandatory; zero tolerance for wet feet',
     salinity: 'Moderately Tolerant (EC < 3.0 dS/m)',
     minDepthCm: 60.0,
@@ -2298,9 +2305,9 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
       'Maval': {'status': 'Unsuitable / High Disease Risk', 'desc': 'High monsoon humidity (> 85%) triggers devastating bacterial blight (telya).'},
       'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Extreme Western Ghats rainfall and fungal fruit rot cause complete loss.'},
     },
-    primarySource: 'ICAR-NRCP Solapur & MPKV Rahuri',
-    publicationTitle: 'Scientific Pomegranate Production Manual for Semi-Arid Tropics',
-    publicationYear: 2021,
+    primarySource: 'ICAR-NRCP & MANAGE',
+    publicationTitle: 'High-tech Pomegranate Production Practices',
+    publicationYear: 2022,
   ),
 
   // 3. Soybean
@@ -2620,21 +2627,24 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     varieties: ['Vijay (Wilt resistant)', 'Digvijay', 'Vishal', 'Phule Vikram'],
     preferredTextures: ['Clay Loam', 'Clay', 'Medium Black Vertisol'],
     acceptableTextures: ['Loam', 'Silt Loam'],
-    phOptMin: 6.5,
-    phOptMax: 7.8,
-    phTolMin: 6.0,
-    phTolMax: 8.2,
-    drainage: 'Well-drained; excess moisture causes collar rot and Fusarium wilt',
-    salinity: 'Sensitive (EC < 1.5 dS/m)',
+    phOptMin: 6.0,
+    phOptMax: 8.0,
+    phTolMin: null,
+    phTolMax: 8.5,
+    phContextNotes: 'Soil pH 6.0–8.0 is documented as best-suited for deep loams or silty clay loams per ICRISAT (2010, p. 8), rather than a universal optimum across all soil textures. Tolerates up to pH 8.5 in Vertisols. High water tables and salinity are unsuitable.',
+    bestSuitedSoilTextures: ['Deep Loam', 'Silty Clay Loam'],
+    drainage: 'Loose tilth & good drainage; highly sensitive to poor aeration, waterlogging and collar rot (ICRISAT 2010, p. 8)',
+    salinity: 'Sensitive; saline soils and fields with high water tables are not suitable (ICRISAT 2010, p. 8)',
     minDepthCm: 45.0,
     tempOptMin: 15.0,
     tempOptMax: 25.0,
     tempTolMin: 10.0,
-    tempTolMax: 32.0,
+    tempTolMax: 35.0,
     annualRainMin: 300.0,
     annualRainMax: 450.0,
-    frostSensitivity: 'Sensitive during flowering',
-    heatSensitivity: 'High; temperatures > 30°C cause flower drop',
+    frostSensitivity: 'Low-temperature sensitivity during reproductive stage: mean of max & min daily temps < 15°C causes flower drop and reduced pod set (ICRISAT 2010, p. 3)',
+    heatSensitivity: 'High-temperature sensitivity during reproductive stage: max daily temp > 35°C causes flower drop and reduced pod set (ICRISAT 2010, p. 3). Not a universal crop mortality threshold.',
+    thermalThresholdContext: 'Sensitivity thresholds (>35°C daily max and <15°C mean of daily max and min) specifically apply during the reproductive stage causing flower drop and reduced pod set (ICRISAT 2010, p. 3).',
     seasons: [
       {'name': 'Rabi', 'plant': '10 Oct - 10 Nov', 'harvest': 'Jan - Feb'},
     ],
@@ -2651,9 +2661,9 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
       'Maval': {'status': 'Marginal / High Input', 'desc': 'Acidic soils and high post-monsoon humidity trigger root rot.'},
       'Mulshi': {'status': 'Unsuitable / High Disease Risk', 'desc': 'Acid laterites cause severe collar rot and seedling mortality.'},
     },
-    primarySource: 'ICAR-IIPR Kanpur & MPKV Rahuri',
-    publicationTitle: 'Chickpea Production Technology in Peninsular Vertisols',
-    publicationYear: 2022,
+    primarySource: 'ICRISAT',
+    publicationTitle: 'Chickpea Seed Production Manual',
+    publicationYear: 2010,
   ),
 
   // 10. Groundnut
@@ -2969,7 +2979,16 @@ class CropDetailScreen extends StatelessWidget {
               children: [
                 _buildRow('Preferred Textures', crop.preferredTextures.join(', ')),
                 _buildRow('Acceptable Textures', crop.acceptableTextures.join(', ')),
-                _buildRow('Optimum pH Range', '${crop.phOptMin} – ${crop.phOptMax} (Tolerable: ${crop.phTolMin} – ${crop.phTolMax})'),
+                _buildRow(
+                  crop.id == 'chickpea' ? 'Soil pH (Best-Suited)' : 'Optimum pH Range',
+                  crop.phTolMin != null
+                      ? '${crop.phOptMin} – ${crop.phOptMax} (Tolerable: ${crop.phTolMin} – ${crop.phTolMax})'
+                      : '${crop.phOptMin} – ${crop.phOptMax} (Tolerable max: ${crop.phTolMax}; lower limit unverified)',
+                ),
+                if (crop.bestSuitedSoilTextures != null && crop.bestSuitedSoilTextures!.isNotEmpty)
+                  _buildRow('Best-Suited Soil Textures', crop.bestSuitedSoilTextures!.join(', ')),
+                if (crop.phContextNotes != null)
+                  _buildRow('pH Context Notes', crop.phContextNotes!),
                 _buildRow('Drainage Requirement', crop.drainage),
                 _buildRow('Salinity Sensitivity', crop.salinity),
                 _buildRow('Minimum Soil Depth', '${crop.minDepthCm} cm'),
@@ -2989,6 +3008,8 @@ class CropDetailScreen extends StatelessWidget {
                   _buildRow('Annual Rainfall Need', '${crop.annualRainMin!.toInt()} – ${crop.annualRainMax!.toInt()} mm'),
                 _buildRow('Frost Sensitivity', crop.frostSensitivity),
                 _buildRow('Heat Sensitivity', crop.heatSensitivity),
+                if (crop.thermalThresholdContext != null)
+                  _buildRow('Thermal Threshold Context', crop.thermalThresholdContext!),
               ],
             ),
             const SizedBox(height: 12),

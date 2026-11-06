@@ -19,13 +19,17 @@ class CropSoilRequirementsResponse(BaseModel):
     acceptable_textures: List[str]
     ph_optimum_min: float
     ph_optimum_max: float
-    ph_tolerable_min: float
+    ph_tolerable_min: Optional[float] = None
     ph_tolerable_max: float
+    ph_context_notes: Optional[str] = None
+    best_suited_soil_textures: Optional[List[str]] = None
     drainage_requirement: str
     salinity_sensitivity: str
     min_soil_depth_cm: float
     optimum_organic_carbon_g_kg: Optional[float] = None
     water_holding_capacity_pref: Optional[str] = None
+    evidence_status: Optional[str] = "derived"
+    unverified_parameters: Optional[List[str]] = None
     source_id: Optional[str] = None
 
 
@@ -39,7 +43,9 @@ class CropClimateRequirementsResponse(BaseModel):
     humidity_preference: Optional[str] = None
     frost_sensitivity: str
     heat_sensitivity: str
+    thermal_threshold_context: Optional[str] = None
     solar_radiation_requirement: Optional[str] = None
+    evidence_status: Optional[str] = "derived"
     source_id: Optional[str] = None
 
 
@@ -55,11 +61,14 @@ class CropSeasonRequirementResponse(BaseModel):
 
 
 class CropWaterRequirementsResponse(BaseModel):
-    annual_water_requirement_mm_min: float
-    annual_water_requirement_mm_max: float
+    annual_water_requirement_mm_min: Optional[float] = None
+    annual_water_requirement_mm_max: Optional[float] = None
     rainfed_suitable: bool
     irrigation_dependency: str
     critical_growth_stages: List[str]
+    daily_water_table: Optional[Dict[str, Any]] = None
+    irrigation_stages_detail: Optional[List[Dict[str, Any]]] = None
+    evidence_status: Optional[str] = "derived"
     waterlogging_sensitivity: str
     drought_sensitivity: str
     source_id: Optional[str] = None
@@ -71,6 +80,7 @@ class CropRegionalSuitabilityResponse(BaseModel):
     suitability_status: str
     agronomic_rationale: str
     limiting_factors: Optional[List[str]] = None
+    evidence_status: Optional[str] = "regional_screening"
     source_id: Optional[str] = None
 
 
