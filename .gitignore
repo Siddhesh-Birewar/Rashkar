@@ -48,6 +48,8 @@ GeneratedPluginRegistrant.java
 *.pem
 *.key
 credentials.json
+infra/db/backups/*.sql
+infra/db/backups/*.json
 *.db
 *.sqlite
 *.sqlite3

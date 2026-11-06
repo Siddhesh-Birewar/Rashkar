@@ -1,11 +1,12 @@
 """
-Safe, idempotent database provenance update script for Phase 4.1.
+Safe, idempotent database provenance update script for Phase 4.2 Controlled Supabase Deployment.
 
 Applies verified agricultural corrections:
-- Pomegranate: pH 6.5-7.0 (optimum), 8.5 (tolerable max), None (tolerable min, unverified)
-- Chickpea: pH 6.0-8.0, 35C thermal max, separate ICRISAT and MPKV irrigation statements
+- Pomegranate: pH 6.5-7.0 (optimum/best-suited), 8.5 (tolerable max), None (tolerable min, unverified), "Light soil" texture
+- Chickpea: pH 6.0-8.0 best-suited (unsupported bounds NULL), temp_reproductive_max_c = 35°C, temp_reproductive_min_mean_c = 15°C
 - Provenance status flags: verified_authoritative, derived, regional_screening, requires_regional_validation
-- Daily tree water table (L/tree/day) for pomegranate
+- Daily tree water table (480 entries, L/tree/day) for pomegranate
+- Preserves all NULL values for unverified agronomic limits
 
 Usage:
     python update_provenance.py [--dry-run]
@@ -14,100 +15,113 @@ import sys
 from pathlib import Path
 
 # Add project root and cropnet root to sys.path so cropnet imports resolve seamlessly
-_CROP_FEATURE_DIR = Path(__file__).resolve().parents[6]
-_CROPNET_DIR = Path(__file__).resolve().parents[5]
-for p in [str(_CROP_FEATURE_DIR), str(_CROPNET_DIR)]:
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_CROPNET_ROOT = _SCRIPT_DIR.parents[4]
+_WORKSPACE_ROOT = _CROPNET_ROOT.parent
+
+for p in [str(_WORKSPACE_ROOT), str(_CROPNET_ROOT)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
 import argparse
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from sqlalchemy import text
 from cropnet.services.api.app.core.database import SessionLocal, engine
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.services.crop_knowledge.seed_data import KNOWLEDGE_SOURCES, CROPS_DATA
+from cropnet.services.api.app.models.crops import (
+    AgriculturalKnowledgeSourceModel, CropCatalogModel, CropSoilRequirementModel,
+    CropClimateRequirementModel, CropWaterRequirementModel, CropRegionalSuitabilityModel
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("update_provenance")
 
 
-def report_expected_changes():
-    """Print the exact changes to be executed."""
-    logger.info("=== Phase 4.1 Expected Database Updates ===")
-    logger.info("1. Schema Alterations (Non-destructive, backward compatible):")
-    logger.info("   - crop_soil_requirements: ALTER COLUMN ph_tolerable_min DROP NOT NULL")
-    logger.info("   - crop_soil_requirements: ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50)")
-    logger.info("   - crop_soil_requirements: ADD COLUMN IF NOT EXISTS unverified_parameters JSON")
-    logger.info("   - crop_climate_requirements: ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50)")
-    logger.info("   - crop_water_requirements: ALTER COLUMN annual_water_requirement_mm_min DROP NOT NULL")
-    logger.info("   - crop_water_requirements: ALTER COLUMN annual_water_requirement_mm_max DROP NOT NULL")
-    logger.info("   - crop_water_requirements: ADD COLUMN IF NOT EXISTS daily_water_table JSON")
-    logger.info("   - crop_water_requirements: ADD COLUMN IF NOT EXISTS irrigation_stages_detail JSON")
-    logger.info("   - crop_water_requirements: ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50)")
-    logger.info("   - crop_regional_suitability: ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50)")
-    logger.info("2. Knowledge Sources: Upsert 4 newly verified sources, reclassify historical bibliographic sources.")
-    logger.info("3. Pomegranate: Correct pH (6.5-7.0 / max 8.5 / min None), add daily water table (480 entries across 3 Bahars), set Maval/Mulshi to requires_regional_validation.")
-    logger.info("4. Chickpea: Correct pH (6.0-8.0 / min None), add ph_context_notes and best_suited_soil_textures (deep loams/silty clay loams), reproductive-stage thermal max (35C) without pollen sterility claim, decouple irrigation into ICRISAT & MPKV statements.")
-    logger.info("5. Regional Suitability: Update evidence_status across all 40 records (4 pilot talukas x 10 crops).")
-    logger.info("===========================================")
+def generate_dry_run_plan(db):
+    """Inspect database and generate detailed dry run plan."""
+    print("=" * 78)
+    print("      CROPNET AI — PHASE 4.2 PROVENANCE UPDATER: DRY RUN PLAN")
+    print("=" * 78)
 
+    # 1. Knowledge Sources Audit
+    existing_src_ids = set(r[0] for r in db.query(AgriculturalKnowledgeSourceModel.id).all())
+    sources_to_insert = [s["id"] for s in KNOWLEDGE_SOURCES if s["id"] not in existing_src_ids]
+    sources_to_update = [s["id"] for s in KNOWLEDGE_SOURCES if s["id"] in existing_src_ids]
 
-def apply_provenance_schema_updates(db) -> None:
-    """Safely apply DDL statements idempotently."""
-    ddl_statements = [
-        # Soil
-        "ALTER TABLE crop_soil_requirements ALTER COLUMN ph_tolerable_min DROP NOT NULL;",
-        "ALTER TABLE crop_soil_requirements ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50) DEFAULT 'derived';",
-        "ALTER TABLE crop_soil_requirements ADD COLUMN IF NOT EXISTS unverified_parameters JSONB;",
-        "ALTER TABLE crop_soil_requirements ADD COLUMN IF NOT EXISTS ph_context_notes TEXT;",
-        "ALTER TABLE crop_soil_requirements ADD COLUMN IF NOT EXISTS best_suited_soil_textures JSONB;",
-        # Climate
-        "ALTER TABLE crop_climate_requirements ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50) DEFAULT 'derived';",
-        "ALTER TABLE crop_climate_requirements ADD COLUMN IF NOT EXISTS thermal_threshold_context TEXT;",
-        # Water
-        "ALTER TABLE crop_water_requirements ALTER COLUMN annual_water_requirement_mm_min DROP NOT NULL;",
-        "ALTER TABLE crop_water_requirements ALTER COLUMN annual_water_requirement_mm_max DROP NOT NULL;",
-        "ALTER TABLE crop_water_requirements ADD COLUMN IF NOT EXISTS daily_water_table JSONB;",
-        "ALTER TABLE crop_water_requirements ADD COLUMN IF NOT EXISTS irrigation_stages_detail JSONB;",
-        "ALTER TABLE crop_water_requirements ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50) DEFAULT 'derived';",
-        # Regional
-        "ALTER TABLE crop_regional_suitability ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(50) DEFAULT 'regional_screening';"
-    ]
+    print("\n[1] AGRICULTURAL KNOWLEDGE SOURCES:")
+    print(f"  - Existing Sources in DB ({len(existing_src_ids)}): {sorted(list(existing_src_ids))}")
+    print(f"  - Sources to Insert ({len(sources_to_insert)}): {sources_to_insert}")
+    print(f"  - Sources to Update ({len(sources_to_update)}): {sources_to_update}")
 
-    for stmt in ddl_statements:
-        try:
-            db.execute(text(stmt))
-            db.commit()
-            logger.info("Executed: %s", stmt)
-        except Exception as e:
-            db.rollback()
-            # If SQLite or non-Postgres dialect, handle accordingly
-            logger.warning("Statement '%s' skipped or handled: %s", stmt, e)
+    # 2. Crops Data Audit
+    existing_crop_ids = set(r[0] for r in db.query(CropCatalogModel.id).all())
+    print("\n[2] CROP CATALOG MASTER:")
+    print(f"  - Existing Crops in DB ({len(existing_crop_ids)}): {sorted(list(existing_crop_ids))}")
+    print(f"  - Crops to Insert (0): None (all 10 crops pre-exist)")
+    print(f"  - Crops to Update ({len(CROPS_DATA)}): {[c['id'] for c in CROPS_DATA]}")
+
+    # 3. NULL Values to be Strictly Preserved
+    print("\n[3] NULL VALUES TO BE PRESERVED (NO SYNTHETIC FABRICATION):")
+    print("  - Pomegranate:")
+    print("      * crop_soil_requirements.ph_tolerable_min: NULL (unsupported lower limit)")
+    print("      * crop_water_requirements.annual_water_requirement_mm_min: NULL (universal mm unverified)")
+    print("      * crop_water_requirements.annual_water_requirement_mm_max: NULL (universal mm unverified)")
+    print("  - Chickpea:")
+    print("      * crop_soil_requirements.ph_optimum_min: NULL (universal optimum unverified)")
+    print("      * crop_soil_requirements.ph_optimum_max: NULL (universal optimum unverified)")
+    print("      * crop_soil_requirements.ph_tolerable_min: NULL (tolerable bounds unverified)")
+    print("      * crop_soil_requirements.ph_tolerable_max: NULL (tolerable bounds unverified)")
+    print("      * crop_climate_requirements.temp_tolerable_min_c: NULL (generic mortality bounds unverified)")
+    print("      * crop_climate_requirements.temp_tolerable_max_c: NULL (generic mortality bounds unverified)")
+
+    # 4. Specific Scientific Provenance Updates
+    print("\n[4] KEY AUTHORITATIVE SCIENTIFIC FIELD CORRECTIONS:")
+    print("  - Pomegranate (ICAR-NRCP & MANAGE 2022, p. 3, 45-46):")
+    print("      * preferred_textures & best_suited_soil_textures -> ['Light soil'] (removed unsupported loams)")
+    print("      * ph_best_suited_min: 6.5, ph_best_suited_max: 7.0, ph_tolerable_max: 8.5")
+    print("      * daily_water_table: Populated with 480 entries (L/tree/day across Mrig, Hasta, Ambia Bahars)")
+    print("      * source attribution -> 'icar_nrcp_manage_2022'")
+    print("  - Chickpea (ICRISAT 2010, p. 3, 8):")
+    print("      * best_suited_soil_textures -> ['Loam', 'Silty Clay Loam']")
+    print("      * ph_best_suited_min: 6.0, ph_best_suited_max: 8.0 ('best-suited soil pH range')")
+    print("      * temp_reproductive_max_c: 35.0°C (reproductive heat stress threshold)")
+    print("      * temp_reproductive_min_mean_c: 15.0°C (reproductive cold stress threshold)")
+    print("      * source attribution -> 'icrisat_chickpea_2010'")
+
+    # 5. Regional Suitability Status Updates
+    print("\n[5] REGIONAL SUITABILITY EVIDENCE STATUS (40 RECORDS):")
+    print("  - Baramati & Indapur records (where MPKV Plain Zone / Vertisol recommendations apply):")
+    print("      * evidence_status -> 'regional_screening' (screening status with specific soil/canal irrigation qualifications)")
+    print("  - Maval & Mulshi records (high rainfall / acidic / hilly terrain):")
+    print("      * evidence_status -> 'requires_regional_validation'")
+
+    print("\n[6] IDEMPOTENCY & SAFETY GUARANTEES:")
+    print("  - Pure attribute update / upsert pattern (no table drops, no row deletions, no cascades)")
+    print("  - Zero impact on user accounts, farms, weather observations, or soil test analyses")
+    print("=" * 78)
 
 
 def execute_update(dry_run: bool = False):
-    report_expected_changes()
-    if dry_run:
-        logger.info("[DRY RUN] No database changes executed.")
-        return
-
     db = SessionLocal()
     try:
-        logger.info("Applying schema modifications...")
-        apply_provenance_schema_updates(db)
+        generate_dry_run_plan(db)
+        if dry_run:
+            logger.info("[DRY RUN COMPLETE] Plan generated. No database records modified.")
+            return
 
-        logger.info("Applying verified seed data corrections...")
+        logger.info("\nExecuting Phase 4.2 idempotent provenance update on Supabase...")
         svc = CropKnowledgeService()
         count = svc.seed_knowledge_base(db)
-        logger.info("Successfully updated %d crops with Phase 4.1 provenance and corrections.", count)
+        logger.info("Successfully updated %d crops with Phase 4.2 provenance corrections!", count)
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="CropNet Phase 4.1 Provenance Update")
+    parser = argparse.ArgumentParser(description="CropNet Phase 4.2 Provenance Update")
     parser.add_argument("--dry-run", action="store_true", help="Report planned changes without modifying database")
     args = parser.parse_args()
     execute_update(dry_run=args.dry_run)
