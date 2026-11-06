@@ -98,8 +98,10 @@ class CropClimateRequirementModel(Base):
     crop_id = Column(String(50), ForeignKey("crop_catalog.id"), nullable=False, unique=True, index=True)
     temp_optimum_min_c = Column(Float, nullable=False)
     temp_optimum_max_c = Column(Float, nullable=False)
-    temp_tolerable_min_c = Column(Float, nullable=False)
-    temp_tolerable_max_c = Column(Float, nullable=False)
+    temp_tolerable_min_c = Column(Float, nullable=True)
+    temp_tolerable_max_c = Column(Float, nullable=True) # Deprecated generic tolerance ceiling; NULL when unsupported
+    temp_reproductive_max_c = Column(Float, nullable=True) # Max daily temp > 35°C during reproductive stage (ICRISAT 2010, p. 3)
+    temp_reproductive_min_mean_c = Column(Float, nullable=True) # Mean of daily max and min < 15°C during reproductive stage (ICRISAT 2010, p. 3)
     annual_rainfall_min_mm = Column(Float, nullable=True)
     annual_rainfall_max_mm = Column(Float, nullable=True)
     humidity_preference = Column(String(150), nullable=True)

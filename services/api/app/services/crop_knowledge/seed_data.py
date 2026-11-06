@@ -307,26 +307,18 @@ CROPS_DATA = [
         "source_id": "icar_nrcp_manage_2022",
         "soil": {
             "preferred_textures": [
-                "Sandy Clay Loam",
-                "Clay Loam",
-                "Loam",
-                "Light to Medium Black"
+                "Light soil"
             ],
-            "acceptable_textures": [
-                "Gravelly Loam",
-                "Sandy Loam"
-            ],
+            "acceptable_textures": [],
             "ph_optimum_min": 6.5,
             "ph_optimum_max": 7.0,
             "ph_best_suited_min": 6.5,
             "ph_best_suited_max": 7.0,
             "ph_tolerable_min": None,
             "ph_tolerable_max": 8.5,
-            "ph_context_notes": "Optimum pH 6.5–7.0 is most suitable; tolerates up to 8.5 under good soil and nutrient management (ICAR-NRCP & MANAGE 2022, p. 9). Lower tolerable limit is unverified.",
+            "ph_context_notes": "Light soil having a pH range of 6.5–7.0 is most suitable for pomegranate but under well-managed conditions, it can tolerate pH up to 8.5 (ICAR-NRCP & MANAGE 2022, p. 3). Lower tolerable limit is unverified.",
             "best_suited_soil_textures": [
-                "Sandy Clay Loam",
-                "Clay Loam",
-                "Light to Medium Black"
+                "Light soil"
             ],
             "drainage_requirement": "Excellent drainage mandatory; light soil on 3-5% slope. Highly intolerant of water stagnation / wet feet",
             "salinity_sensitivity": "Moderately Tolerant (EC up to 3.0 dS/m tolerable; Boron toxicity above 1.5 ppm)",
@@ -2273,8 +2265,10 @@ CROPS_DATA = [
         "climate": {
             "temp_optimum_min_c": 15.0,
             "temp_optimum_max_c": 25.0,
-            "temp_tolerable_min_c": 10.0,
-            "temp_tolerable_max_c": 35.0,
+            "temp_tolerable_min_c": None,
+            "temp_tolerable_max_c": None,
+            "temp_reproductive_max_c": 35.0,
+            "temp_reproductive_min_mean_c": 15.0,
             "annual_rainfall_min_mm": 300.0,
             "annual_rainfall_max_mm": 450.0,
             "humidity_preference": "Cool, dry and bright weather; cloudy humid days induce pod borer (Helicoverpa) and Botrytis",

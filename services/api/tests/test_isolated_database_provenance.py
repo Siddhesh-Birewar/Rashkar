@@ -55,7 +55,9 @@ def test_isolated_database_seeding_and_direct_orm_queries(isolated_test_session)
     assert pom_soil.evidence_status == "verified_authoritative"
     assert "ph_tolerable_min" in pom_soil.unverified_parameters
     assert pom_soil.ph_context_notes is not None
-    assert pom_soil.best_suited_soil_textures is not None
+    assert pom_soil.best_suited_soil_textures == ["Light soil"]
+    assert pom_soil.preferred_textures == ["Light soil"]
+    assert pom_soil.acceptable_textures == []
 
     # 3. Verify Pomegranate Water Requirements (Nullable annual mm and daily water table)
     pom_water = db.query(CropWaterRequirementModel).filter_by(crop_id="pomegranate").first()
@@ -70,6 +72,9 @@ def test_isolated_database_seeding_and_direct_orm_queries(isolated_test_session)
     # 4. Verify Chickpea Thermal Context and Soil Notes in ORM
     chk_clim = db.query(CropClimateRequirementModel).filter_by(crop_id="chickpea").first()
     assert chk_clim is not None
+    assert chk_clim.temp_tolerable_max_c is None, "35°C must NOT be stored as generic tolerable max"
+    assert chk_clim.temp_reproductive_max_c == 35.0
+    assert chk_clim.temp_reproductive_min_mean_c == 15.0
     assert chk_clim.thermal_threshold_context is not None
     assert "reproductive stage" in chk_clim.thermal_threshold_context
     assert "pollen sterility" not in chk_clim.heat_sensitivity.lower()
@@ -195,6 +200,14 @@ def test_chickpea_api_json_and_best_suited_ph_semantics():
     assert "ph_tolerable_max" in (soil["unverified_parameters"] or [])
     assert "deep loams" in soil["ph_context_notes"].lower()
 
+    # Climate assertions: reproductive stage sensitivity fields
+    clim = chk["climate"]
+    assert clim["temp_tolerable_max_c"] is None, "Generic tolerable max must be None for chickpea"
+    assert clim["temp_reproductive_max_c"] == 35.0, "Reproductive heat stress must be 35°C"
+    assert clim["temp_reproductive_min_mean_c"] == 15.0, "Reproductive cold stress must be 15°C mean"
+    assert "reproductive" in clim["heat_sensitivity"].lower()
+    assert "flower drop" in clim["heat_sensitivity"].lower()
+
     # Verify modular requirements endpoint returns exact same semantics
     req_res = client.get("/api/v1/crops/chickpea/requirements")
     assert req_res.status_code == 200
@@ -202,6 +215,9 @@ def test_chickpea_api_json_and_best_suited_ph_semantics():
     assert req_data["soil"]["ph_best_suited_min"] == 6.0
     assert req_data["soil"]["ph_best_suited_max"] == 8.0
     assert req_data["soil"]["ph_optimum_min"] is None
+    assert req_data["climate"]["temp_tolerable_max_c"] is None
+    assert req_data["climate"]["temp_reproductive_max_c"] == 35.0
+    assert req_data["climate"]["temp_reproductive_min_mean_c"] == 15.0
 
 
 def test_explicit_degraded_mode_api_behaviour_and_headers():
@@ -285,11 +301,12 @@ def test_function_scoped_test_isolation_confirms_clean_baseline(isolated_test_se
     assert pom_soil.min_soil_depth_cm == 60.0, "State leakage detected! Test isolation failed."
 
 
-def test_migration_005_downgrade_preflight_check_blocks_all_4_nullable_columns():
+def test_migration_005_downgrade_preflight_check_blocks_all_nullable_columns():
     """
     Verify that executing migration 005 downgrade preflight checks on data containing
-    NULLs aborts with RuntimeError, reporting exact crop IDs for all 4 target columns:
-    ph_tolerable_min, ph_tolerable_max, annual_water_requirement_mm_min, annual_water_requirement_mm_max.
+    NULLs aborts with RuntimeError, reporting exact crop IDs for all target columns:
+    ph_tolerable_min, ph_tolerable_max, annual_water_requirement_mm_min, annual_water_requirement_mm_max,
+    temp_tolerable_min_c, temp_tolerable_max_c.
     """
     # 1. Fetch NULL records directly from DB session
     from cropnet.services.api.tests.conftest import _TestingSession
@@ -315,12 +332,24 @@ def test_migration_005_downgrade_preflight_check_blocks_all_4_nullable_columns()
                 text("SELECT crop_id FROM crop_water_requirements WHERE annual_water_requirement_mm_max IS NULL")
             ).fetchall()
         ]
+        null_temp_tol_min_crops = [
+            r[0] for r in db.execute(
+                text("SELECT crop_id FROM crop_climate_requirements WHERE temp_tolerable_min_c IS NULL")
+            ).fetchall()
+        ]
+        null_temp_tol_max_crops = [
+            r[0] for r in db.execute(
+                text("SELECT crop_id FROM crop_climate_requirements WHERE temp_tolerable_max_c IS NULL")
+            ).fetchall()
+        ]
 
         assert "pomegranate" in null_ph_tol_min_crops
         assert "chickpea" in null_ph_tol_min_crops
         assert "chickpea" in null_ph_tol_max_crops
         assert "pomegranate" in null_water_min_crops
         assert "pomegranate" in null_water_max_crops
+        assert "chickpea" in null_temp_tol_min_crops
+        assert "chickpea" in null_temp_tol_max_crops
 
         details = []
         if null_ph_tol_min_crops:
@@ -331,6 +360,10 @@ def test_migration_005_downgrade_preflight_check_blocks_all_4_nullable_columns()
             details.append(f"crop_water_requirements.annual_water_requirement_mm_min (crops: {null_water_min_crops})")
         if null_water_max_crops:
             details.append(f"crop_water_requirements.annual_water_requirement_mm_max (crops: {null_water_max_crops})")
+        if null_temp_tol_min_crops:
+            details.append(f"crop_climate_requirements.temp_tolerable_min_c (crops: {null_temp_tol_min_crops})")
+        if null_temp_tol_max_crops:
+            details.append(f"crop_climate_requirements.temp_tolerable_max_c (crops: {null_temp_tol_max_crops})")
 
         err_msg = (
             f"Downgrade aborted: Cannot restore NOT NULL constraints safely without data loss. "
@@ -345,6 +378,7 @@ def test_migration_005_downgrade_preflight_check_blocks_all_4_nullable_columns()
         assert "pomegranate" in str(exc_info.value)
         assert "chickpea" in str(exc_info.value)
         assert "ph_tolerable_max" in str(exc_info.value)
+        assert "temp_tolerable_max_c" in str(exc_info.value)
         assert "prohibited" in str(exc_info.value)
     finally:
         db.close()

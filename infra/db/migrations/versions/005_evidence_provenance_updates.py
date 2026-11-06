@@ -78,6 +78,26 @@ def upgrade() -> None:
     )
 
     # 2. Update crop_climate_requirements
+    op.alter_column(
+        "crop_climate_requirements",
+        "temp_tolerable_min_c",
+        existing_type=sa.Float(),
+        nullable=True
+    )
+    op.alter_column(
+        "crop_climate_requirements",
+        "temp_tolerable_max_c",
+        existing_type=sa.Float(),
+        nullable=True
+    )
+    op.add_column(
+        "crop_climate_requirements",
+        sa.Column("temp_reproductive_max_c", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "crop_climate_requirements",
+        sa.Column("temp_reproductive_min_mean_c", sa.Float(), nullable=True)
+    )
     op.add_column(
         "crop_climate_requirements",
         sa.Column("evidence_status", sa.String(length=50), nullable=True, server_default="derived")
@@ -131,6 +151,8 @@ def downgrade() -> None:
     null_ph_opt_max_crops = []
     null_water_min_crops = []
     null_water_max_crops = []
+    null_temp_tol_min_crops = []
+    null_temp_tol_max_crops = []
     try:
         null_ph_tol_min_crops = [
             row[0] for row in conn.execute(
@@ -162,13 +184,24 @@ def downgrade() -> None:
                 sa.text("SELECT crop_id FROM crop_water_requirements WHERE annual_water_requirement_mm_max IS NULL")
             ).fetchall()
         ]
+        null_temp_tol_min_crops = [
+            row[0] for row in conn.execute(
+                sa.text("SELECT crop_id FROM crop_climate_requirements WHERE temp_tolerable_min_c IS NULL")
+            ).fetchall()
+        ]
+        null_temp_tol_max_crops = [
+            row[0] for row in conn.execute(
+                sa.text("SELECT crop_id FROM crop_climate_requirements WHERE temp_tolerable_max_c IS NULL")
+            ).fetchall()
+        ]
     except Exception:
         # If tables do not exist or dialect differs, proceed with standard downgrade operations
         pass
 
     if (null_ph_tol_min_crops or null_ph_tol_max_crops or
             null_ph_opt_min_crops or null_ph_opt_max_crops or
-            null_water_min_crops or null_water_max_crops):
+            null_water_min_crops or null_water_max_crops or
+            null_temp_tol_min_crops or null_temp_tol_max_crops):
         details = []
         if null_ph_tol_min_crops:
             details.append(f"crop_soil_requirements.ph_tolerable_min (crops: {null_ph_tol_min_crops})")
@@ -182,6 +215,10 @@ def downgrade() -> None:
             details.append(f"crop_water_requirements.annual_water_requirement_mm_min (crops: {null_water_min_crops})")
         if null_water_max_crops:
             details.append(f"crop_water_requirements.annual_water_requirement_mm_max (crops: {null_water_max_crops})")
+        if null_temp_tol_min_crops:
+            details.append(f"crop_climate_requirements.temp_tolerable_min_c (crops: {null_temp_tol_min_crops})")
+        if null_temp_tol_max_crops:
+            details.append(f"crop_climate_requirements.temp_tolerable_max_c (crops: {null_temp_tol_max_crops})")
 
         raise RuntimeError(
             f"Downgrade aborted: Cannot restore NOT NULL constraints safely without data loss. "
@@ -213,6 +250,20 @@ def downgrade() -> None:
     # 2. Downgrade crop_climate_requirements
     op.drop_column("crop_climate_requirements", "thermal_threshold_context")
     op.drop_column("crop_climate_requirements", "evidence_status")
+    op.drop_column("crop_climate_requirements", "temp_reproductive_min_mean_c")
+    op.drop_column("crop_climate_requirements", "temp_reproductive_max_c")
+    op.alter_column(
+        "crop_climate_requirements",
+        "temp_tolerable_max_c",
+        existing_type=sa.Float(),
+        nullable=False
+    )
+    op.alter_column(
+        "crop_climate_requirements",
+        "temp_tolerable_min_c",
+        existing_type=sa.Float(),
+        nullable=False
+    )
 
     # 1. Downgrade crop_soil_requirements
     op.drop_column("crop_soil_requirements", "best_suited_soil_textures")

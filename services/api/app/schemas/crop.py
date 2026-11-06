@@ -38,8 +38,10 @@ class CropSoilRequirementsResponse(BaseModel):
 class CropClimateRequirementsResponse(BaseModel):
     temp_optimum_min_c: float
     temp_optimum_max_c: float
-    temp_tolerable_min_c: float
-    temp_tolerable_max_c: float
+    temp_tolerable_min_c: Optional[float] = None
+    temp_tolerable_max_c: Optional[float] = None # Deprecated generic ceiling; None when unsupported
+    temp_reproductive_max_c: Optional[float] = None # Reproductive-stage heat sensitivity (>35°C, ICRISAT 2010, p. 3)
+    temp_reproductive_min_mean_c: Optional[float] = None # Reproductive-stage cold sensitivity (<15°C mean, ICRISAT 2010, p. 3)
     annual_rainfall_min_mm: Optional[float] = None
     annual_rainfall_max_mm: Optional[float] = None
     humidity_preference: Optional[str] = None

@@ -2141,8 +2141,10 @@ class CropKnowledgeItem {
   final double minDepthCm;
   final double tempOptMin;
   final double tempOptMax;
-  final double tempTolMin;
-  final double tempTolMax;
+  final double? tempTolMin;
+  final double? tempTolMax;
+  final double? tempReproductiveMaxC;
+  final double? tempReproductiveMinMeanC;
   final double? annualRainMin;
   final double? annualRainMax;
   final String frostSensitivity;
@@ -2189,8 +2191,10 @@ class CropKnowledgeItem {
     required this.minDepthCm,
     required this.tempOptMin,
     required this.tempOptMax,
-    required this.tempTolMin,
-    required this.tempTolMax,
+    this.tempTolMin,
+    this.tempTolMax,
+    this.tempReproductiveMaxC,
+    this.tempReproductiveMinMeanC,
     this.annualRainMin,
     this.annualRainMax,
     required this.frostSensitivity,
@@ -2278,16 +2282,16 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     minDuration: 150,
     maxDuration: 180,
     varieties: ['Bhagwa (Kesar)', 'Arakta', 'Ganesh', 'Solapur Lal'],
-    preferredTextures: ['Sandy Clay Loam', 'Clay Loam', 'Light to Medium Black'],
-    acceptableTextures: ['Gravelly Loam', 'Loam'],
+    preferredTextures: ['Light soil'],
+    acceptableTextures: [],
     phOptMin: 6.5,
     phOptMax: 7.0,
     phBestSuitedMin: 6.5,
     phBestSuitedMax: 7.0,
     phTolMin: null,
     phTolMax: 8.5,
-    phContextNotes: 'Optimum pH 6.5–7.0; tolerates up to 8.5 under good management. Lower tolerable limit is unverified (ICAR-NRCP & MANAGE 2022, p. 9).',
-    bestSuitedSoilTextures: ['Sandy Clay Loam', 'Clay Loam', 'Light to Medium Black'],
+    phContextNotes: 'Light soil having a pH range of 6.5–7.0 is most suitable for pomegranate but under well-managed conditions, it can tolerate pH up to 8.5 (ICAR-NRCP & MANAGE 2022, p. 3). Lower tolerable limit is unverified.',
+    bestSuitedSoilTextures: ['Light soil'],
     drainage: 'Excellent drainage mandatory; zero tolerance for wet feet',
     salinity: 'Moderately Tolerant (EC < 3.0 dS/m)',
     minDepthCm: 60.0,
@@ -2651,8 +2655,10 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     minDepthCm: 45.0,
     tempOptMin: 15.0,
     tempOptMax: 25.0,
-    tempTolMin: 10.0,
-    tempTolMax: 35.0,
+    tempTolMin: null,
+    tempTolMax: null,
+    tempReproductiveMaxC: 35.0,
+    tempReproductiveMinMeanC: 15.0,
     annualRainMin: 300.0,
     annualRainMax: 450.0,
     frostSensitivity: 'Low-temperature sensitivity during reproductive stage: mean of max & min daily temps < 15°C causes flower drop and reduced pod set (ICRISAT 2010, p. 3)',
@@ -3046,7 +3052,12 @@ class CropDetailScreen extends StatelessWidget {
               color: const Color(0xFFE65100),
               children: [
                 _buildRow('Optimum Temperature', '${crop.tempOptMin}°C – ${crop.tempOptMax}°C'),
-                _buildRow('Tolerable Temperature', '${crop.tempTolMin}°C – ${crop.tempTolMax}°C'),
+                if (crop.tempTolMin != null && crop.tempTolMax != null)
+                  _buildRow('Tolerable Temperature', '${crop.tempTolMin}°C – ${crop.tempTolMax}°C'),
+                if (crop.tempReproductiveMaxC != null)
+                  _buildRow('Reproductive Heat Sensitivity', 'Daily max > ${crop.tempReproductiveMaxC}°C causes flower drop & reduced pod set (ICRISAT 2010, p. 3)'),
+                if (crop.tempReproductiveMinMeanC != null)
+                  _buildRow('Reproductive Cold Sensitivity', 'Daily mean < ${crop.tempReproductiveMinMeanC}°C causes flower drop & reduced pod set (ICRISAT 2010, p. 3)'),
                 if (crop.annualRainMin != null)
                   _buildRow('Annual Rainfall Need', '${crop.annualRainMin!.toInt()} – ${crop.annualRainMax!.toInt()} mm'),
                 _buildRow('Frost Sensitivity', crop.frostSensitivity),

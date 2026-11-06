@@ -151,6 +151,10 @@ def run_migration_lifecycle_test():
             WHERE table_name = 'crop_climate_requirements';
         """)).fetchall()
         clim_map = {r[0]: {"nullable": r[1], "type": r[2]} for r in clim_cols}
+        assert clim_map["temp_tolerable_min_c"]["nullable"] == "YES", "temp_tolerable_min_c must be NULLABLE"
+        assert clim_map["temp_tolerable_max_c"]["nullable"] == "YES", "temp_tolerable_max_c must be NULLABLE"
+        assert "temp_reproductive_max_c" in clim_map, "temp_reproductive_max_c column missing"
+        assert "temp_reproductive_min_mean_c" in clim_map, "temp_reproductive_min_mean_c column missing"
         assert "thermal_threshold_context" in clim_map, "thermal_threshold_context column missing"
         assert "evidence_status" in clim_map, "evidence_status column missing"
 
@@ -202,7 +206,17 @@ def run_migration_lifecycle_test():
         assert chk_soil.ph_tolerable_min is None
         assert chk_soil.ph_tolerable_max is None
 
+        chk_clim = db.query(CropClimateRequirementModel).filter_by(crop_id="chickpea").first()
+        assert chk_clim.temp_tolerable_max_c is None
+        assert chk_clim.temp_reproductive_max_c == 35.0
+        assert chk_clim.temp_reproductive_min_mean_c == 15.0
+
         # Verify Pomegranate ORM record
+        pom_soil = db.query(CropSoilRequirementModel).filter_by(crop_id="pomegranate").first()
+        assert pom_soil.best_suited_soil_textures == ["Light soil"]
+        assert pom_soil.preferred_textures == ["Light soil"]
+        assert pom_soil.acceptable_textures == []
+
         pom_water = db.query(CropWaterRequirementModel).filter_by(crop_id="pomegranate").first()
         assert pom_water.annual_water_requirement_mm_min is None
         assert pom_water.daily_water_table is not None
@@ -235,10 +249,14 @@ def run_migration_lifecycle_test():
         assert chk_json["soil"]["ph_best_suited_max"] == 8.0
         assert chk_json["soil"]["ph_optimum_min"] is None
         assert chk_json["soil"]["ph_tolerable_max"] is None
+        assert chk_json["climate"]["temp_tolerable_max_c"] is None
+        assert chk_json["climate"]["temp_reproductive_max_c"] == 35.0
+        assert chk_json["climate"]["temp_reproductive_min_mean_c"] == 15.0
 
         req_res = client.get("/api/v1/crops/pomegranate/requirements")
         assert req_res.status_code == 200
         req_json = req_res.json()
+        assert req_json["soil"]["best_suited_soil_textures"] == ["Light soil"]
         assert req_json["water"]["daily_water_table"]["unit"] == "liters_per_tree_per_day"
     finally:
         app.dependency_overrides.clear()
@@ -272,6 +290,7 @@ def run_migration_lifecycle_test():
         # Delete nullable rows or backfill valid non-null test numbers temporarily
         conn.execute(text("DELETE FROM crop_soil_requirements WHERE crop_id IN ('pomegranate', 'chickpea');"))
         conn.execute(text("DELETE FROM crop_water_requirements WHERE crop_id = 'pomegranate';"))
+        conn.execute(text("DELETE FROM crop_climate_requirements WHERE crop_id = 'chickpea';"))
         conn.commit()
 
     # Execute downgrade now that NULL records are resolved
@@ -289,12 +308,24 @@ def run_migration_lifecycle_test():
         assert "ph_best_suited_min" not in cols_downgraded
         assert "ph_context_notes" not in cols_downgraded
 
-        # Verify NOT NULL constraint restored on ph_tolerable_min
+        clim_cols_downgraded = [r[0] for r in conn.execute(text("""
+            SELECT column_name FROM information_schema.columns WHERE table_name = 'crop_climate_requirements';
+        """)).fetchall()]
+        assert "temp_reproductive_max_c" not in clim_cols_downgraded
+        assert "temp_reproductive_min_mean_c" not in clim_cols_downgraded
+
+        # Verify NOT NULL constraint restored on ph_tolerable_min and temp_tolerable_max_c
         ph_tol_min_null = conn.execute(text("""
             SELECT is_nullable FROM information_schema.columns
             WHERE table_name = 'crop_soil_requirements' AND column_name = 'ph_tolerable_min';
         """)).scalar()
         assert ph_tol_min_null == "NO", "ph_tolerable_min must be NOT NULL after downgrade"
+
+        temp_tol_max_null = conn.execute(text("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'crop_climate_requirements' AND column_name = 'temp_tolerable_max_c';
+        """)).scalar()
+        assert temp_tol_max_null == "NO", "temp_tolerable_max_c must be NOT NULL after downgrade"
 
     # Step 12: Upgrade back to 005 to leave database in clean final state
     logger.info("[Step 12] Re-applying migration 005 to leave final database at head...")

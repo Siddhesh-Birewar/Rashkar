@@ -54,6 +54,9 @@ def test_pomegranate_verified_corrections():
 
     # Soil pH assertions
     soil = pom["soil"]
+    assert soil["preferred_textures"] == ["Light soil"]
+    assert soil["best_suited_soil_textures"] == ["Light soil"]
+    assert soil["acceptable_textures"] == []
     assert soil["ph_optimum_min"] == 6.5
     assert soil["ph_optimum_max"] == 7.0
     assert soil["ph_tolerable_max"] == 8.5
@@ -141,7 +144,9 @@ def test_chickpea_verified_corrections():
     clim = chk["climate"]
     assert clim["temp_optimum_min_c"] == 15.0
     assert clim["temp_optimum_max_c"] == 25.0
-    assert clim["temp_tolerable_max_c"] == 35.0
+    assert clim["temp_tolerable_max_c"] is None, "35°C must NOT be exposed as generic tolerable ceiling"
+    assert clim["temp_reproductive_max_c"] == 35.0
+    assert clim["temp_reproductive_min_mean_c"] == 15.0
     assert "reproductive" in clim["heat_sensitivity"].lower()
     assert "flower drop" in clim["heat_sensitivity"].lower()
     assert clim["evidence_status"] == "verified_authoritative"

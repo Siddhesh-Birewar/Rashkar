@@ -353,6 +353,8 @@ class CropKnowledgeService:
                             temp_optimum_max_c=cl.temp_optimum_max_c,
                             temp_tolerable_min_c=cl.temp_tolerable_min_c,
                             temp_tolerable_max_c=cl.temp_tolerable_max_c,
+                            temp_reproductive_max_c=getattr(cl, "temp_reproductive_max_c", None),
+                            temp_reproductive_min_mean_c=getattr(cl, "temp_reproductive_min_mean_c", None),
                             annual_rainfall_min_mm=cl.annual_rainfall_min_mm,
                             annual_rainfall_max_mm=cl.annual_rainfall_max_mm,
                             humidity_preference=cl.humidity_preference,
