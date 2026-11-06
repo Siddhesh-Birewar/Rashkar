@@ -37,13 +37,6 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install system geospatial libraries
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo apt-get update -y
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libgeos-dev libproj-dev
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
