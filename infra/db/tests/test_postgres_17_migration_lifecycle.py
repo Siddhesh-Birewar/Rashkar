@@ -109,7 +109,8 @@ def run_migration_lifecycle_test():
     tables_at_004 = inspector.get_table_names()
     logger.info("[Step 4] Existing tables at revision 004: %s", tables_at_004)
     expected_tables = [
-        "farms", "soil_samples", "weather_observations", "weather_forecasts",
+        "farms", "soil_data_sources", "soil_map_layers", "farm_soil_profiles", "soil_parameters",
+        "farm_weather_snapshots", "farm_climate_summaries",
         "crop_catalog", "crop_soil_requirements", "crop_climate_requirements",
         "crop_season_requirements", "crop_water_requirements",
         "crop_regional_suitability", "agricultural_knowledge_sources"
