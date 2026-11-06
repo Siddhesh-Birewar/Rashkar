@@ -62,6 +62,9 @@ def get_target_db_url() -> str:
         raise ValueError(
             "SQLite detected! This test requires an isolated PostgreSQL 17 + PostGIS database."
         )
+    # Ensure standard psycopg2 driver dialect if plain postgresql:// is provided
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return url
 
 
