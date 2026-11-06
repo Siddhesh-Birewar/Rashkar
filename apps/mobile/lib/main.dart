@@ -2128,10 +2128,12 @@ class CropKnowledgeItem {
   final List<String> varieties;
   final List<String> preferredTextures;
   final List<String> acceptableTextures;
-  final double phOptMin;
-  final double phOptMax;
+  final double? phOptMin;
+  final double? phOptMax;
+  final double? phBestSuitedMin;
+  final double? phBestSuitedMax;
   final double? phTolMin;
-  final double phTolMax;
+  final double? phTolMax;
   final String? phContextNotes;
   final List<String>? bestSuitedSoilTextures;
   final String drainage;
@@ -2146,6 +2148,8 @@ class CropKnowledgeItem {
   final String frostSensitivity;
   final String heatSensitivity;
   final String? thermalThresholdContext;
+  final bool degradedMode;
+  final String? degradedWarning;
   final List<Map<String, String>> seasons;
   final double waterReqMinMm;
   final double waterReqMaxMm;
@@ -2172,10 +2176,12 @@ class CropKnowledgeItem {
     required this.varieties,
     required this.preferredTextures,
     required this.acceptableTextures,
-    required this.phOptMin,
-    required this.phOptMax,
+    this.phOptMin,
+    this.phOptMax,
+    this.phBestSuitedMin,
+    this.phBestSuitedMax,
     this.phTolMin,
-    required this.phTolMax,
+    this.phTolMax,
     this.phContextNotes,
     this.bestSuitedSoilTextures,
     required this.drainage,
@@ -2190,6 +2196,8 @@ class CropKnowledgeItem {
     required this.frostSensitivity,
     required this.heatSensitivity,
     this.thermalThresholdContext,
+    this.degradedMode = false,
+    this.degradedWarning,
     required this.seasons,
     required this.waterReqMinMm,
     required this.waterReqMaxMm,
@@ -2274,9 +2282,12 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     acceptableTextures: ['Gravelly Loam', 'Loam'],
     phOptMin: 6.5,
     phOptMax: 7.0,
+    phBestSuitedMin: 6.5,
+    phBestSuitedMax: 7.0,
     phTolMin: null,
     phTolMax: 8.5,
     phContextNotes: 'Optimum pH 6.5–7.0; tolerates up to 8.5 under good management. Lower tolerable limit is unverified (ICAR-NRCP & MANAGE 2022, p. 9).',
+    bestSuitedSoilTextures: ['Sandy Clay Loam', 'Clay Loam', 'Light to Medium Black'],
     drainage: 'Excellent drainage mandatory; zero tolerance for wet feet',
     salinity: 'Moderately Tolerant (EC < 3.0 dS/m)',
     minDepthCm: 60.0,
@@ -2627,11 +2638,13 @@ const List<CropKnowledgeItem> kCropKnowledgeBase = [
     varieties: ['Vijay (Wilt resistant)', 'Digvijay', 'Vishal', 'Phule Vikram'],
     preferredTextures: ['Clay Loam', 'Clay', 'Medium Black Vertisol'],
     acceptableTextures: ['Loam', 'Silt Loam'],
-    phOptMin: 6.0,
-    phOptMax: 8.0,
+    phOptMin: null,
+    phOptMax: null,
+    phBestSuitedMin: 6.0,
+    phBestSuitedMax: 8.0,
     phTolMin: null,
-    phTolMax: 8.5,
-    phContextNotes: 'Soil pH 6.0–8.0 is documented as best-suited for deep loams or silty clay loams per ICRISAT (2010, p. 8), rather than a universal optimum across all soil textures. Tolerates up to pH 8.5 in Vertisols. High water tables and salinity are unsuitable.',
+    phTolMax: null,
+    phContextNotes: 'Soil pH 6.0–8.0 is documented as best-suited for deep loams or silty clay loams per ICRISAT (2010, p. 8). General tolerance limits across all textures are unverified. High water tables and salinity are unsuitable.',
     bestSuitedSoilTextures: ['Deep Loam', 'Silty Clay Loam'],
     drainage: 'Loose tilth & good drainage; highly sensitive to poor aeration, waterlogging and collar rot (ICRISAT 2010, p. 8)',
     salinity: 'Sensitive; saline soils and fields with high water tables are not suitable (ICRISAT 2010, p. 8)',
@@ -2971,6 +2984,29 @@ class CropDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            if (crop.degradedMode)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  border: Border.all(color: const Color(0xFFFF9800)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFE65100)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        crop.degradedWarning ?? 'Operating in degraded offline cache mode. Database unavailable.',
+                        style: const TextStyle(color: Color(0xFFE65100), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Soil Requirements
             _buildSectionCard(
               title: 'Soil Requirements (मृदा निकष)',
@@ -2979,14 +3015,21 @@ class CropDetailScreen extends StatelessWidget {
               children: [
                 _buildRow('Preferred Textures', crop.preferredTextures.join(', ')),
                 _buildRow('Acceptable Textures', crop.acceptableTextures.join(', ')),
+                if (crop.phBestSuitedMin != null)
+                  _buildRow(
+                    'Soil pH (Best-Suited)',
+                    '${crop.phBestSuitedMin} – ${crop.phBestSuitedMax} (Textures: ${crop.bestSuitedSoilTextures?.join(", ") ?? "Deep Loam / Silty Clay Loam"})',
+                  ),
+                if (crop.phOptMin != null)
+                  _buildRow('Optimum pH Range', '${crop.phOptMin} – ${crop.phOptMax}'),
                 _buildRow(
-                  crop.id == 'chickpea' ? 'Soil pH (Best-Suited)' : 'Optimum pH Range',
-                  crop.phTolMin != null
-                      ? '${crop.phOptMin} – ${crop.phOptMax} (Tolerable: ${crop.phTolMin} – ${crop.phTolMax})'
-                      : '${crop.phOptMin} – ${crop.phOptMax} (Tolerable max: ${crop.phTolMax}; lower limit unverified)',
+                  'Tolerable pH Range',
+                  crop.phTolMin == null && crop.phTolMax == null
+                      ? 'Unverified / not defined in reference manual'
+                      : (crop.phTolMin == null
+                          ? 'Up to ${crop.phTolMax} (lower limit unverified)'
+                          : '${crop.phTolMin} – ${crop.phTolMax}'),
                 ),
-                if (crop.bestSuitedSoilTextures != null && crop.bestSuitedSoilTextures!.isNotEmpty)
-                  _buildRow('Best-Suited Soil Textures', crop.bestSuitedSoilTextures!.join(', ')),
                 if (crop.phContextNotes != null)
                   _buildRow('pH Context Notes', crop.phContextNotes!),
                 _buildRow('Drainage Requirement', crop.drainage),

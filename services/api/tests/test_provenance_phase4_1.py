@@ -127,10 +127,14 @@ def test_chickpea_verified_corrections():
 
     # Soil assertions
     soil = chk["soil"]
-    assert soil["ph_optimum_min"] == 6.0
-    assert soil["ph_optimum_max"] == 8.0
+    assert soil["ph_optimum_min"] is None, "Chickpea must not expose universal optimum pH"
+    assert soil["ph_optimum_max"] is None
+    assert soil["ph_best_suited_min"] == 6.0
+    assert soil["ph_best_suited_max"] == 8.0
+    assert soil["best_suited_soil_textures"] == ["Deep Loam", "Silty Clay Loam"]
     assert soil["ph_tolerable_min"] is None
-    assert "ph_tolerable_min" in (soil["unverified_parameters"] or [])
+    assert soil["ph_tolerable_max"] is None, "Chickpea must not claim unsupported 8.5 tolerable upper limit"
+    assert "ph_tolerable_max" in (soil["unverified_parameters"] or [])
     assert soil["evidence_status"] == "verified_authoritative"
 
     # Climate assertions

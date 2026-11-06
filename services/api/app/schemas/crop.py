@@ -17,12 +17,14 @@ class AgriculturalKnowledgeSourceResponse(BaseModel):
 class CropSoilRequirementsResponse(BaseModel):
     preferred_textures: List[str]
     acceptable_textures: List[str]
-    ph_optimum_min: float
-    ph_optimum_max: float
-    ph_tolerable_min: Optional[float] = None
-    ph_tolerable_max: float
-    ph_context_notes: Optional[str] = None
-    best_suited_soil_textures: Optional[List[str]] = None
+    ph_optimum_min: Optional[float] = Field(None, description="[DEPRECATED] Universal optimum pH minimum. None if pH is texture-conditioned.")
+    ph_optimum_max: Optional[float] = Field(None, description="[DEPRECATED] Universal optimum pH maximum. None if pH is texture-conditioned.")
+    ph_best_suited_min: Optional[float] = Field(None, description="Best-suited pH minimum for specific qualifying soil textures (e.g. 6.0 for Chickpea in deep loams)")
+    ph_best_suited_max: Optional[float] = Field(None, description="Best-suited pH maximum for specific qualifying soil textures (e.g. 8.0 for Chickpea in silty clay loams)")
+    ph_tolerable_min: Optional[float] = Field(None, description="Lower tolerable pH limit across all textures; None if unverified")
+    ph_tolerable_max: Optional[float] = Field(None, description="Upper tolerable pH limit across all textures; None if unverified")
+    ph_context_notes: Optional[str] = Field(None, description="Agronomic context, texture qualifications, and scientific provenance explaining pH bounds")
+    best_suited_soil_textures: Optional[List[str]] = Field(None, description="Soil texture classes where best-suited pH strictly applies")
     drainage_requirement: str
     salinity_sensitivity: str
     min_soil_depth_cm: float
@@ -99,6 +101,8 @@ class CropCatalogSummaryResponse(BaseModel):
     typical_duration_days_max: Optional[int] = None
     recommended_varieties: Optional[List[str]] = None
     primary_source_org: Optional[str] = None
+    degraded_mode: bool = Field(False, description="True if served from static cache due to database outage")
+    data_source_mode: str = Field("database", description="'database' or 'cache_degraded'")
 
 
 class CropFullProfileResponse(BaseModel):
@@ -124,6 +128,11 @@ class CropFullProfileResponse(BaseModel):
     water: Optional[CropWaterRequirementsResponse] = None
     regional_suitability: List[CropRegionalSuitabilityResponse] = Field(default_factory=list)
     sources: List[AgriculturalKnowledgeSourceResponse] = Field(default_factory=list)
+    
+    # Degraded Mode Metadata
+    degraded_mode: bool = Field(False, description="True if response is served from static cache due to database outage")
+    data_source_mode: str = Field("database", description="'database' during normal operation, 'cache_degraded' during database outage")
+    degraded_warning: Optional[str] = Field(None, description="Clear warning message when serving in degraded cache fallback mode")
 
 
 class MaharashtraSeasonCalendarResponse(BaseModel):

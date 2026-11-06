@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 
 from cropnet.services.api.app.core.database import get_db
@@ -20,6 +20,7 @@ crop_service = CropKnowledgeService()
 
 @router.get("", response_model=List[CropCatalogSummaryResponse])
 async def list_crops(
+    response: Response,
     category: Optional[str] = Query(None, description="Filter by crop category (e.g. 'Cereal', 'Cash Crop', 'Pulse', 'Oilseed', 'Fiber', 'Horticulture')"),
     season: Optional[str] = Query(None, description="Filter by season (e.g. 'Kharif', 'Rabi', 'Zaid', 'Summer', 'Adsali')"),
     db: Session = Depends(get_db)
@@ -28,12 +29,17 @@ async def list_crops(
     List all crops in the Agricultural Knowledge Base.
     Supports filtering by crop category and agricultural cropping season.
     """
-    return crop_service.get_all_crops(db=db, category=category, season=season)
+    crops = crop_service.get_all_crops(db=db, category=category, season=season)
+    is_degraded = any(c.degraded_mode for c in crops) if crops else False
+    response.headers["X-CropNet-Degraded-Mode"] = "true" if is_degraded else "false"
+    response.headers["X-CropNet-Data-Source"] = "cache_degraded" if is_degraded else "database"
+    return crops
 
 
 @router.get("/{crop_id}", response_model=CropFullProfileResponse)
 async def get_crop_profile(
     crop_id: str,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """
@@ -46,12 +52,17 @@ async def get_crop_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Crop '{crop_id}' not found in Agricultural Knowledge Base"
         )
+    response.headers["X-CropNet-Degraded-Mode"] = "true" if profile.degraded_mode else "false"
+    response.headers["X-CropNet-Data-Source"] = profile.data_source_mode
+    if profile.degraded_warning:
+        response.headers["X-CropNet-Degraded-Warning"] = profile.degraded_warning
     return profile
 
 
 @router.get("/{crop_id}/requirements")
 async def get_crop_requirements(
     crop_id: str,
+    response: Response,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -63,10 +74,15 @@ async def get_crop_requirements(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Crop '{crop_id}' not found"
         )
+    response.headers["X-CropNet-Degraded-Mode"] = "true" if profile.degraded_mode else "false"
+    response.headers["X-CropNet-Data-Source"] = profile.data_source_mode
     return {
         "crop_id": profile.id,
         "common_name": profile.common_name,
         "scientific_name": profile.scientific_name,
+        "degraded_mode": profile.degraded_mode,
+        "data_source_mode": profile.data_source_mode,
+        "degraded_warning": profile.degraded_warning,
         "soil": profile.soil,
         "climate": profile.climate,
         "seasons": profile.seasons,

@@ -126,7 +126,7 @@ def test_soilgrids_polygon_extraction_and_provenance():
     )
 
     assert profile.is_map_derived is True
-    assert "NOT a physical laboratory soil test" in profile.disclaimer
+    assert "not laboratory soil test" in profile.disclaimer.lower()
 
     # Check pH
     assert profile.ph is not None

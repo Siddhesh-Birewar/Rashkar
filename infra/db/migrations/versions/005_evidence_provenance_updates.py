@@ -27,12 +27,38 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 1. Update crop_soil_requirements
-    # Make ph_tolerable_min nullable (for crops where lower tolerable limit is unverified)
+    # Make pH bounds nullable (for crops where lower/upper tolerable limits or universal optimums are unverified)
     op.alter_column(
         "crop_soil_requirements",
         "ph_tolerable_min",
         existing_type=sa.Float(),
         nullable=True
+    )
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_tolerable_max",
+        existing_type=sa.Float(),
+        nullable=True
+    )
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_optimum_min",
+        existing_type=sa.Float(),
+        nullable=True
+    )
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_optimum_max",
+        existing_type=sa.Float(),
+        nullable=True
+    )
+    op.add_column(
+        "crop_soil_requirements",
+        sa.Column("ph_best_suited_min", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "crop_soil_requirements",
+        sa.Column("ph_best_suited_max", sa.Float(), nullable=True)
     )
     op.add_column(
         "crop_soil_requirements",
@@ -100,12 +126,30 @@ def downgrade() -> None:
     conn = op.get_bind()
 
     null_ph_tol_min_crops = []
+    null_ph_tol_max_crops = []
+    null_ph_opt_min_crops = []
+    null_ph_opt_max_crops = []
     null_water_min_crops = []
     null_water_max_crops = []
     try:
         null_ph_tol_min_crops = [
             row[0] for row in conn.execute(
                 sa.text("SELECT crop_id FROM crop_soil_requirements WHERE ph_tolerable_min IS NULL")
+            ).fetchall()
+        ]
+        null_ph_tol_max_crops = [
+            row[0] for row in conn.execute(
+                sa.text("SELECT crop_id FROM crop_soil_requirements WHERE ph_tolerable_max IS NULL")
+            ).fetchall()
+        ]
+        null_ph_opt_min_crops = [
+            row[0] for row in conn.execute(
+                sa.text("SELECT crop_id FROM crop_soil_requirements WHERE ph_optimum_min IS NULL")
+            ).fetchall()
+        ]
+        null_ph_opt_max_crops = [
+            row[0] for row in conn.execute(
+                sa.text("SELECT crop_id FROM crop_soil_requirements WHERE ph_optimum_max IS NULL")
             ).fetchall()
         ]
         null_water_min_crops = [
@@ -122,10 +166,18 @@ def downgrade() -> None:
         # If tables do not exist or dialect differs, proceed with standard downgrade operations
         pass
 
-    if null_ph_tol_min_crops or null_water_min_crops or null_water_max_crops:
+    if (null_ph_tol_min_crops or null_ph_tol_max_crops or
+            null_ph_opt_min_crops or null_ph_opt_max_crops or
+            null_water_min_crops or null_water_max_crops):
         details = []
         if null_ph_tol_min_crops:
             details.append(f"crop_soil_requirements.ph_tolerable_min (crops: {null_ph_tol_min_crops})")
+        if null_ph_tol_max_crops:
+            details.append(f"crop_soil_requirements.ph_tolerable_max (crops: {null_ph_tol_max_crops})")
+        if null_ph_opt_min_crops:
+            details.append(f"crop_soil_requirements.ph_optimum_min (crops: {null_ph_opt_min_crops})")
+        if null_ph_opt_max_crops:
+            details.append(f"crop_soil_requirements.ph_optimum_max (crops: {null_ph_opt_max_crops})")
         if null_water_min_crops:
             details.append(f"crop_water_requirements.annual_water_requirement_mm_min (crops: {null_water_min_crops})")
         if null_water_max_crops:
@@ -133,7 +185,7 @@ def downgrade() -> None:
 
         raise RuntimeError(
             f"Downgrade aborted: Cannot restore NOT NULL constraints safely without data loss. "
-            f"Detected NULL values across 3 target columns: {'; '.join(details)}. "
+            f"Detected NULL values across target columns: {'; '.join(details)}. "
             f"Per CropNet scientific integrity guidelines, fabricating synthetic backfill values is strictly prohibited. "
             f"Please verify or restore verified agronomic values prior to executing downgrade."
         )
@@ -167,6 +219,26 @@ def downgrade() -> None:
     op.drop_column("crop_soil_requirements", "ph_context_notes")
     op.drop_column("crop_soil_requirements", "unverified_parameters")
     op.drop_column("crop_soil_requirements", "evidence_status")
+    op.drop_column("crop_soil_requirements", "ph_best_suited_max")
+    op.drop_column("crop_soil_requirements", "ph_best_suited_min")
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_optimum_max",
+        existing_type=sa.Float(),
+        nullable=False
+    )
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_optimum_min",
+        existing_type=sa.Float(),
+        nullable=False
+    )
+    op.alter_column(
+        "crop_soil_requirements",
+        "ph_tolerable_max",
+        existing_type=sa.Float(),
+        nullable=False
+    )
     op.alter_column(
         "crop_soil_requirements",
         "ph_tolerable_min",

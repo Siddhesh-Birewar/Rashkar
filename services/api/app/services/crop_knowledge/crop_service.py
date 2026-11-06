@@ -58,7 +58,12 @@ class CropKnowledgeService:
         for c in CROPS_DATA:
             soil_obj = None
             if "soil" in c:
-                soil_obj = CropSoilRequirementsResponse(**c["soil"])
+                soil_data = dict(c["soil"])
+                if soil_data.get("ph_best_suited_min") is None and soil_data.get("ph_optimum_min") is not None:
+                    soil_data["ph_best_suited_min"] = soil_data.get("ph_optimum_min")
+                if soil_data.get("ph_best_suited_max") is None and soil_data.get("ph_optimum_max") is not None:
+                    soil_data["ph_best_suited_max"] = soil_data.get("ph_optimum_max")
+                soil_obj = CropSoilRequirementsResponse(**soil_data)
 
             climate_obj = None
             if "climate" in c:
@@ -92,7 +97,10 @@ class CropKnowledgeService:
                 seasons=seasons_objs,
                 water=water_obj,
                 regional_suitability=regional_objs,
-                sources=crop_sources
+                sources=crop_sources,
+                degraded_mode=True,
+                data_source_mode="cache_degraded",
+                degraded_warning="Database-backed information could not be retrieved due to an active database outage. Displaying static in-memory cached profile."
             )
 
     def seed_knowledge_base(self, db: Session) -> int:
@@ -148,10 +156,15 @@ class CropKnowledgeService:
                 # Seed Soil Requirements
                 if "soil" in c_data:
                     existing_soil = db.query(CropSoilRequirementModel).filter_by(crop_id=c_id).first()
+                    soil_dict = dict(c_data["soil"])
+                    if soil_dict.get("ph_best_suited_min") is None and soil_dict.get("ph_optimum_min") is not None:
+                        soil_dict["ph_best_suited_min"] = soil_dict.get("ph_optimum_min")
+                    if soil_dict.get("ph_best_suited_max") is None and soil_dict.get("ph_optimum_max") is not None:
+                        soil_dict["ph_best_suited_max"] = soil_dict.get("ph_optimum_max")
                     if not existing_soil:
-                        db.add(CropSoilRequirementModel(crop_id=c_id, **c_data["soil"]))
+                        db.add(CropSoilRequirementModel(crop_id=c_id, **soil_dict))
                     else:
-                        for k, v in c_data["soil"].items():
+                        for k, v in soil_dict.items():
                             setattr(existing_soil, k, v)
 
                 # Seed Climate Requirements
@@ -241,7 +254,9 @@ class CropKnowledgeService:
                         typical_duration_days_min=m.typical_duration_days_min,
                         typical_duration_days_max=m.typical_duration_days_max,
                         recommended_varieties=m.recommended_varieties or [],
-                        primary_source_org=m.primary_source.organization if m.primary_source else "MPKV / ICAR"
+                        primary_source_org=m.primary_source.organization if m.primary_source else "MPKV / ICAR",
+                        degraded_mode=False,
+                        data_source_mode="database"
                     ))
                 if summaries:
                     return summaries
@@ -268,7 +283,9 @@ class CropKnowledgeService:
                 typical_duration_days_min=c.typical_duration_days_min,
                 typical_duration_days_max=c.typical_duration_days_max,
                 recommended_varieties=c.recommended_varieties,
-                primary_source_org=c.sources[0].organization if c.sources else "MPKV / ICAR"
+                primary_source_org=c.sources[0].organization if c.sources else "MPKV / ICAR",
+                degraded_mode=True,
+                data_source_mode="cache_degraded"
             ))
 
         return summaries
@@ -300,11 +317,20 @@ class CropKnowledgeService:
                     soil_obj = None
                     if crop.soil_requirements:
                         s = crop.soil_requirements
+                        best_min = getattr(s, "ph_best_suited_min", None)
+                        if best_min is None:
+                            best_min = s.ph_optimum_min
+                        best_max = getattr(s, "ph_best_suited_max", None)
+                        if best_max is None:
+                            best_max = s.ph_optimum_max
+
                         soil_obj = CropSoilRequirementsResponse(
                             preferred_textures=s.preferred_textures,
                             acceptable_textures=s.acceptable_textures,
                             ph_optimum_min=s.ph_optimum_min,
                             ph_optimum_max=s.ph_optimum_max,
+                            ph_best_suited_min=best_min,
+                            ph_best_suited_max=best_max,
                             ph_tolerable_min=s.ph_tolerable_min,
                             ph_tolerable_max=s.ph_tolerable_max,
                             ph_context_notes=getattr(s, "ph_context_notes", None),
@@ -412,12 +438,22 @@ class CropKnowledgeService:
                         seasons=seasons_objs,
                         water=water_obj,
                         regional_suitability=regional_objs,
-                        sources=src_objs
+                        sources=src_objs,
+                        degraded_mode=False,
+                        data_source_mode="database",
+                        degraded_warning=None
                     )
             except Exception as e:
                 logger.debug("DB crop profile fetch error: %s, checking cache", e)
 
-        return _CROPS_CACHE.get(crop_id)
+        cached = _CROPS_CACHE.get(crop_id)
+        if cached:
+            return cached.model_copy(update={
+                "degraded_mode": True,
+                "data_source_mode": "cache_degraded",
+                "degraded_warning": "Database-backed information could not be retrieved due to an active database outage. Displaying static in-memory cached profile."
+            })
+        return None
 
     def get_crop_sources(
         self,

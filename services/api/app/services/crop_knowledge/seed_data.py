@@ -318,9 +318,16 @@ CROPS_DATA = [
             ],
             "ph_optimum_min": 6.5,
             "ph_optimum_max": 7.0,
+            "ph_best_suited_min": 6.5,
+            "ph_best_suited_max": 7.0,
             "ph_tolerable_min": None,
             "ph_tolerable_max": 8.5,
             "ph_context_notes": "Optimum pH 6.5–7.0 is most suitable; tolerates up to 8.5 under good soil and nutrient management (ICAR-NRCP & MANAGE 2022, p. 9). Lower tolerable limit is unverified.",
+            "best_suited_soil_textures": [
+                "Sandy Clay Loam",
+                "Clay Loam",
+                "Light to Medium Black"
+            ],
             "drainage_requirement": "Excellent drainage mandatory; light soil on 3-5% slope. Highly intolerant of water stagnation / wet feet",
             "salinity_sensitivity": "Moderately Tolerant (EC up to 3.0 dS/m tolerable; Boron toxicity above 1.5 ppm)",
             "min_soil_depth_cm": 60.0,
@@ -2238,11 +2245,13 @@ CROPS_DATA = [
                 "Loam",
                 "Silt Loam"
             ],
-            "ph_optimum_min": 6.0,
-            "ph_optimum_max": 8.0,
+            "ph_optimum_min": None,
+            "ph_optimum_max": None,
+            "ph_best_suited_min": 6.0,
+            "ph_best_suited_max": 8.0,
             "ph_tolerable_min": None,
-            "ph_tolerable_max": 8.5,
-            "ph_context_notes": "Soil pH range 6.0–8.0 is specifically documented by ICRISAT 2010 (p. 8) as the 'best-suited' range for deep loams or silty clay loams, rather than a universal agronomic optimum or physiological ceiling across all soil textures. Chickpea is successfully cultivated in soils from coarse sands to fine-textured Vertisols (tolerating up to pH 8.5). Saline soils and fields with a high water table are unsuitable.",
+            "ph_tolerable_max": None,
+            "ph_context_notes": "Soil pH range 6.0–8.0 is specifically documented by ICRISAT 2010 (p. 8) as the 'best-suited' range for deep loams or silty clay loams, rather than a universal agronomic optimum or physiological ceiling across all soil textures. Chickpea is adaptable to a wide variety of soils from coarse-textured sands to fine-textured deep black Vertisols, but numerical minimum and maximum tolerable pH limits across all textures are not defined in ICRISAT (2010) and remain unverified. Saline soils and fields with high water tables are unsuitable.",
             "best_suited_soil_textures": [
                 "Deep Loam",
                 "Silty Clay Loam"
@@ -2255,7 +2264,10 @@ CROPS_DATA = [
             "source_id": "icrisat_chickpea_2010",
             "evidence_status": "verified_authoritative",
             "unverified_parameters": [
-                "ph_tolerable_min"
+                "ph_optimum_min",
+                "ph_optimum_max",
+                "ph_tolerable_min",
+                "ph_tolerable_max"
             ]
         },
         "climate": {

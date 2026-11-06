@@ -67,10 +67,12 @@ class CropSoilRequirementModel(Base):
     crop_id = Column(String(50), ForeignKey("crop_catalog.id"), nullable=False, unique=True, index=True)
     preferred_textures = Column(JSON, nullable=False) # List of USDA texture classes e.g. ["Clay Loam", "Clay"]
     acceptable_textures = Column(JSON, nullable=False) # Tolerable texture classes
-    ph_optimum_min = Column(Float, nullable=False)
-    ph_optimum_max = Column(Float, nullable=False)
+    ph_optimum_min = Column(Float, nullable=True) # Nullable where optimum is texture-specific (deprecated as universal)
+    ph_optimum_max = Column(Float, nullable=True)
+    ph_best_suited_min = Column(Float, nullable=True) # Best-suited pH min for specific qualifying soil textures
+    ph_best_suited_max = Column(Float, nullable=True) # Best-suited pH max for specific qualifying soil textures
     ph_tolerable_min = Column(Float, nullable=True) # Nullable for crops where lower tolerable limit is unverified
-    ph_tolerable_max = Column(Float, nullable=False)
+    ph_tolerable_max = Column(Float, nullable=True) # Nullable for crops where upper tolerable limit is unverified
     ph_context_notes = Column(Text, nullable=True) # Textual provenance explaining pH bounds and specific soil associations
     best_suited_soil_textures = Column(JSON, nullable=True) # Textures where best-suited pH strictly applies e.g. ["Deep Loam", "Silty Clay Loam"]
     drainage_requirement = Column(Text, nullable=False)
