@@ -18,8 +18,17 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _get_target_url() -> str:
+    url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL
+    if url and url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    if url and "@localhost:" in url:
+        url = url.replace("@localhost:", "@127.0.0.1:")
+    return url
+
+
 def run_migrations_offline() -> None:
-    url = settings.SYNC_DATABASE_URL or config.get_main_option("sqlalchemy.url")
+    url = _get_target_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -31,8 +40,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.SYNC_DATABASE_URL or config.get_main_option("sqlalchemy.url")
+    configuration = config.get_section(config.config_ini_section) or {}
+    configuration["sqlalchemy.url"] = _get_target_url()
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
