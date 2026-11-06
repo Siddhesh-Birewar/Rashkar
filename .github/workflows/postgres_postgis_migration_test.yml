@@ -57,7 +57,7 @@ jobs:
 
       - name: Run PostgreSQL 17 + PostGIS Migration Lifecycle Test
         env:
-          POSTGRES_TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/cropnet_isolated_test
+          POSTGRES_TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
           PYTHONPATH: .
         run: |
           python infra/db/tests/test_postgres_17_migration_lifecycle.py
