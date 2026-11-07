@@ -22,10 +22,26 @@ class FarmRepository extends ChangeNotifier {
   final List<FarmItem> _farms = [];
   bool _isLoading = false;
   String? _error;
+  String? _selectedFarmId;
 
   List<FarmItem> get farms => List.unmodifiable(_farms);
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get selectedFarmId => _selectedFarmId;
+
+  set selectedFarmId(String? id) {
+    if (_selectedFarmId != id) {
+      _selectedFarmId = id;
+      notifyListeners();
+    }
+  }
+
+  void selectFarm(String? id) {
+    if (_selectedFarmId != id) {
+      _selectedFarmId = id;
+      notifyListeners();
+    }
+  }
 
   FarmItem? getFarmById(String id) {
     try {
@@ -107,6 +123,9 @@ class FarmRepository extends ChangeNotifier {
     try {
       await _dataRepo.deleteFarm(farmId);
       _farms.removeWhere((f) => f.id == farmId);
+      if (_selectedFarmId == farmId) {
+        _selectedFarmId = _farms.isNotEmpty ? _farms.first.id : null;
+      }
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -117,7 +136,12 @@ class FarmRepository extends ChangeNotifier {
   }
 
   void addFarm(FarmItem farm) {
-    _farms.insert(0, farm);
+    final index = _farms.indexWhere((f) => f.id == farm.id);
+    if (index != -1) {
+      _farms[index] = farm;
+    } else {
+      _farms.insert(0, farm);
+    }
     notifyListeners();
   }
 
@@ -125,12 +149,17 @@ class FarmRepository extends ChangeNotifier {
     final index = _farms.indexWhere((f) => f.id == farm.id);
     if (index != -1) {
       _farms[index] = farm;
-      notifyListeners();
+    } else {
+      _farms.insert(0, farm);
     }
+    notifyListeners();
   }
 
   void deleteFarm(String farmId) {
     _farms.removeWhere((f) => f.id == farmId);
+    if (_selectedFarmId == farmId) {
+      _selectedFarmId = _farms.isNotEmpty ? _farms.first.id : null;
+    }
     notifyListeners();
   }
 
@@ -139,6 +168,7 @@ class FarmRepository extends ChangeNotifier {
     _farms.clear();
     _error = null;
     _isLoading = false;
+    _selectedFarmId = null;
     notifyListeners();
   }
 
