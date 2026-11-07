@@ -15,10 +15,11 @@ from .models import (
 from .parser import SoilReportParser
 from .safeguards import ExtractionSafeguards
 from .ollama_client import OllamaOCRClient, register_mock_transcription
-from .extractor import SoilOCRExtractor
+from .extractor import SoilOCRExtractor, DocumentExtractionPipeline
 
 __all__ = [
     "SoilOCRExtractor",
+    "DocumentExtractionPipeline",
     "SoilReportParser",
     "ExtractionSafeguards",
     "OllamaOCRClient",

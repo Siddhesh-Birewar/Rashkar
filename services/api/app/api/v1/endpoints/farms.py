@@ -1,12 +1,30 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from shapely.geometry import Polygon
 
 from cropnet.services.api.app.schemas.farm import FarmCreate, FarmUpdate, FarmResponse
-from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile, SoilAnalyseRequest
+from cropnet.services.api.app.schemas.soil import (
+    UnifiedSoilProfile,
+    SoilAnalyseRequest,
+    VerificationStatus,
+    ParameterAvailability,
+    SoilParameterObservation,
+)
+from cropnet.services.api.app.schemas.soil_reports import (
+    ReviewStatus,
+    MeasurementVerificationStatus,
+    CANONICAL_SOIL_PARAMETERS,
+)
+from cropnet.services.api.app.models.soil_reports import SoilTestReportModel, SoilMeasurementModel
+from cropnet.services.api.app.schemas.agriculture_intelligence import (
+    FarmContextInput,
+    FarmEvaluationResponse,
+    SoilDataProvenance,
+)
+from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
@@ -481,6 +499,165 @@ async def analyse_farm_soil(
     return profile
 
 
+def _fuse_confirmed_laboratory_measurements(
+    profile: Optional[UnifiedSoilProfile],
+    farm_id: uuid.UUID,
+    farm_data: dict,
+    db: Session,
+    depth: Optional[str] = None
+) -> Optional[UnifiedSoilProfile]:
+    """
+    Dual-Source Agricultural Intelligence Fusion:
+    - Check if confirmed soil test reports exist for this farm (SoilTestReportModel.review_status == "CONFIRMED").
+    - If confirmed measurements exist:
+      * Dual-source preservation: Keep SoilGrids modelled estimates (source="ISRIC SoilGrids 2.0", verification_status="map_derived_estimate") intact.
+      * Precedence rule: For the unified profile, prioritize confirmed laboratory measurements for
+        soil_ph, organic_carbon, electrical_conductivity, available_nitrogen, available_phosphorus, available_potassium
+        with source="Laboratory Report: <lab_name>" and verification_status="laboratory_verified".
+      * Strict isolation: Unconfirmed measurements (NEEDS_REVIEW or EXTRACTED_UNVERIFIED) are completely ignored.
+      * Rule compatibility: Preserve micronutrients (Zn, Fe, Mn, Cu, B, S), total_nitrogen, organic_matter
+        in additional_parameters for display without passing them as unhandled inputs to SoilConstraintEvaluator.
+    """
+    confirmed_reports = (
+        db.query(SoilTestReportModel)
+        .filter(
+            SoilTestReportModel.farm_id == str(farm_id),
+            SoilTestReportModel.review_status == ReviewStatus.CONFIRMED.value
+        )
+        .order_by(SoilTestReportModel.report_date.desc(), SoilTestReportModel.upload_timestamp.desc())
+        .all()
+    )
+
+    if not confirmed_reports:
+        return profile
+
+    confirmed_measurements = (
+        db.query(SoilMeasurementModel)
+        .join(SoilTestReportModel, SoilMeasurementModel.report_id == SoilTestReportModel.id)
+        .filter(
+            SoilMeasurementModel.farm_id == str(farm_id),
+            SoilTestReportModel.review_status == ReviewStatus.CONFIRMED.value,
+            SoilMeasurementModel.verification_status == MeasurementVerificationStatus.FARMER_CONFIRMED.value
+        )
+        .order_by(SoilTestReportModel.report_date.desc(), SoilMeasurementModel.created_at.desc())
+        .all()
+    )
+
+    if not confirmed_measurements:
+        return profile
+
+    latest_by_param: Dict[str, SoilMeasurementModel] = {}
+    for m in confirmed_measurements:
+        if m.parameter_key not in latest_by_param:
+            latest_by_param[m.parameter_key] = m
+
+    if profile is None:
+        profile = UnifiedSoilProfile(
+            profile_id=str(uuid.uuid4()),
+            farm_id=str(farm_id),
+            created_at=datetime.utcnow(),
+            version=1,
+            taluka=farm_data.get("taluka"),
+            district=farm_data.get("district", "Pune"),
+            state=farm_data.get("state", "Maharashtra"),
+            is_map_derived=False,
+            disclaimer=(
+                "This profile incorporates farmer-confirmed laboratory soil test measurements. "
+                "Values reflect physical laboratory analysis."
+            ),
+            source_dataset="Laboratory Test Report",
+            dataset_version="1.0.0",
+            spatial_resolution="point_sample",
+            depth_interval=confirmed_reports[0].sample_depth_interval or "0-15cm",
+        )
+    else:
+        profile = profile.model_copy(deep=True)
+
+    def _make_lab_obs(key: str, meas: SoilMeasurementModel, display_name: str, scientific_note: Optional[str] = None) -> SoilParameterObservation:
+        lab_name = meas.report.laboratory_name if (meas.report and meas.report.laboratory_name) else "Certified Laboratory"
+        val = meas.farmer_corrected_value if meas.farmer_corrected_value is not None else (
+            meas.normalized_value if meas.normalized_value is not None else meas.original_value
+        )
+        unit = meas.normalized_unit or meas.original_unit or ""
+        depth_int = meas.report.sample_depth_interval if (meas.report and meas.report.sample_depth_interval) else profile.depth_interval
+        vintage = meas.report.report_date.year if (meas.report and meas.report.report_date) else datetime.utcnow().year
+
+        return SoilParameterObservation(
+            parameter_key=key,
+            display_name=display_name,
+            value=val,
+            unit=unit,
+            source=f"Laboratory Report: {lab_name}",
+            dataset_version="1.0.0",
+            depth_interval=depth_int,
+            spatial_resolution="point_sample",
+            vintage_year=vintage,
+            verification_status=VerificationStatus.LABORATORY_VERIFIED,
+            availability_status=ParameterAvailability.AVAILABLE,
+            farm_coverage_percent=100.0,
+            scientific_note=scientific_note or f"Farmer-confirmed physical laboratory test from {lab_name}."
+        )
+
+    # 1. Precedence: soil_ph
+    if "soil_ph" in latest_by_param:
+        m = latest_by_param["soil_ph"]
+        if profile.ph:
+            profile.additional_parameters["isric_ph"] = profile.ph
+        profile.ph = _make_lab_obs("ph", m, "Soil pH (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+
+    # 2. Precedence: organic_carbon
+    if "organic_carbon" in latest_by_param:
+        m = latest_by_param["organic_carbon"]
+        if profile.organic_carbon:
+            profile.additional_parameters["isric_soc"] = profile.organic_carbon
+        profile.organic_carbon = _make_lab_obs("soc", m, "Soil Organic Carbon (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+
+    # 3. Precedence: electrical_conductivity
+    if "electrical_conductivity" in latest_by_param:
+        m = latest_by_param["electrical_conductivity"]
+        profile.additional_parameters["electrical_conductivity"] = _make_lab_obs(
+            "electrical_conductivity", m, "Electrical Conductivity (Laboratory Measured)", "Farmer-confirmed laboratory measurement."
+        )
+
+    # 4. Precedence: available_nitrogen
+    if "available_nitrogen" in latest_by_param:
+        m = latest_by_param["available_nitrogen"]
+        profile.available_nitrogen = _make_lab_obs(
+            "available_nitrogen", m, "Available Nitrogen (Laboratory Measured)", "Farmer-confirmed laboratory measurement (alkaline permanganate)."
+        )
+
+    # 5. Precedence: available_phosphorus
+    if "available_phosphorus" in latest_by_param:
+        m = latest_by_param["available_phosphorus"]
+        profile.available_phosphorus = _make_lab_obs(
+            "available_phosphorus", m, "Available Phosphorus (Laboratory Measured)", "Farmer-confirmed laboratory measurement (Olsen P2O5)."
+        )
+
+    # 6. Precedence: available_potassium
+    if "available_potassium" in latest_by_param:
+        m = latest_by_param["available_potassium"]
+        profile.available_potassium = _make_lab_obs(
+            "available_potassium", m, "Available Potassium (Laboratory Measured)", "Farmer-confirmed laboratory measurement (neutral ammonium acetate)."
+        )
+
+    # 7. Preserve micronutrients and secondary parameters in additional_parameters
+    for key, m in latest_by_param.items():
+        if key not in ("soil_ph", "organic_carbon", "available_nitrogen", "available_phosphorus", "available_potassium"):
+            param_meta = CANONICAL_SOIL_PARAMETERS.get(key, {})
+            disp = param_meta.get("display_name", key.replace("_", " ").title())
+            profile.additional_parameters[key] = _make_lab_obs(key, m, f"{disp} (Laboratory Measured)")
+
+    primary_list = [
+        profile.ph, profile.organic_carbon, profile.sand_percent, profile.silt_percent,
+        profile.clay_percent, profile.total_nitrogen, profile.cation_exchange_capacity,
+        profile.available_nitrogen, profile.available_phosphorus, profile.available_potassium
+    ]
+    avail_count = sum(1 for p in primary_list if p and p.value is not None) + len(profile.additional_parameters)
+    profile.available_parameters_count = avail_count
+
+    return profile
+
+
 @router.get("/{farm_id}/soil", response_model=UnifiedSoilProfile)
 async def get_farm_soil_profile(
     farm_id: uuid.UUID,
@@ -490,15 +667,17 @@ async def get_farm_soil_profile(
 ):
     """
     Retrieve latest soil intelligence profile for a farm.
+    Fuses farmer-confirmed laboratory measurements with SoilGrids estimates under precedence rules.
     """
-    _get_farm_and_verify_owner(farm_id, current_user, db)
+    farm = _get_farm_and_verify_owner(farm_id, current_user, db)
     profile = spatial_soil_service.get_latest_profile(db, str(farm_id), depth=depth)
-    if not profile:
+    fused_profile = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db, depth=depth)
+    if not fused_profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No soil profile has been generated for farm {farm_id} yet. Please run soil analysis first."
         )
-    return profile
+    return fused_profile
 
 
 @router.get("/{farm_id}/soil/history", response_model=List[UnifiedSoilProfile])
@@ -512,6 +691,100 @@ async def get_farm_soil_history(
     """
     _get_farm_and_verify_owner(farm_id, current_user, db)
     return spatial_soil_service.get_profile_history(db, str(farm_id))
+
+
+@router.post("/{farm_id}/advisory/evaluate", response_model=FarmEvaluationResponse, tags=["Farm Advisory"])
+async def evaluate_farm_advisory(
+    farm_id: uuid.UUID,
+    payload: Optional[FarmContextInput] = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Execute deterministic agricultural intelligence evaluation for a farm.
+    If confirmed laboratory measurements exist for this farm, fuses them into FarmContextInput
+    with soil_data_provenance = SoilDataProvenance.LABORATORY_MEASURED.
+    Otherwise uses SoilGrids spatial profile if available.
+    """
+    farm = _get_farm_and_verify_owner(farm_id, current_user, db)
+
+    coords = farm.get("geometry", {}).get("coordinates", [[]])[0]
+    centroid_lat = sum(c[1] for c in coords) / len(coords) if coords else None
+    centroid_lon = sum(c[0] for c in coords) / len(coords) if coords else None
+
+    ctx_dict = {
+        "farm_id": str(farm_id),
+        "taluka": farm.get("taluka"),
+        "district": farm.get("district", "Pune"),
+        "latitude": centroid_lat,
+        "longitude": centroid_lon,
+        "irrigation_available": farm.get("irrigation_type") != "rainfed",
+        "irrigation_source": farm.get("water_source"),
+    }
+
+    if payload:
+        payload_data = payload.model_dump(exclude_unset=True)
+        ctx_dict.update(payload_data)
+
+    # Check for confirmed laboratory measurements
+    confirmed_measurements = (
+        db.query(SoilMeasurementModel)
+        .join(SoilTestReportModel, SoilMeasurementModel.report_id == SoilTestReportModel.id)
+        .filter(
+            SoilMeasurementModel.farm_id == str(farm_id),
+            SoilTestReportModel.review_status == ReviewStatus.CONFIRMED.value,
+            SoilMeasurementModel.verification_status == MeasurementVerificationStatus.FARMER_CONFIRMED.value
+        )
+        .order_by(SoilTestReportModel.report_date.desc(), SoilMeasurementModel.created_at.desc())
+        .all()
+    )
+
+    if confirmed_measurements:
+        latest_meas: Dict[str, SoilMeasurementModel] = {}
+        for m in confirmed_measurements:
+            if m.parameter_key not in latest_meas:
+                latest_meas[m.parameter_key] = m
+
+        ctx_dict["soil_data_provenance"] = SoilDataProvenance.LABORATORY_MEASURED
+
+        def _val(k: str) -> Optional[float]:
+            meas = latest_meas.get(k)
+            if not meas:
+                return None
+            return meas.farmer_corrected_value if meas.farmer_corrected_value is not None else (
+                meas.normalized_value if meas.normalized_value is not None else meas.original_value
+            )
+
+        if "soil_ph" in latest_meas:
+            ctx_dict["soil_ph"] = _val("soil_ph")
+        if "organic_carbon" in latest_meas:
+            ctx_dict["soil_organic_carbon_pct"] = _val("organic_carbon")
+        if "electrical_conductivity" in latest_meas:
+            ctx_dict["electrical_conductivity_ds_m"] = _val("electrical_conductivity")
+        if "available_nitrogen" in latest_meas:
+            ctx_dict["available_nitrogen_kg_ha"] = _val("available_nitrogen")
+        if "available_phosphorus" in latest_meas:
+            ctx_dict["available_phosphorus_kg_ha"] = _val("available_phosphorus")
+        if "available_potassium" in latest_meas:
+            ctx_dict["available_potassium_kg_ha"] = _val("available_potassium")
+        if "total_nitrogen" in latest_meas:
+            ctx_dict["total_nitrogen_pct"] = _val("total_nitrogen")
+
+        rep = confirmed_measurements[0].report
+        if rep and rep.report_date:
+            ctx_dict["soil_measurement_date"] = rep.report_date.date().isoformat()
+    else:
+        profile = spatial_soil_service.get_latest_profile(db, str(farm_id))
+        if profile:
+            if ctx_dict.get("soil_ph") is None and profile.ph and profile.ph.value is not None:
+                ctx_dict["soil_ph"] = profile.ph.value
+                ctx_dict["soil_data_provenance"] = SoilDataProvenance.SPATIALLY_ESTIMATED_ISRIC
+            if ctx_dict.get("soil_organic_carbon_pct") is None and profile.organic_carbon and profile.organic_carbon.value is not None:
+                ctx_dict["soil_organic_carbon_pct"] = profile.organic_carbon.value
+
+    context_input = FarmContextInput(**ctx_dict)
+    decision_engine = DeterministicDecisionEngine()
+    return decision_engine.evaluate_farm(ctx=context_input, db=db)
 
 
 # Sub-router for farm-specific weather & climate intelligence

@@ -21,7 +21,8 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FollowUpAnswerRequest,
     AgriculturalExplanationResponse,
     ExplainDecisionRequest,
-    ConversationRequest
+    ConversationRequest,
+    SoilDataProvenance,
 )
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
@@ -56,7 +57,63 @@ def evaluate_farm_intelligence(
     Evaluates hard constraints, Bahar water tables, and regional suitability with
     evidence gating and explicit abstention triggers.
     Dispatched via worker threadpool to prevent blocking the asyncio event loop.
+    Fuses confirmed laboratory soil measurements when available for the farm.
     """
+    if payload.farm_id and payload.soil_data_provenance != SoilDataProvenance.LABORATORY_MEASURED and db is not None:
+        try:
+            from cropnet.services.api.app.models.soil_reports import SoilTestReportModel, SoilMeasurementModel
+            from cropnet.services.api.app.schemas.soil_reports import ReviewStatus, MeasurementVerificationStatus
+
+            confirmed_measurements = (
+                db.query(SoilMeasurementModel)
+                .join(SoilTestReportModel, SoilMeasurementModel.report_id == SoilTestReportModel.id)
+                .filter(
+                    SoilMeasurementModel.farm_id == str(payload.farm_id),
+                    SoilTestReportModel.review_status == ReviewStatus.CONFIRMED.value,
+                    SoilMeasurementModel.verification_status == MeasurementVerificationStatus.FARMER_CONFIRMED.value
+                )
+                .order_by(SoilTestReportModel.report_date.desc(), SoilMeasurementModel.created_at.desc())
+                .all()
+            )
+            if confirmed_measurements:
+                latest_meas = {}
+                for m in confirmed_measurements:
+                    if m.parameter_key not in latest_meas:
+                        latest_meas[m.parameter_key] = m
+
+                updates = {"soil_data_provenance": SoilDataProvenance.LABORATORY_MEASURED}
+
+                def _val(k: str) -> Optional[float]:
+                    meas = latest_meas.get(k)
+                    if not meas:
+                        return None
+                    return meas.farmer_corrected_value if meas.farmer_corrected_value is not None else (
+                        meas.normalized_value if meas.normalized_value is not None else meas.original_value
+                    )
+
+                if payload.soil_ph is None and "soil_ph" in latest_meas:
+                    updates["soil_ph"] = _val("soil_ph")
+                if payload.soil_organic_carbon_pct is None and "organic_carbon" in latest_meas:
+                    updates["soil_organic_carbon_pct"] = _val("organic_carbon")
+                if payload.electrical_conductivity_ds_m is None and "electrical_conductivity" in latest_meas:
+                    updates["electrical_conductivity_ds_m"] = _val("electrical_conductivity")
+                if payload.available_nitrogen_kg_ha is None and "available_nitrogen" in latest_meas:
+                    updates["available_nitrogen_kg_ha"] = _val("available_nitrogen")
+                if payload.available_phosphorus_kg_ha is None and "available_phosphorus" in latest_meas:
+                    updates["available_phosphorus_kg_ha"] = _val("available_phosphorus")
+                if payload.available_potassium_kg_ha is None and "available_potassium" in latest_meas:
+                    updates["available_potassium_kg_ha"] = _val("available_potassium")
+                if payload.total_nitrogen_pct is None and "total_nitrogen" in latest_meas:
+                    updates["total_nitrogen_pct"] = _val("total_nitrogen")
+
+                rep = confirmed_measurements[0].report
+                if rep and rep.report_date:
+                    updates["soil_measurement_date"] = rep.report_date.date().isoformat()
+
+                payload = payload.model_copy(update=updates)
+        except Exception:
+            pass
+
     return decision_engine.evaluate_farm(ctx=payload, db=db)
 
 

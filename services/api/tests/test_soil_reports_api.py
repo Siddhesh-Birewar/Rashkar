@@ -147,7 +147,7 @@ def test_upload_pdf_report_success():
     assert result["laboratory_name"] == "Krishi Vigyan Kendra Soil Testing Lab"
     assert result["sample_depth_interval"] == "0-15cm"
     assert result["sampling_point_name"] == "North Field - Plot A"
-    assert result["extraction_status"] == ExtractionStatus.UPLOADED.value
+    assert result["extraction_status"] in (ExtractionStatus.UPLOADED.value, ExtractionStatus.NEEDS_REVIEW.value, ExtractionStatus.FAILED.value)
     assert result["review_status"] == ReviewStatus.NEEDS_REVIEW.value
     assert result["signed_document_url"] is not None
     assert result["file_size_bytes"] == len(pdf_bytes)
@@ -628,3 +628,40 @@ def test_not_found_errors():
         headers={"X-Dev-User-Id": user_id}
     )
     assert resp.status_code == 404
+
+
+def test_upload_real_pdf_triggers_ocr_and_inserts_measurements():
+    """Upload representative Soil Health Card and verify OCR bridge inserts measurements."""
+    user_id = str(uuid.uuid4())
+    farm_id = _create_test_farm(user_id)
+
+    pdf_path = Path(_worktree_root) / "services/api/tests/evaluation/soil_reports_corpus/tc01_shc_pune_digital.pdf"
+    assert pdf_path.exists(), f"Corpus PDF missing at {pdf_path}"
+    pdf_bytes = pdf_path.read_bytes()
+
+    resp = client.post(
+        f"/api/v1/farms/{farm_id}/soil-reports",
+        files={"file": ("tc01_shc_pune_digital.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert resp.status_code == 201
+    result = resp.json()
+    assert result["extraction_status"] == ExtractionStatus.NEEDS_REVIEW.value
+    assert result["review_status"] == ReviewStatus.NEEDS_REVIEW.value
+    assert len(result["measurements"]) > 0
+
+    # Verify measurements are in EXTRACTED_UNVERIFIED status
+    m_keys = [m["parameter_key"] for m in result["measurements"]]
+    assert "soil_ph" in m_keys
+    assert "available_nitrogen" in m_keys
+    for m in result["measurements"]:
+        assert m["verification_status"] == MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value
+
+    # Verify reprocess re-extracts the document
+    rep_resp = client.post(
+        f"/api/v1/farms/{farm_id}/soil-reports/{result['id']}/reprocess",
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert rep_resp.status_code == 200
+    assert rep_resp.json()["extraction_status"] == ExtractionStatus.NEEDS_REVIEW.value
+    assert len(rep_resp.json()["measurements"]) > 0

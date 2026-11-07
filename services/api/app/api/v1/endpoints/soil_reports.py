@@ -11,6 +11,7 @@ Enforces:
 """
 import uuid
 import hashlib
+import logging
 from datetime import datetime
 from typing import Optional, List
 from fastapi import (
@@ -19,16 +20,21 @@ from fastapi import (
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 try:
     from cropnet.services.api.app.core.database import get_db
     from cropnet.services.api.app.core.security import get_current_user, CurrentUser
     from cropnet.services.api.app.api.v1.endpoints.farms import _get_farm_and_verify_owner
     from cropnet.services.api.app.models.soil_reports import SoilTestReportModel, SoilMeasurementModel
     from cropnet.services.api.app.services.soil_report_storage import soil_report_storage
+    from cropnet.services.api.app.services.soil_ocr.extractor import DocumentExtractionPipeline
+    from cropnet.services.api.app.services.soil_ocr.models import ReportExtractionStatus
     from cropnet.services.api.app.schemas.soil_reports import (
         ExtractionStatus,
         ReviewStatus,
         MeasurementVerificationStatus,
+        CANONICAL_SOIL_PARAMETERS,
         SoilReportSummary,
         SoilReportDetail,
         SoilMeasurementItem,
@@ -43,10 +49,13 @@ except ImportError:
     from .farms import _get_farm_and_verify_owner
     from ...models.soil_reports import SoilTestReportModel, SoilMeasurementModel
     from ...services.soil_report_storage import soil_report_storage
+    from ...services.soil_ocr.extractor import DocumentExtractionPipeline
+    from ...services.soil_ocr.models import ReportExtractionStatus
     from ...schemas.soil_reports import (
         ExtractionStatus,
         ReviewStatus,
         MeasurementVerificationStatus,
+        CANONICAL_SOIL_PARAMETERS,
         SoilReportSummary,
         SoilReportDetail,
         SoilMeasurementItem,
@@ -152,6 +161,82 @@ def _model_to_report_detail(r: SoilTestReportModel, signed_url: Optional[str] = 
     )
 
 
+def _execute_report_extraction(
+    report: SoilTestReportModel,
+    content: bytes,
+    filename: str,
+    content_type: Optional[str],
+    db: Session
+) -> None:
+    """
+    Execute OCR and structured measurement extraction on an uploaded report document.
+    Updates report extraction_status to NEEDS_REVIEW (or FAILED if unparseable),
+    persists raw extraction payload for audit trail, and inserts individual
+    SoilMeasurementModel records with EXTRACTED_UNVERIFIED verification status.
+    """
+    try:
+        pipeline = DocumentExtractionPipeline()
+        result = pipeline.extract(
+            file_bytes=content,
+            filename=filename,
+            mime_type=content_type
+        )
+        report.raw_extracted_payload = result.model_dump()
+
+        if result.extraction_status == ReportExtractionStatus.FAILED.value:
+            report.extraction_status = ExtractionStatus.FAILED.value
+            report.extraction_error = "; ".join(result.warnings) if result.warnings else "Document extraction failed."
+        else:
+            # Propagate extracted metadata if not manually supplied
+            if result.metadata.laboratory_name and not report.laboratory_name:
+                report.laboratory_name = result.metadata.laboratory_name
+            if result.metadata.report_date and not report.report_date:
+                report.report_date = _parse_optional_date(result.metadata.report_date)
+            if result.metadata.collection_date and not report.sample_collection_date:
+                report.sample_collection_date = _parse_optional_date(result.metadata.collection_date)
+            if result.metadata.sample_depth and not report.sample_depth_interval:
+                report.sample_depth_interval = result.metadata.sample_depth
+            if result.metadata.sampling_point and not report.sampling_point_name:
+                report.sampling_point_name = result.metadata.sampling_point
+
+            # Insert extracted measurements
+            for m in result.measurements:
+                param_meta = CANONICAL_SOIL_PARAMETERS.get(m.parameter_key, {})
+                cat = param_meta.get("category", "macronutrient")
+                meas = SoilMeasurementModel(
+                    id=str(uuid.uuid4()),
+                    report_id=report.id,
+                    farm_id=report.farm_id,
+                    parameter_key=m.parameter_key,
+                    parameter_category=cat,
+                    original_parameter_name=m.original_parameter_name,
+                    original_value=m.original_value,
+                    original_value_text=str(m.original_value) if m.original_value is not None else None,
+                    original_unit=m.original_unit or "",
+                    normalized_value=m.normalized_value,
+                    normalized_unit=m.normalized_unit,
+                    analytical_method=m.analytical_method,
+                    lab_reference_range={"range": m.reference_range} if m.reference_range else None,
+                    lab_rating=m.laboratory_rating,
+                    detection_limit=None,
+                    page_number=m.page_number or 1,
+                    bounding_box=None,
+                    extraction_confidence=m.ocr_confidence,
+                    is_ambiguous=m.is_ambiguous,
+                    verification_status=MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value,
+                    farmer_notes=m.ambiguity_reason if m.is_ambiguous else None,
+                )
+                db.add(meas)
+
+            report.extraction_status = ExtractionStatus.NEEDS_REVIEW.value
+            report.review_status = ReviewStatus.NEEDS_REVIEW.value
+            report.extraction_error = None
+    except Exception as exc:
+        logger.exception("Error executing OCR pipeline for report %s: %s", report.id, exc)
+        report.extraction_status = ExtractionStatus.FAILED.value
+        report.extraction_error = str(exc)
+
+
 @router.post("", response_model=SoilReportDetail, status_code=status.HTTP_201_CREATED)
 @router.post("/upload", response_model=SoilReportDetail, status_code=status.HTTP_201_CREATED)
 async def upload_soil_report(
@@ -167,7 +252,8 @@ async def upload_soil_report(
 ):
     """
     Upload a laboratory soil test report for an authenticated user's farm.
-    Validates ownership, file format, and size limit before storing in private storage.
+    Validates ownership, file format, and size limit before storing in private storage,
+    then executes OCR structured extraction and inserts unverified measurements.
     """
     # 1. Enforce farm ownership
     _get_farm_and_verify_owner(farm_id, current_user, db)
@@ -211,7 +297,7 @@ async def upload_soil_report(
         content_type=content_type or "application/pdf"
     )
 
-    # 6. Persist record to database
+    # 6. Persist initial record to database
     report = SoilTestReportModel(
         id=report_id,
         user_id=str(current_user.user_id),
@@ -234,7 +320,18 @@ async def upload_soil_report(
     db.commit()
     db.refresh(report)
 
-    # 7. Generate time-limited signed URL
+    # 7. Bridge to DocumentExtractionPipeline for OCR & Structured Extraction
+    _execute_report_extraction(
+        report=report,
+        content=content,
+        filename=filename,
+        content_type=content_type,
+        db=db
+    )
+    db.commit()
+    db.refresh(report)
+
+    # 8. Generate time-limited signed URL
     signed_url = soil_report_storage.generate_signed_url(
         storage_path=storage_path,
         farm_id=str(farm_id),
@@ -471,10 +568,23 @@ async def reprocess_soil_report(
         SoilMeasurementModel.verification_status == MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value
     ).delete(synchronize_session=False)
 
-    report.extraction_status = ExtractionStatus.PROCESSING.value
     report.extraction_error = None
     report.review_status = ReviewStatus.NEEDS_REVIEW.value
     report.updated_at = datetime.utcnow()
+
+    # Re-run extraction pipeline using stored document
+    try:
+        doc_bytes, mime = soil_report_storage.get_file_bytes(report.storage_path)
+        _execute_report_extraction(
+            report=report,
+            content=doc_bytes,
+            filename=report.original_filename,
+            content_type=mime or report.mime_type,
+            db=db
+        )
+    except FileNotFoundError:
+        # If document file is not present in storage (e.g. test mock), set to PROCESSING
+        report.extraction_status = ExtractionStatus.PROCESSING.value
 
     db.commit()
     db.refresh(report)

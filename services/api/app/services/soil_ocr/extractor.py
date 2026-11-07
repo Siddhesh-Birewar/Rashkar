@@ -278,3 +278,7 @@ class SoilOCRExtractor:
             y_offset += im.height
 
         return stitched
+
+
+# Alias for cross-module integration
+DocumentExtractionPipeline = SoilOCRExtractor
