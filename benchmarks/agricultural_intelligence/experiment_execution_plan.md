@@ -103,8 +103,13 @@ The response is parsed and passed to the dual evaluation tracks:
 | **M-08** | Calibrated Abstention Quality (CAQ) | Track B | $1.00$ (100%) | $< 0.90$ |
 | **M-09** | Marathi Terminological Fidelity (MTF) | Language | $\ge 0.90$ | $< 0.75$ |
 | **M-10** | Cross-Lingual Numerical Parity (CLNP) | Language | $1.00$ (100%) | $< 1.00$ |
-| **M-11** | Response Latency ($p95$) | Systems | $\le 3.5\text{ s}$ | $> 5.0\text{ s}$ |
-| **M-12** | Peak VRAM Footprint | Systems | $\le 6.5\text{ GB}$ | $> 8.0\text{ GB}$ |
+| **M-11** | End-to-End Latency ($p95$) | Systems | $\le 4.0\text{ s}$ (Provisional) | $> 6.0\text{ s}$ |
+| **M-12** | Peak Process Memory (RSS) | Systems | $\le 6.5\text{ GB}$ (Provisional) | $> 8.0\text{ GB}$ |
+| **M-13** | Time to First Token ($p95$ TTFT) | Systems | $\le 1.5\text{ s}$ (Provisional) | $> 2.5\text{ s}$ |
+| **M-14** | Generation Throughput (TPS) | Systems | $\ge 15.0\text{ tokens/s}$ (Provisional) | $< 8.0\text{ tokens/s}$ |
+| **M-15** | System Memory Pressure Level | Systems | `NORMAL` (Level 1) | `WARNING` or `CRITICAL` |
+
+*(Note: Hardware metrics are tailored for Apple Silicon unified memory architecture measuring Resident Set Size and Darwin kernel memory pressure. Numerical targets are provisional baselines to be calibrated during Phase 5.3 benchmarks; zero model inference is executed in Phase 5.0).*
 
 ---
 

@@ -34,7 +34,7 @@
         "What is your target yield for Rabi Sorghum?",
         "Have you applied farmyard manure (FYM) or compost recently that could slowly mineralize nitrogen?"
       ],
-      "verified_source_references": ["mpkv_research_2023"],
+      "verified_source_references": ["mpkv_research_2023", "mpkv_pop_2023"],
       "expected_answer_boundaries": {
         "nitrogen_fertility_class": "LOW",
         "fertilizer_recommendation_stance": "MUST_APPLY_NITROGEN",
@@ -105,7 +105,7 @@
       "expected_follow_up_questions": [
         "Do you have access to biomass, compost, or cattle manure to incorporate before sowing?"
       ],
-      "verified_source_references": ["mpkv_research_2023"],
+      "verified_source_references": ["mpkv_research_2023", "mpkv_pop_2023"],
       "expected_answer_boundaries": {
         "soc_fertility_class": "LOW (< 0.50%)",
         "agronomic_implications": ["Low moisture holding capacity", "Poor biological activity", "High vulnerability to dry spells"]
@@ -352,7 +352,7 @@
       "expected_reasoning": "Agronomic suitability and financial profitability are fundamentally distinct domains. Agronomic suitability measures biological feasibility (soil, climate, water). Financial profitability depends on market prices, mandi volatility, input costs, pest/disease outbreaks, storage infrastructure, and post-harvest handling. CropNet explicitly decouples suitability from profitability and never guarantees financial return.",
       "required_information": [],
       "expected_follow_up_questions": [],
-      "verified_source_references": ["mpkv_research_2023"],
+      "verified_source_references": ["mpkv_research_2023", "mpkv_pop_2023"],
       "expected_answer_boundaries": {
         "suitability_stance": "AGRONOMICALLY_SUITABLE",
         "profitability_stance": "NO_FINANCIAL_GUARANTEE",
@@ -384,7 +384,7 @@
         "Is there a hardpan, rock, or heavy clay layer right beneath the sandy topsoil?",
         "Is your field located in a low-lying depression receiving runoff from surrounding areas?"
       ],
-      "verified_source_references": ["mpkv_research_2023"],
+      "verified_source_references": ["mpkv_research_2023", "mpkv_pop_2023"],
       "expected_answer_boundaries": {
         "decision_action": "REJECT_CONTRADICTORY_INPUTS_AND_SEEK_CLARIFICATION",
         "prohibited_claims": [

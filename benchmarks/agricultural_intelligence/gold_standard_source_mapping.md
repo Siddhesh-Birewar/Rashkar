@@ -32,9 +32,9 @@ Every benchmark test case in `CROPNET-AGRI-BENCH-V1` is strictly grounded in the
 
 | Test ID | Domain | Database Table & Columns Queried | Primary Document & Section | Verified Scientific Rule / Ground Truth |
 |---|---|---|---|---|
-| `AGRI-BENCH-001` | Soil | `soil_parameters` (`parameter_name`, `value`), `farm_soil_profiles` | MPKV (2023), Soil Testing Chapter | Total N (~0.05%) != Available N (185 kg/ha). Available N < 280 kg/ha is 'Low'. Fertilizer N application is mandatory. |
+| `AGRI-BENCH-001` | Soil | `soil_parameters` (`parameter_name`, `value`), `farm_soil_profiles` | MPKV (2023) PoP (`mpkv_pop_2023`), Soil Science Section, pp. 24–35 | Total N (~0.05%) != Available N (185 kg/ha). Available N < 280 kg/ha is 'Low'. Fertilizer N application is mandatory. |
 | `AGRI-BENCH-002` | Soil | `crop_soil_requirements` (`ph_best_suited_min/max`, `drainage_type`, `waterlogging_sensitivity`) | ICAR-NRCP & MANAGE (2022), p. 3 | pH 6.8 is optimum, but shallow depth (20 cm) and poor drainage/waterlogging disqualify pomegranate unconditionally. |
-| `AGRI-BENCH-003` | Soil | `farm_soil_profiles`, `soil_parameters` (`organic_carbon`) | MPKV (2023), Soil Chemistry Section | SOC 0.38% is 'Low' (< 0.50% threshold for semi-arid Vertisols). Requires FYM/compost incorporation. |
+| `AGRI-BENCH-003` | Soil | `farm_soil_profiles`, `soil_parameters` (`organic_carbon`) | MPKV (2023) PoP (`mpkv_pop_2023`), Soil Science Section, pp. 24–35 | SOC 0.38% is 'Low' (< 0.50% threshold for semi-arid Vertisols). Requires FYM/compost incorporation. |
 | `AGRI-BENCH-004` | Soil | `crop_soil_requirements` (`salinity_tolerance`, `texture`), `crop_catalog` | ICRISAT (2010), p. 8 | Chickpea is highly sensitive to soil salinity and waterlogging. Canal zone requires EC verification before certification. |
 | `AGRI-BENCH-005` | Soil | `crop_soil_requirements` (`best_suited_soil_textures`, `ph_best_suited_min/max`, `ph_tolerable_max`) | ICAR-NRCP & MANAGE (2022), p. 3 | "Light soil" with pH 6.5–7.0 is most suitable. Upper tolerance is 8.5 (well-managed). Lower tolerable pH is NULL. |
 | `AGRI-BENCH-006` | Suitability | `crop_regional_suitability` (`regional_status`, `suitability_class`, `taluka`) | ICRISAT (2010) & MPKV (2023) | Maval is `requires_regional_validation`; Western Ghats humidity promotes Ascochyta/Botrytis and vegetative excess. |

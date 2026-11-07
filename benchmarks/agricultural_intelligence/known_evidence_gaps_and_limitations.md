@@ -42,7 +42,9 @@
 ### 1.3 Sugarcane, Cotton, Groundnut, Maize, Bajra, Sorghum, Soybean, Wheat
 - **Institutional Attributions vs Parameter Verification:**
   - *Status:* **PARTIAL PROVENANCE MAPPING**
-  - *Evidence:* While MPKV (2023) provides comprehensive varietal yield trials and fertilizer recommendations for Vertisols, broad global parameters (e.g., minimum base temperature for germination, exact soil depth thresholds for minor millets) rely on ICAR institute brochures (CICR, DGR, IIMR, IIWBR, IISR) or legacy ICAR agritech compilations.
+  - *MPKV Research 2023 vs MPKV PoP 2023:* A vital distinction must be maintained between `mpkv_research_2023` (the 13-page Joint Agresco research recommendations covering 69 specific trial releases) and `mpkv_pop_2023` (the comprehensive *कृषी दैनंदिनी २०२३-२४* Package of Practices). Standard soil testing fertility ratings (Available N < 280 kg/ha = Low; SOC < 0.50% = Low) originate from `mpkv_pop_2023` (Soil Science chapter, pp. 24–35). `mpkv_research_2023` validates specific cropping systems (e.g. Rec. 8 canal Vertisol Rabi scheduling at 20–25 & 60–65 DAS).
+  - *Sugarcane Limitations:* The four uploaded PDFs included *IISR at a Glance* (`iisr_brochure_glance`), which is an 8-page promotional brochure focusing on sub-tropical UP/Bihar conditions. It does not substantiate Maharashtra tropical Vertisol depth, pH, or Adsali/Pre-seasonal calendars. Sugarcane water demand (1500–2500 mm) and Suru drip practices depend on `icar_iisr_sugarcane_2022` and MPKV Suru drip trial releases (Rec. 3, p. 2).
+  - *Cotton & Wheat Limitations:* The four uploaded PDFs contained zero field trials for Cotton or Wheat. Regional recommendations for Cotton depend on `icar_cicr_cotton_2022` (Nagpur), and Wheat depends on `icar_iiwbr_wheat_2022` (Peninsular Zone, Karnal).
   - *Limitation:* High-precision physiological thresholds for these crops must be reported with explicit provenance tags (`evidence_status = "provisional_literature"` or `"unverified_parameters"`).
 
 ---

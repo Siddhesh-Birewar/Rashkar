@@ -108,13 +108,31 @@ Evaluates the fluency, vernacular accuracy, and semantic parity of Marathi respo
   - Pod set $\rightarrow$ **घाटे धारणा**
 - **Cross-Lingual Numerical Parity:** Asserts that every numerical value in English appears identically in Marathi (e.g. ३५°C $\leftrightarrow$ 35°C, ६.५–७.० $\leftrightarrow$ 6.5–7.0).
 
-### 4.2 System Latency & Resource Consumption
-- **Response Latency:**
-  - $p50 \le 1.50\text{ seconds}$
-  - $p95 \le 3.50\text{ seconds}$
-  - $p99 \le 5.00\text{ seconds}$
-- **Throughput:** Minimum 15 tokens/sec generation on local target hardware.
-- **VRAM Footprint:** Maximum 6.5 GB VRAM utilization for local 8B model (4-bit / 8-bit quantized baseline).
+### 4.2 Unified Memory Hardware & Performance Framework (Apple Silicon Architecture)
+
+On Apple Silicon (M-series Darwin unified memory architecture), CPU, GPU, and Neural Engine share a unified LPDDR memory pool. The concept of discrete PCI-e GPU VRAM is inapplicable. System evaluation must measure operating system process memory and memory pressure rather than discrete VRAM.
+
+#### Defined Metrics & Provisional Evaluation Targets
+*(All performance thresholds are provisional baselines to be empirically calibrated in Phase 5.3; zero model inference is conducted in Phase 5.0).*
+
+1. **Peak Process Resident Set Size (RSS):**
+   - Measures maximum physical RAM mapped to the inference process (`ps -o rss` or `resource.getrusage(RUSAGE_SELF).ru_maxrss`).
+   - *Provisional Target:* $\le 6.5\text{ GB}$ RSS (including 8B quantized model weights, KV cache, and runtime overhead).
+2. **System Memory Pressure Level:**
+   - Evaluated via Darwin kernel memory pressure metrics (`sysctl kern.memorystatus_vm_pressure_level`).
+   - *Target:* Must remain strictly **`NORMAL`** (Level 1); zero swapfile thrashing, zero memory compression freezes.
+3. **Time to First Token (TTFT):**
+   - Duration from prompt submission through retrieval and prefill to emission of the first response token.
+   - *Provisional Target:* $p50 \le 800\text{ ms}$, $p95 \le 1500\text{ ms}$.
+4. **Generation Tokens Per Second (TPS):**
+   - Autoregressive generation decode throughput on Metal Performance Shaders (MPS).
+   - *Provisional Target:* $\ge 15.0\text{ tokens/second}$.
+5. **End-to-End Advisory Latency:**
+   - Complete pipeline execution time (Validation $\rightarrow$ Retrieval $\rightarrow$ Decision Engine $\rightarrow$ LLM Explanation $\rightarrow$ Output Guardrail):
+   - *Provisional Target:* $p50 \le 2.0\text{ seconds}$, $p95 \le 4.0\text{ seconds}$.
+6. **Concurrency & Context-Length Assumptions:**
+   - *Evaluation Concurrency:* Single-user evaluation ($C = 1$) matching edge-to-mobile interaction.
+   - *Maximum Context Length:* $2048\text{ tokens}$ total context window (~800–1200 prompt tokens including structured agricultural payload, ~250–400 generation tokens).
 
 ---
 
