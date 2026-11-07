@@ -59,6 +59,13 @@ async def request_middleware(request: Request, call_next):
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+try:
+    from cropnet.services.api.app.api.v1.endpoints.soil_reports import router as soil_reports_router
+except ImportError:
+    from .api.v1.endpoints.soil_reports import router as soil_reports_router
+
+app.include_router(soil_reports_router, prefix=settings.API_V1_PREFIX)
+
 
 @app.get("/")
 async def root():
