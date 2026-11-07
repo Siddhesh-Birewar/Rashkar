@@ -16,4 +16,10 @@ abstract final class RouteNames {
   static const String about = 'about';
   static const String login = 'login';
   static const String register = 'register';
+
+  // Soil Laboratory Workspace names
+  static const String soilLabWorkspace = 'soilLabWorkspace';
+  static const String soilLabUpload = 'soilLabUpload';
+  static const String soilLabReportReview = 'soilLabReportReview';
+  static const String soilLabHistory = 'soilLabHistory';
 }

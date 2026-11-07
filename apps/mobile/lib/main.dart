@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cropnet_mobile/core/router/app_router.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
@@ -1393,6 +1394,13 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
         title: Text('${widget.farm.name} — Soil Intelligence'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.science_outlined),
+            tooltip: 'Soil Laboratory Workspace',
+            onPressed: () {
+              context.push(RoutePaths.soilLabWorkspacePath(widget.farm.id));
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Force Refresh SoilGrids Extraction',
             onPressed: _refreshSoilAnalysis,
@@ -1713,6 +1721,26 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                           _buildUnavailableRow('Available Nitrogen (N)', 'Physical soil test required'),
                           _buildUnavailableRow('Available Phosphorus (P2O5)', 'Physical soil test required'),
                           _buildUnavailableRow('Available Potassium (K2O)', 'Physical soil test required'),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1B5E20),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(Icons.upload_file, size: 20),
+                              label: const Text(
+                                'Upload Soil Test Report to Unlock NPK',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              onPressed: () {
+                                context.push(RoutePaths.soilLabWorkspacePath(widget.farm.id));
+                              },
+                            ),
+                          ),
                         ],
                       ),
                     ),

@@ -42,10 +42,27 @@ abstract final class RoutePaths {
   static const String login = '/login';
   static const String register = '/register';
 
+  /// Soil Laboratory Workspace: /soil-testing/:farmId/lab
+  static const String soilLabWorkspace = '/soil-testing/:farmId/lab';
+
+  /// Soil Laboratory Upload: /soil-testing/:farmId/lab/upload
+  static const String soilLabUpload = '/soil-testing/:farmId/lab/upload';
+
+  /// Soil Laboratory Report Review: /soil-testing/:farmId/lab/reports/:reportId
+  static const String soilLabReportReview = '/soil-testing/:farmId/lab/reports/:reportId';
+
+  /// Soil Laboratory Report History: /soil-testing/:farmId/lab/history
+  static const String soilLabHistory = '/soil-testing/:farmId/lab/history';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';
   static String soilDetailPath(String farmId) => '/soil-testing/$farmId';
+  static String soilLabWorkspacePath(String farmId) => '/soil-testing/$farmId/lab';
+  static String soilLabUploadPath(String farmId) => '/soil-testing/$farmId/lab/upload';
+  static String soilLabReportReviewPath(String farmId, String reportId) =>
+      '/soil-testing/$farmId/lab/reports/$reportId';
+  static String soilLabHistoryPath(String farmId) => '/soil-testing/$farmId/lab/history';
   static String weatherDetailPath(String farmId) => '/weather/$farmId';
   static String cropDetailPath(String cropId) => '/crop-recommendation/$cropId';
 }

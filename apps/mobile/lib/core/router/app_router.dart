@@ -11,6 +11,9 @@ import 'package:cropnet_mobile/features/auth/auth_service.dart';
 import 'package:cropnet_mobile/features/auth/auth_state.dart';
 import 'package:cropnet_mobile/features/auth/presentation/login_screen.dart';
 import 'package:cropnet_mobile/features/auth/presentation/register_screen.dart';
+import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_history_screen.dart';
+import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_review_screen.dart';
+import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_upload_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -163,6 +166,50 @@ GoRouter createCropNetRouter({
                       }
                       return SoilIntelligenceReportScreen(farm: farm);
                     },
+                    routes: [
+                      GoRoute(
+                        path: 'lab',
+                        name: RouteNames.soilLabWorkspace,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) {
+                          final farmId = state.pathParameters['farmId'] ?? '';
+                          return SoilReportHistoryScreen(farmId: farmId);
+                        },
+                        routes: [
+                          GoRoute(
+                            path: 'upload',
+                            name: RouteNames.soilLabUpload,
+                            parentNavigatorKey: rootNavigatorKey,
+                            builder: (context, state) {
+                              final farmId = state.pathParameters['farmId'] ?? '';
+                              return SoilReportUploadScreen(farmId: farmId);
+                            },
+                          ),
+                          GoRoute(
+                            path: 'reports/:reportId',
+                            name: RouteNames.soilLabReportReview,
+                            parentNavigatorKey: rootNavigatorKey,
+                            builder: (context, state) {
+                              final farmId = state.pathParameters['farmId'] ?? '';
+                              final reportId = state.pathParameters['reportId'] ?? '';
+                              return SoilReportReviewScreen(
+                                farmId: farmId,
+                                reportId: reportId,
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'history',
+                            name: RouteNames.soilLabHistory,
+                            parentNavigatorKey: rootNavigatorKey,
+                            builder: (context, state) {
+                              final farmId = state.pathParameters['farmId'] ?? '';
+                              return SoilReportHistoryScreen(farmId: farmId);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
