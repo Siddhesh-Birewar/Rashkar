@@ -1,27 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
+import 'package:cropnet_mobile/features/advisory/data/advisory_repository.dart';
+import 'package:cropnet_mobile/features/advisory/models/advisory_models.dart';
+import 'package:cropnet_mobile/main.dart' show FarmItem;
 
-/// Message model for AI Dialogue & Advisory session
+/// Chat message model for AI Dialogue & Advisory session.
 class AdvisoryMessage {
   final String id;
   final String sender; // 'user' or 'assistant'
   final String text;
   final String? provenance;
+  final String? generationSource;
   final DateTime timestamp;
+  final bool isError;
 
   const AdvisoryMessage({
     required this.id,
     required this.sender,
     required this.text,
     this.provenance,
+    this.generationSource,
     required this.timestamp,
+    this.isError = false,
   });
 
   bool get isUser => sender == 'user';
 }
 
-/// AI Dialogue & Agricultural Advisory Screen
-/// Integrates Qwen3:8B explanation and dialogue interface with deterministic safeguards.
+/// AI Dialogue & Agricultural Advisory Screen.
+///
+/// Integrates the deterministic agricultural decision engine (Phase 5.1)
+/// and guarded Qwen3:8B explanation interface (Phase 5.2) via [AdvisoryRepository].
+///
+/// Enforces key agronomic guardrails:
+/// - LLM never decides crop suitability; all decisions originate from the deterministic rule engine.
+/// - Responses link directly to verified ICAR/MPKV citations and deterministic rule provenance.
+/// - Unverified map-derived soil nitrogen is never fabricated as available NPK.
+/// - Supports both English and Marathi.
 class AdvisoryScreen extends StatefulWidget {
   const AdvisoryScreen({super.key});
 
@@ -32,9 +47,18 @@ class AdvisoryScreen extends StatefulWidget {
 class _AdvisoryScreenState extends State<AdvisoryScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AdvisoryRepository _advisoryRepo = AdvisoryRepository();
 
   String _selectedTaluka = 'Baramati';
-  String _selectedTopic = 'Soil Health';
+  String _selectedLanguage = 'en'; // 'en' or 'mr'
+  String? _selectedFarmId;
+  String? _decisionId;
+
+  FarmEvaluationResponse? _evaluation;
+  AgriculturalExplanationResponse? _lastExplanation;
+  bool _isEvaluating = false;
+  bool _isSendingMessage = false;
+  String? _errorMessage;
 
   final List<String> _topics = [
     'Soil Health',
@@ -54,23 +78,38 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
   }
 
   void _resetConversation() {
+    _decisionId = null;
+    _evaluation = null;
+    _lastExplanation = null;
+    _errorMessage = null;
+
+    final isMr = _selectedLanguage == 'mr';
     _messages = [
       AdvisoryMessage(
         id: 'msg-init-1',
         sender: 'assistant',
-        text: 'Namaste! Welcome to CropNet AI Agronomic Advisory. '
-            'I am connected to the CropNet agricultural intelligence system for $_selectedTaluka. '
-            'How can I assist with your farming operations today?',
+        text: isMr
+            ? 'नमस्ते! क्रॉपनेट एआय कृषी सल्लागार प्रणालीमध्ये आपले स्वागत आहे. '
+              'मी $_selectedTaluka परिसरासाठी कृषी निर्णय प्रणालीशी जोडलेला आहे. '
+              'आपल्या शेतीविषयक प्रश्नांसाठी मी कशी मदत करू शकेन?'
+            : 'Namaste! Welcome to CropNet AI Agronomic Advisory. '
+              'I am connected to the CropNet agricultural intelligence system for $_selectedTaluka. '
+              'How can I assist with your farming operations today?',
         provenance: 'ICAR-CRIDA Agro-meteorology Bulletin 2023 | Qwen3:8B Dialogue Engine',
+        generationSource: 'fastapi_qwen_dialogue',
         timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
       ),
       AdvisoryMessage(
         id: 'msg-init-2',
         sender: 'assistant',
-        text: 'Location Profile for $_selectedTaluka: Deep black Vertisol clay soil, '
-            'neutral-to-alkaline pH (7.29), medium organic carbon. '
-            'Verified suited crops include Sugarcane, Soybean, Jowar (Sorghum), and Chickpea.',
+        text: isMr
+            ? '$_selectedTaluka स्थानिक परिस्थिती: काळी मध्यम ते भारी व्हर्टिसोल जमीन, '
+              'सामू ७.२ ते ७.८. प्रमाणित पिके: सोयाबीन, हरभरा, ज्वारी, आणि ऊस (पाणी उपलब्धतेनुसार).'
+            : 'Location Profile for $_selectedTaluka: Deep black Vertisol clay soil, '
+              'neutral-to-alkaline pH (7.29), medium organic carbon. '
+              'Verified suited crops include Sugarcane, Soybean, Jowar (Sorghum), and Chickpea.',
         provenance: 'ISRIC SoilGrids 2.0 & ICAR Agricultural Package of Practices',
+        generationSource: 'deterministic_engine',
         timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
       ),
     ];
@@ -83,7 +122,110 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
     super.dispose();
   }
 
-  void _sendMessage(String query) {
+  FarmItem? _getCurrentFarm() {
+    final farms = FarmRepository.instance.farms;
+    if (_selectedFarmId != null) {
+      return FarmRepository.instance.getFarmById(_selectedFarmId!);
+    }
+    if (farms.isNotEmpty) {
+      return farms.first;
+    }
+    return null;
+  }
+
+  /// Trigger deterministic farm evaluation against FastAPI
+  Future<void> _runDeterministicEvaluation({String? userQuery}) async {
+    setState(() {
+      _isEvaluating = true;
+      _errorMessage = null;
+    });
+
+    final currentFarm = _getCurrentFarm();
+    final taluka = currentFarm?.taluka ?? _selectedTaluka;
+
+    final contextInput = FarmContextInput(
+      farmId: currentFarm?.id,
+      taluka: taluka,
+      district: currentFarm?.district ?? 'Pune',
+      latitude: currentFarm?.centroid.latitude ?? 18.18,
+      longitude: currentFarm?.centroid.longitude ?? 74.53,
+      irrigationAvailable: currentFarm != null ? currentFarm.irrigationType != 'rainfed' : true,
+      irrigationSource: currentFarm?.waterSource ?? 'canal',
+      language: _selectedLanguage,
+      userQuery: userQuery,
+    );
+
+    try {
+      final eval = await _advisoryRepo.evaluateFarm(contextInput);
+      _decisionId = eval.decisionId;
+      _evaluation = eval;
+
+      // Request natural-language explanation grounded in this decision
+      try {
+        final explanation = await _advisoryRepo.explainDecision(
+          eval.decisionId,
+          language: _selectedLanguage,
+        );
+        _lastExplanation = explanation;
+
+        final citationsText = explanation.authoritativeCitations.isNotEmpty
+            ? explanation.authoritativeCitations.map((c) => '${c.organization} (${c.publicationYear})').join(' | ')
+            : 'MPKV Rahuri / ICAR Agronomic Package';
+
+        if (mounted) {
+          setState(() {
+            _messages.add(
+              AdvisoryMessage(
+                id: 'eval-exp-${DateTime.now().millisecondsSinceEpoch}',
+                sender: 'assistant',
+                text: explanation.explanationText,
+                provenance: '$citationsText [${explanation.generationSource}]',
+                generationSource: explanation.generationSource,
+                timestamp: DateTime.now(),
+              ),
+            );
+          });
+        }
+      } catch (_) {
+        // Fallback to summarizing deterministic outcomes directly
+        if (mounted && eval.cropOutcomes.isNotEmpty) {
+          final outcomeSummary = eval.cropOutcomes.map((o) {
+            final statusStr = o.decisionState.value.replaceAll('_', ' ');
+            return '• ${o.commonName}: $statusStr — ${o.explanation}';
+          }).join('\n');
+
+          setState(() {
+            _messages.add(
+              AdvisoryMessage(
+                id: 'eval-direct-${DateTime.now().millisecondsSinceEpoch}',
+                sender: 'assistant',
+                text: 'Evaluation Results for $taluka:\n$outcomeSummary',
+                provenance: 'CropNet Deterministic Rule Engine (ICAR/MPKV)',
+                generationSource: 'deterministic_fallback',
+                timestamp: DateTime.now(),
+              ),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'API Connection Error: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEvaluating = false;
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  /// Submit user message to conversation endpoint
+  Future<void> _sendMessage(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
 
@@ -96,59 +238,152 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
 
     setState(() {
       _messages.add(userMsg);
+      _isSendingMessage = true;
+      _errorMessage = null;
     });
     _textController.clear();
     _scrollToBottom();
 
-    // Generate responsive agronomic guidance respecting safeguards
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      final reply = _generateAgronomicGuidance(trimmed);
-      setState(() {
-        _messages.add(reply);
-      });
-      _scrollToBottom();
-    });
-  }
-
-  AdvisoryMessage _generateAgronomicGuidance(String query) {
-    final lower = query.toLowerCase();
-    String responseText;
-    String provenance;
-
-    if (lower.contains('fertilizer') || lower.contains('npk') || lower.contains('nutrient')) {
-      responseText =
-          'For Vertisol soils in $_selectedTaluka, ISRIC digital soil maps indicate total nitrogen is moderate (1.25 g/kg). '
-          'Because available nitrogen is not lab-measured on map data, apply recommended basal NPK doses split into 2-3 applications: '
-          '50% basal at sowing, 25% at vegetative stage, and 25% at flowering. Incorporate farmyard manure (FYM) to improve carbon sequestration.';
-      provenance = 'MPKV Rahuri Crop Practice Guidelines & ISRIC SoilGrids 2.0';
-    } else if (lower.contains('irrigation') || lower.contains('water') || lower.contains('canal') || lower.contains('drip')) {
-      responseText =
-          'In the $_selectedTaluka pilot zone, canal irrigation is common along Nira canals. '
-          'Vertisols have high water retention but poor drainage when saturated. '
-          'Drip irrigation is recommended to prevent waterlogging and reduce root rot risk in sugarcane and vegetable crops.';
-      provenance = 'Central Ground Water Board Pune District Report & ICAR Water Management';
-    } else if (lower.contains('crop') || lower.contains('sow') || lower.contains('kharif') || lower.contains('rabi')) {
-      responseText =
-          'For current seasonal conditions in $_selectedTaluka: '
-          'Kharif recommendations: Soybean (JS 335, Phule Kalyani) and Bajra. '
-          'Rabi recommendations: Maldandi Jowar (M 35-1) and Chickpea (Digvijay). '
-          'All crop selections should match your specific soil texture and available irrigation source.';
-      provenance = 'Department of Agriculture Maharashtra & ICAR-CRIDA Regional Suitability Matrix';
-    } else {
-      responseText =
-          'Regarding "$query" in $_selectedTaluka: Always align field interventions with seasonal weather forecasts and local soil moisture. '
-          'For precise chemical dosage or disease identification, consult your local Krishi Vigyan Kendra (KVK Baramati) extension officer.';
-      provenance = 'CropNet AI Deterministic Agronomic Safety Guardrail';
+    // If no decision evaluated yet, run evaluation first with this query
+    if (_decisionId == null) {
+      await _runDeterministicEvaluation(userQuery: trimmed);
+      if (mounted) setState(() => _isSendingMessage = false);
+      return;
     }
 
-    return AdvisoryMessage(
-      id: 'reply-${DateTime.now().millisecondsSinceEpoch}',
-      sender: 'assistant',
-      text: responseText,
-      provenance: provenance,
-      timestamp: DateTime.now(),
-    );
+    try {
+      final history = _messages
+          .where((m) => m.id != userMsg.id && !m.isError)
+          .map((m) => ConversationMessage(
+                role: m.sender == 'user' ? 'user' : 'assistant',
+                content: m.text,
+              ))
+          .toList();
+
+      final response = await _advisoryRepo.processConversation(
+        _decisionId!,
+        trimmed,
+        language: _selectedLanguage,
+        history: history,
+      );
+
+      _lastExplanation = response;
+      final citationsText = response.authoritativeCitations.isNotEmpty
+          ? response.authoritativeCitations.map((c) => '${c.organization} (${c.publicationYear})').join(' | ')
+          : 'ICAR / MPKV Deterministic Rule Engine';
+
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            AdvisoryMessage(
+              id: 'reply-${DateTime.now().millisecondsSinceEpoch}',
+              sender: 'assistant',
+              text: response.explanationText,
+              provenance: '$citationsText [${response.generationSource}]',
+              generationSource: response.generationSource,
+              timestamp: DateTime.now(),
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            AdvisoryMessage(
+              id: 'err-${DateTime.now().millisecondsSinceEpoch}',
+              sender: 'assistant',
+              text: 'Unable to reach the agronomic advisory service. Verify API connection and try again.',
+              provenance: 'CropNet Deterministic Agronomic Safety Guardrail',
+              generationSource: 'deterministic_fallback',
+              timestamp: DateTime.now(),
+              isError: true,
+            ),
+          );
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingMessage = false;
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  /// Submit diagnostic follow-up answer to re-evaluate farm
+  Future<void> _submitFollowUpAnswer(String questionId, String parameter, dynamic answer) async {
+    if (_decisionId == null) return;
+
+    setState(() {
+      _isEvaluating = true;
+    });
+
+    try {
+      final updatedEval = await _advisoryRepo.processFollowUp(
+        _decisionId!,
+        {parameter: answer},
+      );
+
+      _evaluation = updatedEval;
+      _decisionId = updatedEval.decisionId;
+
+      final isMr = _selectedLanguage == 'mr';
+      final ackText = isMr
+          ? 'माहिती नोंदवली गेली ($parameter: $answer). सुधारित कृषी मूल्यांकन खाली अद्यतनित केले आहे.'
+          : 'Parameter updated ($parameter: $answer). Re-evaluating crop feasibility...';
+
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            AdvisoryMessage(
+              id: 'followup-${DateTime.now().millisecondsSinceEpoch}',
+              sender: 'assistant',
+              text: ackText,
+              provenance: 'CropNet Deterministic Rule Engine',
+              generationSource: 'deterministic_engine',
+              timestamp: DateTime.now(),
+            ),
+          );
+        });
+      }
+
+      // Explain re-evaluation
+      final explanation = await _advisoryRepo.explainDecision(
+        updatedEval.decisionId,
+        language: _selectedLanguage,
+      );
+      _lastExplanation = explanation;
+
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            AdvisoryMessage(
+              id: 're-eval-${DateTime.now().millisecondsSinceEpoch}',
+              sender: 'assistant',
+              text: explanation.explanationText,
+              provenance: 'MPKV Rahuri / ICAR Re-evaluation [${explanation.generationSource}]',
+              generationSource: explanation.generationSource,
+              timestamp: DateTime.now(),
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Follow-up submission failed: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEvaluating = false;
+        });
+        _scrollToBottom();
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -163,9 +398,27 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
     });
   }
 
+  Color _getDecisionStateColor(DecisionState state) {
+    switch (state) {
+      case DecisionState.verifiedSuitable:
+        return const Color(0xFF2E7D32);
+      case DecisionState.regionalScreeningOnly:
+        return const Color(0xFF1976D2);
+      case DecisionState.conditionallySuitablePendingData:
+        return const Color(0xFFE65100);
+      case DecisionState.requiresRegionalValidation:
+        return const Color(0xFFF57F17);
+      case DecisionState.unsuitableVerifiedConstraint:
+        return const Color(0xFFC62828);
+      case DecisionState.abstainInsufficientEvidence:
+        return Colors.grey.shade700;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final farms = FarmRepository.instance.farms;
+    final isMr = _selectedLanguage == 'mr';
 
     return Scaffold(
       appBar: AppBar(
@@ -173,16 +426,30 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
+          // Language toggle (EN / MR)
+          TextButton.icon(
+            icon: const Icon(Icons.language, color: Colors.white, size: 18),
+            label: Text(
+              isMr ? 'English' : 'मराठी',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            onPressed: () {
+              setState(() {
+                _selectedLanguage = isMr ? 'en' : 'mr';
+                _resetConversation();
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Restart Dialogue',
+            tooltip: isMr ? 'पुन्हा सुरू करा' : 'Restart Dialogue',
             onPressed: () => setState(_resetConversation),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Safeguard Banner
+          // Safeguard Banner — Mandated by Qwen dialogue architecture
           Container(
             color: const Color(0xFFE8F5E9),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -192,7 +459,9 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Qwen3:8B Agronomic Dialogue • Grounded in ICAR/MPKV Agricultural Standards',
+                    isMr
+                        ? 'Qwen3:8B Agronomic Dialogue • ICAR/MPKV कृषी संशोधन मानकांवर आधारित'
+                        : 'Qwen3:8B Agronomic Dialogue • Grounded in ICAR/MPKV Agricultural Standards',
                     style: TextStyle(fontSize: 12, color: Colors.green.shade900, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -211,7 +480,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               children: [
                 const Icon(Icons.location_on, size: 18, color: Color(0xFF1B5E20)),
                 const SizedBox(width: 6),
-                const Text('Region: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('${isMr ? "तालुका" : "Region"}: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 DropdownButton<String>(
                   value: _selectedTaluka,
                   isDense: true,
@@ -230,18 +499,162 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
                 ),
                 if (farms.isNotEmpty) ...[
                   const SizedBox(width: 12),
-                  const Text('• Farm: ', style: TextStyle(fontSize: 13, color: Colors.black54)),
+                  Text('• ${isMr ? "शेत" : "Farm"}: ', style: const TextStyle(fontSize: 13, color: Colors.black54)),
                   Flexible(
-                    child: Text(
-                      farms.first.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF1B5E20)),
+                    child: DropdownButton<String>(
+                      value: _selectedFarmId ?? farms.first.id,
+                      isDense: true,
+                      underline: const SizedBox(),
+                      items: farms.map((f) {
+                        return DropdownMenuItem(
+                          value: f.id,
+                          child: Text(f.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF1B5E20))),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null && val != _selectedFarmId) {
+                          setState(() {
+                            _selectedFarmId = val;
+                            final f = FarmRepository.instance.getFarmById(val);
+                            if (f != null) _selectedTaluka = f.taluka;
+                            _resetConversation();
+                          });
+                        }
+                      },
                     ),
                   ),
                 ],
+                const Spacer(),
+                // Evaluate Farm Button
+                ElevatedButton.icon(
+                  icon: _isEvaluating
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.play_arrow, size: 16),
+                  label: Text(_isEvaluating ? (isMr ? 'मूल्यांकन चालू...' : 'Evaluating...') : (isMr ? 'मूल्यांकन करा' : 'Evaluate Farm')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1B5E20),
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  onPressed: _isEvaluating ? null : () => _runDeterministicEvaluation(),
+                ),
               ],
             ),
           ),
+
+          // Deterministic Decision Summary (if evaluated)
+          if (_evaluation != null && _evaluation!.cropOutcomes.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.grey.shade50,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.analytics_outlined, size: 16, color: Color(0xFF1B5E20)),
+                      const SizedBox(width: 6),
+                      Text(
+                        isMr ? 'प्रमाणित पीक मूल्यांकन निष्कर्ष:' : 'Deterministic Crop Evaluations:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Decision ID: ${_decisionId ?? ""}',
+                        style: const TextStyle(fontSize: 10, color: Colors.black45),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 36,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _evaluation!.cropOutcomes.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (ctx, idx) {
+                        final outcome = _evaluation!.cropOutcomes[idx];
+                        final color = _getDecisionStateColor(outcome.decisionState);
+                        final label = isMr && outcome.marathiName != null
+                            ? outcome.marathiName!
+                            : outcome.commonName;
+
+                        return Tooltip(
+                          message: outcome.explanation,
+                          child: Chip(
+                            backgroundColor: color.withAlpha(25),
+                            side: BorderSide(color: color),
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                            avatar: Icon(
+                              outcome.isDisqualified ? Icons.cancel : Icons.check_circle,
+                              size: 16,
+                              color: color,
+                            ),
+                            label: Text(
+                              '$label: ${outcome.decisionState.value.replaceAll('_', ' ')}',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Follow-Up Questions (Diagnostic refinement)
+          if (_evaluation != null && _evaluation!.followUpQuestions.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: const Color(0xFFFFF8E1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.help_outline, size: 16, color: Color(0xFFE65100)),
+                      const SizedBox(width: 6),
+                      Text(
+                        isMr ? 'अतिरिक्त माहिती आवश्यक:' : 'Diagnostic Follow-Up Required:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFE65100)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ..._evaluation!.followUpQuestions.take(2).map((q) {
+                    final qText = isMr ? q.questionTextMr : q.questionTextEn;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              qText,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          if (q.options != null && q.options!.isNotEmpty)
+                            Wrap(
+                              spacing: 4,
+                              children: q.options!.take(3).map((opt) {
+                                return ActionChip(
+                                  label: Text(opt, style: const TextStyle(fontSize: 10)),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => _submitFollowUpAnswer(q.questionId, q.targetParameter, opt),
+                                );
+                              }).toList(),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
 
           // Quick Topic Chips
           SizedBox(
@@ -253,22 +666,35 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (ctx, idx) {
                 final topic = _topics[idx];
-                final isSelected = topic == _selectedTopic;
-                return ChoiceChip(
-                  label: Text(topic, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.black87)),
-                  selected: isSelected,
-                  selectedColor: const Color(0xFF1B5E20),
+                return ActionChip(
+                  label: Text(topic, style: const TextStyle(fontSize: 12)),
                   backgroundColor: Colors.grey.shade100,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() => _selectedTopic = topic);
-                      _sendMessage('What are the key advisory recommendations for $topic in $_selectedTaluka?');
-                    }
+                  onPressed: () {
+                    final query = isMr
+                        ? '$_selectedTaluka भागात $topic संदर्भात प्रमाणित कृषी सल्ला काय आहे?'
+                        : 'What are the key advisory recommendations for $topic in $_selectedTaluka?';
+                    _sendMessage(query);
                   },
                 );
               },
             ),
           ),
+
+          // Error banner if any
+          if (_errorMessage != null)
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.red.shade50,
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: Colors.red)),
+                  ),
+                ],
+              ),
+            ),
 
           // Dialogue Messages List
           Expanded(
@@ -282,6 +708,30 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               },
             ),
           ),
+
+          // Sending loading indicator
+          if (_isSendingMessage)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text('Consulting CropNet agricultural engine...', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                ],
+              ),
+            ),
+
+          if (_lastExplanation != null && _lastExplanation!.governanceNotice.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Text(
+                _lastExplanation!.governanceNotice,
+                style: const TextStyle(fontSize: 10, color: Colors.black45, fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
+            ),
 
           // Input Bar
           Container(
@@ -297,7 +747,9 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
                     child: TextField(
                       controller: _textController,
                       decoration: InputDecoration(
-                        hintText: 'Ask about soil, crops, or fertilizers in $_selectedTaluka...',
+                        hintText: isMr
+                            ? '$_selectedTaluka परिसरातील माती, पिके, किंवा खतांबद्दल विचारा...'
+                            : 'Ask about soil, crops, or fertilizers in $_selectedTaluka...',
                         hintStyle: const TextStyle(fontSize: 13),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         border: OutlineInputBorder(
@@ -333,7 +785,11 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
         ),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: msg.isUser ? const Color(0xFF1B5E20) : Colors.white,
+          color: msg.isUser
+              ? const Color(0xFF1B5E20)
+              : msg.isError
+                  ? Colors.red.shade50
+                  : Colors.white,
           borderRadius: BorderRadius.circular(12).copyWith(
             bottomLeft: msg.isUser ? const Radius.circular(12) : Radius.zero,
             bottomRight: msg.isUser ? Radius.zero : const Radius.circular(12),
@@ -345,7 +801,9 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               offset: Offset(0, 2),
             ),
           ],
-          border: msg.isUser ? null : Border.all(color: Colors.grey.shade200),
+          border: msg.isUser
+              ? null
+              : Border.all(color: msg.isError ? Colors.red.shade200 : Colors.grey.shade200),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,19 +812,39 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  msg.isUser ? Icons.person : Icons.psychology,
+                  msg.isUser
+                      ? Icons.person
+                      : msg.isError
+                          ? Icons.warning_amber
+                          : Icons.psychology,
                   size: 16,
                   color: msg.isUser ? Colors.white70 : const Color(0xFF1B5E20),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  msg.isUser ? 'You' : 'CropNet AI Assistant',
+                  msg.isUser
+                      ? 'You'
+                      : 'CropNet AI Assistant',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: msg.isUser ? Colors.white70 : const Color(0xFF1B5E20),
                   ),
                 ),
+                if (msg.generationSource != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      msg.generationSource!,
+                      style: const TextStyle(fontSize: 9, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 6),
