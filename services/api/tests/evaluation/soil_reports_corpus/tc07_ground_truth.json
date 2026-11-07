@@ -1,0 +1,85 @@
+{
+  "document_id": "TC-07",
+  "document_filename": "tc07_multi_depth_orchard.pdf",
+  "expected_document_type": "text_pdf",
+  "expected_metadata": {
+    "laboratory_name": "ICAR-NRC on Pomegranate Soil Testing Laboratory, Solapur",
+    "sample_id": "NRCP-SOIL-2024-77",
+    "farmer_name": "Ashok Kadam",
+    "report_date": "2024-04-20"
+  },
+  "expected_parameters_multi_depth": [
+    {
+      "parameter_key": "soil_ph",
+      "depth": "0-15 cm",
+      "value": 7.7,
+      "unit": "pH"
+    },
+    {
+      "parameter_key": "soil_ph",
+      "depth": "15-30 cm",
+      "value": 8.0,
+      "unit": "pH"
+    },
+    {
+      "parameter_key": "electrical_conductivity",
+      "depth": "0-15 cm",
+      "value": 0.42,
+      "unit": "dS/m"
+    },
+    {
+      "parameter_key": "electrical_conductivity",
+      "depth": "15-30 cm",
+      "value": 0.58,
+      "unit": "dS/m"
+    },
+    {
+      "parameter_key": "organic_carbon",
+      "depth": "0-15 cm",
+      "value": 0.55,
+      "unit": "%"
+    },
+    {
+      "parameter_key": "organic_carbon",
+      "depth": "15-30 cm",
+      "value": 0.38,
+      "unit": "%"
+    },
+    {
+      "parameter_key": "available_nitrogen",
+      "depth": "0-15 cm",
+      "value": 220.0,
+      "unit": "kg/ha"
+    },
+    {
+      "parameter_key": "available_nitrogen",
+      "depth": "15-30 cm",
+      "value": 140.0,
+      "unit": "kg/ha"
+    },
+    {
+      "parameter_key": "available_phosphorus",
+      "depth": "0-15 cm",
+      "value": 19.5,
+      "unit": "kg/ha"
+    },
+    {
+      "parameter_key": "available_phosphorus",
+      "depth": "15-30 cm",
+      "value": 11.0,
+      "unit": "kg/ha"
+    },
+    {
+      "parameter_key": "available_potassium",
+      "depth": "0-15 cm",
+      "value": 360.0,
+      "unit": "kg/ha"
+    },
+    {
+      "parameter_key": "available_potassium",
+      "depth": "15-30 cm",
+      "value": 280.0,
+      "unit": "kg/ha"
+    }
+  ]
+}
