@@ -15,6 +15,8 @@ import 'package:cropnet_mobile/features/auth/presentation/register_screen.dart';
 import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_history_screen.dart';
 import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_review_screen.dart';
 import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_upload_screen.dart';
+import 'package:cropnet_mobile/features/water/presentation/screens/water_workspace_screen.dart';
+import 'package:cropnet_mobile/features/satellite/presentation/screens/satellite_vegetation_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -127,6 +129,40 @@ GoRouter createCropNetRouter({
                         ),
                       );
                     },
+                    routes: [
+                      GoRoute(
+                        path: 'water',
+                        name: RouteNames.farmWater,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) {
+                          final farmId = state.pathParameters['farmId'] ?? '';
+                          return FarmRouteResolver(
+                            farmId: farmId,
+                            featureName: 'Water Intelligence',
+                            builder: (context, farm) => WaterWorkspaceScreen(
+                              farmId: farm.id,
+                              farmName: farm.name,
+                            ),
+                          );
+                        },
+                      ),
+                      GoRoute(
+                        path: 'vegetation',
+                        name: RouteNames.farmVegetation,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) {
+                          final farmId = state.pathParameters['farmId'] ?? '';
+                          return FarmRouteResolver(
+                            farmId: farmId,
+                            featureName: 'Satellite Vegetation',
+                            builder: (context, farm) => SatelliteVegetationScreen(
+                              farmId: farm.id,
+                              farmName: farm.name,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

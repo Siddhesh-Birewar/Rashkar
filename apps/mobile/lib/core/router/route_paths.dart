@@ -54,9 +54,17 @@ abstract final class RoutePaths {
   /// Soil Laboratory Report History: /soil-testing/:farmId/lab/history
   static const String soilLabHistory = '/soil-testing/:farmId/lab/history';
 
+  /// Irrigation Water Intelligence Workspace: /farms/:farmId/water
+  static const String farmWater = '/farms/:farmId/water';
+
+  /// Satellite Vegetation Health Workspace: /farms/:farmId/vegetation
+  static const String farmVegetation = '/farms/:farmId/vegetation';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';
+  static String farmWaterPath(String farmId) => '/farms/$farmId/water';
+  static String farmVegetationPath(String farmId) => '/farms/$farmId/vegetation';
   static String soilDetailPath(String farmId) => '/soil-testing/$farmId';
   static String soilLabWorkspacePath(String farmId) => '/soil-testing/$farmId/lab';
   static String soilLabUploadPath(String farmId) => '/soil-testing/$farmId/lab/upload';

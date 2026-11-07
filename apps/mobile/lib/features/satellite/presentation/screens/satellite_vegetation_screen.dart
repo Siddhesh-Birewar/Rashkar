@@ -405,7 +405,7 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(Icons.shield_outlined, color: Colors.blueGrey, size: 24),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'SCIENTIFIC SAFEGUARD NOTICE: Sentinel-2 Level-2A NDVI and NDMI reflect surface '

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class SatelliteObservation {
   final String id;
   final String farmId;

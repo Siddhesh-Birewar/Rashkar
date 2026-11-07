@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../shared/widgets/centered_page_container.dart';
 import '../../models/water_models.dart';
@@ -117,8 +116,16 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Location / Remarks',
+                      hintText: 'e.g., Near pump room, South corner',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<WaterSourceType>(
-                    value: selectedType,
+                    initialValue: selectedType,
                     decoration: const InputDecoration(labelText: 'Source Type'),
                     items: WaterSourceType.values
                         .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
@@ -129,7 +136,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: seasonal,
+                    initialValue: seasonal,
                     decoration: const InputDecoration(labelText: 'Seasonal Availability'),
                     items: const [
                       DropdownMenuItem(value: 'perennial', child: Text('Perennial (Year-round)')),
@@ -146,7 +153,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: reliability,
+                          initialValue: reliability,
                           decoration: const InputDecoration(labelText: 'Reliability'),
                           items: const [
                             DropdownMenuItem(value: 'reliable', child: Text('Reliable (Daily)')),
@@ -176,7 +183,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: irrigation,
+                          initialValue: irrigation,
                           decoration: const InputDecoration(labelText: 'Irrigation Method'),
                           items: const [
                             DropdownMenuItem(value: 'drip', child: Text('Drip Irrigation')),
@@ -204,7 +211,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: provenance,
+                    initialValue: provenance,
                     decoration: const InputDecoration(labelText: 'Capacity Origin'),
                     items: const [
                       DropdownMenuItem(value: 'FARMER_REPORTED', child: Text('Farmer-Reported Estimate')),
@@ -225,12 +232,14 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
             ),
             FilledButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(ctx);
                 try {
                   await _repository.createWaterSource(
                     widget.farmId,
                     sourceType: selectedType,
                     name: nameCtrl.text.trim().isEmpty ? 'Borewell' : nameCtrl.text.trim(),
+                    locationDescription: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
                     seasonalAvailability: seasonal,
                     reliability: reliability,
                     dailyAvailableHours: double.tryParse(hoursCtrl.text),
@@ -240,11 +249,10 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                   );
                   _loadData();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error adding source: $e')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error adding source: $e')),
+                  );
                 }
               },
               child: const Text('Save Source'),
@@ -585,7 +593,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                                 elevation: 1,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  side: BorderSide(color: color.withOpacity(0.5)),
+                                  side: BorderSide(color: color.withValues(alpha: 0.5)),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16.0),
@@ -648,6 +656,62 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                             ),
                           ),
 
+                        const SizedBox(height: 32),
+
+                        // SECTION 4: LABORATORY TEST REPORTS LIST
+                        Text(
+                          'Laboratory Water Reports',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Uploaded physical water testing documents with verification audit status.',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                        const SizedBox(height: 16),
+
+                        if (_reports.isEmpty)
+                          Card(
+                            elevation: 0,
+                            color: Colors.grey.shade100,
+                            child: const Padding(
+                              padding: EdgeInsets.all(24.0),
+                              child: Center(
+                                child: Text('No water laboratory reports uploaded for this farm.'),
+                              ),
+                            ),
+                          )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _reports.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final rep = _reports[index];
+                              return ListTile(
+                                tileColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                leading: const Icon(Icons.description, color: Color(0xFF1B5E20)),
+                                title: Text(rep.originalFilename, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(
+                                  'Lab: ${rep.laboratoryName ?? "Testing Lab"} • ${rep.measurementCount} parameters',
+                                ),
+                                trailing: Chip(
+                                  label: Text(rep.reviewStatus, style: const TextStyle(fontSize: 11)),
+                                  backgroundColor: rep.reviewStatus == 'CONFIRMED'
+                                      ? Colors.green.shade100
+                                      : Colors.amber.shade100,
+                                ),
+                              );
+                            },
+                          ),
+
                         const SizedBox(height: 24),
 
                         // CGWB Notice Banner
@@ -662,7 +726,7 @@ class _WaterWorkspaceScreenState extends State<WaterWorkspaceScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(Icons.info_outline, color: Colors.amber, size: 24),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'REGIONAL CONTEXT NOTICE: Regional Central Ground Water Board (CGWB) aquifer data '

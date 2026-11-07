@@ -31,7 +31,7 @@ class WaterRepository {
       final res = await _client.get('${_waterBasePath(farmId)}/sources');
       final list = res as List<dynamic>;
       return list.map((e) => WaterSource.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -80,7 +80,7 @@ class WaterRepository {
       final res = await _client.get('${_waterBasePath(farmId)}/reports');
       final list = res as List<dynamic>;
       return list.map((e) => WaterReportSummary.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -109,29 +109,55 @@ class WaterRepository {
       );
     }
 
-    final fields = <String, String>{};
-    if (waterSourceId != null) fields['water_source_id'] = waterSourceId;
-    if (laboratoryName != null) fields['laboratory_name'] = laboratoryName;
-    if (reportDate != null) fields['report_date'] = reportDate.toIso8601String();
-    if (samplingLocation != null) fields['sampling_location'] = samplingLocation;
+    final uri = Uri.parse('${_client.baseUrl}${_waterBasePath(farmId)}/reports/upload');
+    final request = http.MultipartRequest('POST', uri);
+
+    String? token = _client.bearerToken;
+    final provider = _client.authTokenProvider ?? ApiClient.defaultAuthTokenProvider;
+    if (provider != null) {
+      try {
+        token = await provider();
+      } catch (_) {}
+    }
+
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    } else if (_client.devUserId != null && _client.devUserId!.isNotEmpty) {
+      request.headers[ApiConstants.devUserIdHeader] = _client.devUserId!;
+    }
+
+    request.headers['Accept'] = 'application/json';
+
+    if (waterSourceId != null) request.fields['water_source_id'] = waterSourceId;
+    if (laboratoryName != null) request.fields['laboratory_name'] = laboratoryName;
+    if (reportDate != null) request.fields['report_date'] = reportDate.toIso8601String();
+    if (samplingLocation != null) request.fields['sampling_location'] = samplingLocation;
 
     MediaType? parsedContentType;
     try {
-      final parts = mimeType.split('/');
-      if (parts.length == 2) {
-        parsedContentType = MediaType(parts[0], parts[1]);
-      }
-    } catch (_) {}
+      parsedContentType = MediaType.parse(mimeType);
+    } catch (_) {
+      parsedContentType = MediaType('application', 'octet-stream');
+    }
 
-    final res = await _client.uploadMultipart(
-      '${_waterBasePath(farmId)}/reports/upload',
-      fileBytes: fileBytes,
-      fileName: fileName,
-      fileFieldName: 'file',
-      fields: fields,
-      fileContentType: parsedContentType,
+    final multipartFile = http.MultipartFile.fromBytes(
+      'file',
+      fileBytes,
+      filename: fileName,
+      contentType: parsedContentType,
     );
+    request.files.add(multipartFile);
 
-    return WaterReportSummary.fromJson(res as Map<String, dynamic>);
+    final streamed = await _httpClient.send(request);
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return WaterReportSummary.fromJson(Map<String, dynamic>.from(decoded as Map));
+    }
+
+    throw NetworkException(
+      message: 'Failed to upload water report with status ${response.statusCode}: ${response.body}',
+    );
   }
 }

@@ -1041,6 +1041,40 @@ class FarmDetailScreen extends StatelessWidget {
                       context.push(RoutePaths.weatherDetailPath(farm.id));
                     },
                   ),
+                  const SizedBox(height: 10),
+
+                  // Action to trigger irrigation water intelligence
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00695C),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.water_drop),
+                    label: const Text('Irrigation Water Quality & Sources', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      context.push(RoutePaths.farmWaterPath(farm.id));
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Action to trigger satellite vegetation health monitoring
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF558B2F),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.satellite_alt),
+                    label: const Text('Sentinel-2 Satellite Vegetation Health', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      context.push(RoutePaths.farmVegetationPath(farm.id));
+                    },
+                  ),
                 ],
               ),
             ),

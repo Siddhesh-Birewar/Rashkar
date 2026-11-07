@@ -22,4 +22,8 @@ abstract final class RouteNames {
   static const String soilLabUpload = 'soilLabUpload';
   static const String soilLabReportReview = 'soilLabReportReview';
   static const String soilLabHistory = 'soilLabHistory';
+
+  // Advanced Farm Health Intelligence names
+  static const String farmWater = 'farmWater';
+  static const String farmVegetation = 'farmVegetation';
 }
