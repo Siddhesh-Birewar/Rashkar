@@ -17,6 +17,13 @@ echo "======================================================================"
 echo "  🌱 CropNet AI — Local Prototype Environment Launcher"
 echo "======================================================================"
 
+# Check for --restart flag
+if [ "$1" = "--restart" ] || [ "$1" = "--clean" ]; then
+    echo "[!] Restart flag detected. Stopping any existing instances first..."
+    "${SCRIPT_DIR}/stop_local_prototype.sh"
+    sleep 1
+fi
+
 # 1. Check Ollama
 echo "[1/3] Checking local Ollama service (127.0.0.1:11434)..."
 if curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
@@ -38,8 +45,16 @@ echo "[2/3] Starting FastAPI backend on http://127.0.0.1:8000..."
 if curl -s http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
     echo "  ✓ FastAPI backend is already running on port 8000."
 else
+    # Release stale port 8000 if not responding to health
+    PID_8000=$(lsof -ti:8000 2>/dev/null || true)
+    if [ -n "$PID_8000" ]; then
+        echo "  ⚠ Port 8000 is occupied but unresponsive. Releasing port..."
+        kill -9 $PID_8000 2>/dev/null || true
+        sleep 1
+    fi
+
     cd "${ROOT_DIR}"
-    python3 -m uvicorn cropnet.services.api.app.main:app --host 127.0.0.1 --port 8000 --reload &
+    PYTHONPATH="${ROOT_DIR}/..:${ROOT_DIR}" python3 -m uvicorn cropnet.services.api.app.main:app --host 127.0.0.1 --port 8000 --reload &
     FASTAPI_PID=$!
     echo "  ✓ FastAPI started (PID: ${FASTAPI_PID}). Waiting for health check..."
     
