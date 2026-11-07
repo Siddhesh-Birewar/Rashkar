@@ -266,17 +266,17 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
         return;
       }
 
-      // Native browser/device file picker with multi-tier fallback
+      // Native browser/device file picker with platform-appropriate handling
       PlatformFile? picked;
       if (kIsWeb) {
         try {
           picked = await pickDocumentNative(
             allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
           );
-        } catch (_) {}
-      }
-
-      if (picked == null) {
+        } catch (e) {
+          debugPrint('Native web file picker error: $e');
+        }
+      } else {
         try {
           picked = await FilePicker.pickFile(
             type: FileType.custom,

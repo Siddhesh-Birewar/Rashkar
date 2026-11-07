@@ -554,6 +554,9 @@ def _fuse_confirmed_laboratory_measurements(
             latest_by_param[m.parameter_key] = m
 
     if profile is None:
+        first_rep_depth = confirmed_reports[0].sample_depth_interval if confirmed_reports else None
+        if not first_rep_depth or first_rep_depth.strip().lower() in {"not specified", "unknown"}:
+            first_rep_depth = "Not specified"
         profile = UnifiedSoilProfile(
             profile_id=str(uuid.uuid4()),
             farm_id=str(farm_id),
@@ -570,7 +573,7 @@ def _fuse_confirmed_laboratory_measurements(
             source_dataset="Laboratory Test Report",
             dataset_version="1.0.0",
             spatial_resolution="point_sample",
-            depth_interval=confirmed_reports[0].sample_depth_interval or "0-15cm",
+            depth_interval=first_rep_depth,
         )
     else:
         profile = profile.model_copy(deep=True)
@@ -581,8 +584,18 @@ def _fuse_confirmed_laboratory_measurements(
             meas.normalized_value if meas.normalized_value is not None else meas.original_value
         )
         unit = meas.normalized_unit or meas.original_unit or ""
-        depth_int = meas.report.sample_depth_interval if (meas.report and meas.report.sample_depth_interval) else profile.depth_interval
+        depth_int = (
+            meas.report.sample_depth_interval
+            if (meas.report and meas.report.sample_depth_interval and meas.report.sample_depth_interval.strip().lower() not in {"not specified", "unknown"})
+            else "Not specified"
+        )
         vintage = meas.report.report_date.year if (meas.report and meas.report.report_date) else datetime.utcnow().year
+        depth_prov = meas.report.depth_provenance if (meas.report and meas.report.depth_provenance) else "UNKNOWN"
+        base_note = scientific_note or f"Farmer-confirmed physical laboratory test from {lab_name}."
+        if depth_int == "Not specified":
+            full_note = f"{base_note} (Depth: Not specified)."
+        else:
+            full_note = f"{base_note} (Depth: {depth_int}, provenance: {depth_prov})."
 
         return SoilParameterObservation(
             parameter_key=key,
@@ -597,7 +610,7 @@ def _fuse_confirmed_laboratory_measurements(
             verification_status=VerificationStatus.LABORATORY_VERIFIED,
             availability_status=ParameterAvailability.AVAILABLE,
             farm_coverage_percent=100.0,
-            scientific_note=scientific_note or f"Farmer-confirmed physical laboratory test from {lab_name}."
+            scientific_note=full_note
         )
 
     # 1. Precedence: soil_ph
