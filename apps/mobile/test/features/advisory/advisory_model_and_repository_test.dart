@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:cropnet_mobile/core/network/api_client.dart';
+import 'package:cropnet_mobile/core/network/api_exception.dart';
 import 'package:cropnet_mobile/features/advisory/data/advisory_repository.dart';
 import 'package:cropnet_mobile/features/advisory/models/advisory_models.dart';
 
@@ -233,6 +234,24 @@ void main() {
       );
 
       expect(conversation.decisionId, 'dec-2026-0301-baramati-01');
+    });
+
+    test('AdvisoryRepository maps network timeout to RequestTimeoutException', () async {
+      final mockClient = MockClient((request) async {
+        await Future.delayed(const Duration(milliseconds: 50));
+        return http.Response('{}', 200);
+      });
+
+      final client = ApiClient(httpClient: mockClient);
+      final repo = AdvisoryRepository(client: client);
+
+      expect(
+        () => repo.evaluateFarm(
+          const FarmContextInput(taluka: 'Baramati'),
+          timeout: const Duration(milliseconds: 10),
+        ),
+        throwsA(isA<RequestTimeoutException>()),
+      );
     });
   });
 }

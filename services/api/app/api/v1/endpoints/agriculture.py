@@ -1,10 +1,15 @@
 """
-CropNet AI — Agriculture Reference & Intelligence API Endpoints.
+CropNet AI — Agriculture Intelligence API Endpoints.
 
-Provides agricultural calendar reference, deterministic farm evaluation,
-decision inspection, and targeted diagnostic follow-up handling.
+Provides REST interfaces for:
+1. Agro-climatic cropping season calendar (Kharif, Rabi, Summer).
+2. Deterministic farm crop evaluation with hard biological constraints (Phase 5.1).
+3. Evaluation decision inspection by decision ID.
+4. Interactive diagnostic follow-up re-evaluation.
+5. Grounded, farmer-friendly natural language explanations (Phase 5.2).
+6. Grounded conversational dialogue and follow-up consultation.
 """
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -14,24 +19,25 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmContextInput,
     FarmEvaluationResponse,
     FollowUpAnswerRequest,
+    AgriculturalExplanationResponse,
     ExplainDecisionRequest,
-    ConversationRequest,
-    AgriculturalExplanationResponse
+    ConversationRequest
 )
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
 from cropnet.services.api.app.services.llm.explanation_service import AgriculturalExplanationService
 
 router = APIRouter()
+
 crop_service = CropKnowledgeService()
 decision_engine = DeterministicDecisionEngine()
 explanation_service = AgriculturalExplanationService(decision_engine=decision_engine)
 
 
-@router.get("/seasons", response_model=List[MaharashtraSeasonCalendarResponse], tags=["Agricultural Reference"])
-async def list_agricultural_seasons():
+@router.get("/seasons", response_model=List[MaharashtraSeasonCalendarResponse], tags=["Agriculture Intelligence"])
+def get_maharashtra_seasons():
     """
-    Standard agricultural cropping seasons in Maharashtra:
+    Get the official Maharashtra agro-climatic cropping calendar:
     - Kharif (Monsoon)
     - Rabi (Winter)
     - Zaid / Summer (Hot season)
@@ -41,7 +47,7 @@ async def list_agricultural_seasons():
 
 
 @router.post("/evaluate-farm", response_model=FarmEvaluationResponse, tags=["Agriculture Intelligence"])
-async def evaluate_farm_intelligence(
+def evaluate_farm_intelligence(
     payload: FarmContextInput,
     db: Session = Depends(get_db)
 ):
@@ -49,12 +55,13 @@ async def evaluate_farm_intelligence(
     Execute deterministic agricultural evaluation of candidate crops for a farm context.
     Evaluates hard constraints, Bahar water tables, and regional suitability with
     evidence gating and explicit abstention triggers.
+    Dispatched via worker threadpool to prevent blocking the asyncio event loop.
     """
     return decision_engine.evaluate_farm(ctx=payload, db=db)
 
 
 @router.get("/decision/{decision_id}", response_model=FarmEvaluationResponse, tags=["Agriculture Intelligence"])
-async def get_evaluation_decision(
+def get_evaluation_decision(
     decision_id: str
 ):
     """
@@ -70,7 +77,7 @@ async def get_evaluation_decision(
 
 
 @router.post("/follow-up", response_model=FarmEvaluationResponse, tags=["Agriculture Intelligence"])
-async def process_decision_followup(
+def process_decision_followup(
     payload: FollowUpAnswerRequest,
     db: Session = Depends(get_db)
 ):
@@ -91,7 +98,7 @@ async def process_decision_followup(
 
 
 @router.post("/explain-decision", response_model=AgriculturalExplanationResponse, tags=["Agriculture Explanation & Dialogue"])
-async def explain_evaluation_decision(
+def explain_evaluation_decision(
     payload: ExplainDecisionRequest,
     db: Session = Depends(get_db)
 ):
@@ -109,7 +116,7 @@ async def explain_evaluation_decision(
 
 
 @router.post("/conversation", response_model=AgriculturalExplanationResponse, tags=["Agriculture Explanation & Dialogue"])
-async def process_agricultural_conversation(
+def process_agricultural_conversation(
     payload: ConversationRequest,
     db: Session = Depends(get_db)
 ):

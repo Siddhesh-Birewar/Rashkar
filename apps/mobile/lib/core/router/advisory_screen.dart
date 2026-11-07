@@ -55,13 +55,13 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
 
   late TabController _mobileTabController;
 
-  // Farm Context State
-  String _selectedTaluka = 'Baramati';
-  String _selectedDistrict = 'Pune';
+  // Farm Context State (Loaded exclusively from authenticated user farms)
+  String? _selectedTaluka;
+  String? _selectedDistrict;
   String? _selectedFarmId;
-  double _soilPh = 7.8; // Default Vertisol alkaline baseline for Baramati pilot
-  bool _irrigationAvailable = true;
-  String _irrigationSource = 'canal';
+  double? _soilPh; // Real soil pH only if measured or profiled for selected farm
+  bool? _irrigationAvailable;
+  String? _irrigationSource;
   String _selectedSeason = 'kharif'; // 'kharif', 'rabi', 'summer'
   String _selectedLanguage = 'en'; // 'en' or 'mr'
 
@@ -72,16 +72,6 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
   bool _isEvaluating = false;
   bool _isSendingMessage = false;
   String? _errorMessage;
-
-  final List<String> _pilotTalukas = [
-    'Baramati',
-    'Indapur',
-    'Maval',
-    'Mulshi',
-    'Haveli',
-    'Shirur',
-    'Daund',
-  ];
 
   late List<AdvisoryMessage> _messages;
 
@@ -123,7 +113,18 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
         _irrigationAvailable = selected.irrigationType != 'rainfed';
         _irrigationSource = selected.waterSource;
       });
+      _fetchFarmSoilProfile(selected.id);
+    } else {
+      setState(() {
+        _selectedFarmId = null;
+        _selectedTaluka = null;
+        _selectedDistrict = null;
+        _soilPh = null;
+        _irrigationAvailable = null;
+        _irrigationSource = null;
+      });
     }
+    _resetConversation();
   }
 
   /// Fetch soil profile to obtain measured or estimated pH
@@ -134,9 +135,10 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
         setState(() {
           _soilPh = profile.ph!.value!;
         });
+        _resetConversation();
       }
     } catch (_) {
-      // Retain existing/default pH if soil profile is not yet initialized
+      // Retain null if soil profile is not yet available
     }
   }
 
@@ -150,6 +152,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
         _selectedDistrict = farm.district;
         _irrigationAvailable = farm.irrigationType != 'rainfed';
         _irrigationSource = farm.waterSource;
+        _soilPh = null; // Clear until fetched for this farm
       }
       _decisionId = null;
       _evaluation = null;
@@ -170,17 +173,45 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
 
     final isMr = _selectedLanguage == 'mr';
     final seasonName = _getSeasonDisplayLabel(_selectedSeason, isMr);
+    final currentFarm = _getCurrentFarm();
+
+    if (currentFarm == null) {
+      _messages = [
+        AdvisoryMessage(
+          id: 'msg-init-empty',
+          sender: 'assistant',
+          text: isMr
+              ? 'नमस्ते! क्रॉपनेट एआय कृषी सल्लागार प्रणालीमध्ये आपले स्वागत आहे. '
+                'प्रमाणित पीक मूल्यमापन आणि सल्ला सुरू करण्यासाठी कृपया तुमचे शेत निवडा किंवा नवीन शेत नोंदवा.'
+              : 'Namaste! Welcome to CropNet AI Agronomic Advisory. '
+                'Please select or register a farm to begin agricultural evaluation and dialogue.',
+          provenance: '[CropNet System Notice | Verified Authentication Required]',
+          generationSource: 'system',
+          timestamp: DateTime.now(),
+        ),
+      ];
+      return;
+    }
+
+    final taluka = currentFarm.taluka;
+    final district = currentFarm.district;
+    final farmName = currentFarm.name;
+    final phText = _soilPh != null
+        ? '${_soilPh!.toStringAsFixed(1)} (Measured)'
+        : (isMr ? 'माती चाचणी आवश्यक' : 'Soil test required');
+    final irrigText = currentFarm.irrigationType != 'rainfed'
+        ? currentFarm.waterSource
+        : (isMr ? 'जिरायती (Rainfed)' : 'Rainfed');
 
     _messages = [
       AdvisoryMessage(
         id: 'msg-init-1',
         sender: 'assistant',
         text: isMr
-            ? 'नमस्ते! क्रॉपनेट एआय कृषी सल्लागार प्रणालीमध्ये आपले स्वागत आहे. '
-              'मी $_selectedTaluka ($seasonName हंगाम) परिसरासाठी प्रमाणित कृषी निर्णय प्रणालीशी जोडलेला आहे. '
-              'पिकांची निवड, माती परीक्षण, किंवा हवामानानुसार सल्ला हवा असल्यास विचारा.'
+            ? 'नमस्ते! मी $farmName ($taluka, $seasonName हंगाम) परिसरातील तुमच्या शेतासाठी प्रमाणित कृषी निर्णय प्रणालीशी जोडलेला आहे. '
+              'पिकांची निवड, माती मर्यादा, किंवा सिंचनानुसार सल्ला हवा असल्यास विचारा.'
             : 'Namaste! Welcome to CropNet AI Agronomic Advisory. '
-              'I am connected to the CropNet agricultural intelligence decision engine for $_selectedTaluka ($seasonName Season). '
+              'I am connected to the CropNet agricultural intelligence decision engine for $farmName in $taluka ($seasonName Season). '
               'How can I assist with your crop feasibility, soil constraints, or irrigation decisions today?',
         provenance: '[llm_qwen3_8b | Guardrails: Verified | Sources: MPKV Rahuri / ICAR / CRIDA]',
         generationSource: 'llm_qwen3_8b',
@@ -190,14 +221,12 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
         id: 'msg-init-2',
         sender: 'assistant',
         text: isMr
-            ? '📍 $_selectedTaluka परिसर प्रोफाइल: काळी मध्यम ते भारी व्हर्टिसोल जमीन, '
-              'सामू (pH) ${_soilPh.toStringAsFixed(1)}. उपलब्ध सिंचन: ${_irrigationAvailable ? _irrigationSource : "जिरायती (Rainfed)"}. '
+            ? '📍 शेत संदर्भ ($farmName): $taluka, $district. सामू (pH): $phText. सिंचन: $irrigText. '
               'खालील "शेत पिकांचे मूल्यांकन करा" बटण दाबून प्रमाणित पीक feasibility तपासा.'
-            : '📍 Farm Context for $_selectedTaluka, $_selectedDistrict: Vertisol black clay soil, '
-              'soil pH ${_soilPh.toStringAsFixed(1)}, irrigation: ${_irrigationAvailable ? _irrigationSource : "Rainfed"}. '
+            : '📍 Farm Context for $farmName ($taluka, $district): Soil pH: $phText, Irrigation: $irrigText. '
               'Tap "Evaluate Farm Crops" to run deterministic crop feasibility analysis.',
-        provenance: '[deterministic_fallback | Guardrails: Enforced | Sources: ISRIC SoilGrids / MPKV Rahuri]',
-        generationSource: 'deterministic_fallback',
+        provenance: '[deterministic_engine | Verified Farm Record | Sources: Farm Registry / MPKV Rahuri]',
+        generationSource: 'deterministic_engine',
         timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
       ),
     ];
@@ -216,24 +245,30 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
 
   /// Trigger deterministic farm evaluation against Phase 5.1 FastAPI endpoints
   Future<void> _runDeterministicEvaluation({String? userQuery}) async {
+    final currentFarm = _getCurrentFarm();
+    if (currentFarm == null) {
+      setState(() {
+        _errorMessage = _selectedLanguage == 'mr'
+            ? 'मूल्यांकन सुरू करण्यासाठी कृपया प्रथम शेत निवडा किंवा नोंदवा.'
+            : 'Select or register a farm to begin evaluation.';
+      });
+      return;
+    }
+
     setState(() {
       _isEvaluating = true;
       _errorMessage = null;
     });
 
-    final currentFarm = _getCurrentFarm();
-    final taluka = currentFarm?.taluka ?? _selectedTaluka;
-    final district = currentFarm?.district ?? _selectedDistrict;
-
     final contextInput = FarmContextInput(
-      farmId: currentFarm?.id,
-      taluka: taluka,
-      district: district,
-      latitude: currentFarm?.centroid.latitude ?? 18.18,
-      longitude: currentFarm?.centroid.longitude ?? 74.53,
+      farmId: currentFarm.id,
+      taluka: currentFarm.taluka,
+      district: currentFarm.district,
+      latitude: currentFarm.centroid.latitude,
+      longitude: currentFarm.centroid.longitude,
       soilPh: _soilPh,
-      irrigationAvailable: _irrigationAvailable,
-      irrigationSource: _irrigationSource,
+      irrigationAvailable: currentFarm.irrigationType != 'rainfed',
+      irrigationSource: currentFarm.waterSource,
       targetSeason: _selectedSeason,
       language: _selectedLanguage,
       userQuery: userQuery,
@@ -932,8 +967,44 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
             ),
             const Divider(height: 20),
 
-            // Registered Farm Dropdown Selector
-            if (farms.isNotEmpty) ...[
+            // Registered Farm Dropdown Selector or Honest Empty State
+            if (farms.isEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  border: Border.all(color: const Color(0xFFFFE082)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.amber.shade900, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isMr ? 'नोंदणीकृत शेत आढळले नाही' : 'No Registered Farm Selected',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isMr
+                                ? 'सल्ला किंवा पीक मूल्यांकन सुरू करण्यासाठी कृपया प्रथम आपले शेत नोंदवा.'
+                                : 'Select or register a farm to begin. Real verified farm records are required for agronomic feasibility analysis.',
+                            style: TextStyle(fontSize: 12, color: Colors.brown.shade800),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
               Text(
                 isMr ? 'नोंदणीकृत शेत निवडा:' : 'Select Registered Farm:',
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -973,41 +1044,6 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
                 ),
               ),
               const SizedBox(height: 12),
-            ] else ...[
-              Text(
-                isMr ? 'पायलट तालुका निवडा:' : 'Select Pilot Taluka:',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade50,
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedTaluka,
-                    isExpanded: true,
-                    items: _pilotTalukas.map((t) {
-                      return DropdownMenuItem<String>(
-                        value: t,
-                        child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null && val != _selectedTaluka) {
-                        setState(() {
-                          _selectedTaluka = val;
-                          _resetConversation();
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
             ],
 
             // Current Farm Context Parameters Display
@@ -1017,21 +1053,25 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
               children: [
                 _buildContextChip(
                   icon: Icons.location_on,
-                  label: '${isMr ? "तालुका" : "Taluka"}: $_selectedTaluka',
+                  label: '${isMr ? "तालुका" : "Taluka"}: ${_selectedTaluka ?? (isMr ? "निवडला नाही" : "Not selected")}',
                 ),
                 _buildContextChip(
                   icon: Icons.map,
-                  label: '${isMr ? "जिल्हा" : "District"}: $_selectedDistrict',
+                  label: '${isMr ? "जिल्हा" : "District"}: ${_selectedDistrict ?? (isMr ? "निवडला नाही" : "Not selected")}',
                 ),
                 _buildContextChip(
                   icon: Icons.science,
-                  label: 'Soil pH: ${_soilPh.toStringAsFixed(1)} (Vertisol)',
+                  label: _soilPh != null
+                      ? 'Soil pH: ${_soilPh!.toStringAsFixed(1)}'
+                      : (isMr ? 'सामू (pH): माती चाचणी आवश्यक' : 'Soil pH: Lab test required'),
                 ),
                 _buildContextChip(
                   icon: Icons.water_drop,
-                  label: _irrigationAvailable
-                      ? '${isMr ? "सिंचन" : "Irrigation"}: $_irrigationSource'
-                      : (isMr ? 'जिरायती (Rainfed)' : 'Rainfed'),
+                  label: _irrigationAvailable != null
+                      ? (_irrigationAvailable!
+                          ? '${isMr ? "सिंचन" : "Irrigation"}: ${_irrigationSource ?? "Available"}'
+                          : (isMr ? 'जिरायती (Rainfed)' : 'Rainfed'))
+                      : (isMr ? 'सिंचन: नोंद नाही' : 'Irrigation: Unspecified'),
                 ),
               ],
             ),
@@ -1077,9 +1117,19 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
 
             // Prominent "Evaluate Farm Crops" Button
             ElevatedButton(
-              onPressed: _isEvaluating ? null : () => _runDeterministicEvaluation(),
+              onPressed: _isEvaluating
+                  ? null
+                  : (farms.isEmpty
+                      ? () {
+                          setState(() {
+                            _errorMessage = isMr
+                                ? 'मूल्यांकन सुरू करण्यासाठी कृपया प्रथम शेत निवडा किंवा नोंदवा.'
+                                : 'Select or register a farm to begin evaluation.';
+                          });
+                        }
+                      : () => _runDeterministicEvaluation()),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B5E20),
+                backgroundColor: farms.isEmpty ? Colors.grey.shade400 : const Color(0xFF1B5E20),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1100,7 +1150,9 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
                   Text(
                     _isEvaluating
                         ? (isMr ? 'मूल्यांकन चालू आहे...' : 'Evaluating Farm Feasibility...')
-                        : (isMr ? 'शेत पिकांचे मूल्यांकन करा' : 'Evaluate Farm Crops'),
+                        : (farms.isEmpty
+                            ? (isMr ? 'प्रथम शेत निवडा / नोंदवा' : 'Select or Register a Farm')
+                            : (isMr ? 'शेत पिकांचे मूल्यांकन करा' : 'Evaluate Farm Crops')),
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ],

@@ -4,6 +4,8 @@ CropNet AI — Agricultural Knowledge Retriever.
 Executes parameterized queries against Phase 4 PostgreSQL knowledge tables
 and retrieves verified crop requirements, decoupled irrigation statements,
 Bahar daily tree water tables, and institutional source citations.
+Includes high-performance in-memory caching to prevent redundant WAN round-trips
+during multi-dimensional crop evaluation cycles.
 """
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
@@ -12,39 +14,93 @@ from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKn
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse, AgriculturalKnowledgeSourceResponse
 from cropnet.services.api.app.schemas.agriculture_intelligence import CitationMetadata
 from cropnet.services.api.app.services.agriculture_intelligence.evidence_gate import EvidenceGate, SOURCE_TIER_MAPPING
+from cropnet.services.api.app.services.crop_knowledge.seed_data import KNOWLEDGE_SOURCES
 
 
 class KnowledgeRetriever:
     """
-    Retrieves validated crop requirements and source metadata.
+    Retrieves validated crop requirements and source metadata with in-memory caching.
     """
 
     def __init__(self, crop_service: Optional[CropKnowledgeService] = None):
         self.crop_service = crop_service or CropKnowledgeService()
+        self._profile_cache: Dict[str, CropFullProfileResponse] = {}
+        self._citation_cache: Dict[str, Optional[CitationMetadata]] = {}
+        self._crops_list: Optional[List[str]] = None
+        self._prime_cache()
+
+    def _prime_cache(self) -> None:
+        """
+        Pre-populate memory cache from CropKnowledgeService's verified in-memory dataset
+        to guarantee sub-millisecond evaluation latency without blocking WAN round trips.
+        """
+        try:
+            summaries = self.crop_service.get_all_crops(db=None)
+            self._crops_list = [s.id for s in summaries]
+            for cid in self._crops_list:
+                prof = self.crop_service.get_crop_profile(cid, db=None)
+                if prof:
+                    self._profile_cache[cid] = prof
+
+            for src_data in KNOWLEDGE_SOURCES:
+                sid = src_data["id"]
+                src = self.crop_service.get_source(source_id=sid, db=None)
+                if src:
+                    self._citation_cache[sid] = EvidenceGate.format_citation(
+                        source_id=src.id,
+                        organization=src.organization,
+                        publication_title=src.publication_title,
+                        publication_year=src.publication_year,
+                        section_or_pages=src.section_or_pages
+                    )
+        except Exception:
+            pass
+
+    def clear_cache(self) -> None:
+        """Invalidate all cached crop profiles and citation metadata."""
+        self._profile_cache.clear()
+        self._citation_cache.clear()
+        self._crops_list = None
+        self._prime_cache()
 
     def get_supported_crops(self, db: Optional[Session] = None) -> List[str]:
         """Returns the canonical 10 crop IDs."""
+        if self._crops_list is not None and len(self._crops_list) > 0:
+            return self._crops_list
         summaries = self.crop_service.get_all_crops(db=db)
-        return [s.id for s in summaries]
+        self._crops_list = [s.id for s in summaries]
+        return self._crops_list
 
     def get_crop_profile(self, crop_id: str, db: Optional[Session] = None) -> Optional[CropFullProfileResponse]:
         """Retrieve full crop profile with all nested requirement modules."""
-        return self.crop_service.get_crop_profile(crop_id=crop_id, db=db)
+        if crop_id in self._profile_cache:
+            return self._profile_cache[crop_id]
+        profile = self.crop_service.get_crop_profile(crop_id=crop_id, db=db)
+        if profile is not None:
+            self._profile_cache[crop_id] = profile
+        return profile
 
     def get_source_citation(self, source_id: Optional[str], db: Optional[Session] = None) -> Optional[CitationMetadata]:
         """Fetch granular citation metadata for a registered source ID."""
         if not source_id:
             return None
+        if source_id in self._citation_cache:
+            return self._citation_cache[source_id]
+
         src = self.crop_service.get_source(source_id=source_id, db=db)
         if not src:
+            self._citation_cache[source_id] = None
             return None
-        return EvidenceGate.format_citation(
+
+        citation = EvidenceGate.format_citation(
             source_id=src.id,
             organization=src.organization,
             publication_title=src.publication_title,
             publication_year=src.publication_year,
             section_or_pages=src.section_or_pages
         )
+        self._citation_cache[source_id] = citation
+        return citation
 
     def get_regional_suitability(
         self,

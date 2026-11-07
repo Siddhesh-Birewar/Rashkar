@@ -114,8 +114,15 @@ class OllamaClient:
         }
 
         start_t = time.time()
+        timeout_config = httpx.Timeout(
+            timeout=float(req_timeout),
+            connect=3.0,
+            read=float(req_timeout),
+            write=10.0,
+            pool=5.0
+        )
         try:
-            with httpx.Client(timeout=float(req_timeout)) as client:
+            with httpx.Client(timeout=timeout_config) as client:
                 resp = client.post(f"{self.base_url}/api/chat", json=payload)
                 elapsed = time.time() - start_t
 
@@ -200,8 +207,15 @@ class OllamaClient:
         }
 
         start_t = time.time()
+        timeout_config = httpx.Timeout(
+            timeout=float(req_timeout),
+            connect=3.0,
+            read=float(req_timeout),
+            write=10.0,
+            pool=5.0
+        )
         try:
-            async with httpx.AsyncClient(timeout=float(req_timeout)) as client:
+            async with httpx.AsyncClient(timeout=timeout_config) as client:
                 resp = await client.post(f"{self.base_url}/api/chat", json=payload)
                 elapsed = time.time() - start_t
 
