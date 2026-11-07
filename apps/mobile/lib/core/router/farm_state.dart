@@ -1,53 +1,118 @@
 import 'package:flutter/foundation.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:cropnet_mobile/main.dart';
+import 'package:cropnet_mobile/features/farm/data/farm_repository.dart' as data;
+import 'package:cropnet_mobile/features/farm/models/farm_models.dart';
 
 /// Central Farm Repository providing reactive state management and lookup
 /// for all routing branches, deep linking, and URL synchronization.
+///
+/// Wraps the typed HTTP data repository [data.FarmRepository] and manages
+/// authentic multi-tenant user farm state with zero hardcoded demo data.
 class FarmRepository extends ChangeNotifier {
   static final FarmRepository _instance = FarmRepository._internal();
   static FarmRepository get instance => _instance;
 
   factory FarmRepository() => _instance;
 
-  FarmRepository._internal() {
-    _initializeDefaultFarms();
-  }
+  final data.FarmRepository _dataRepo;
+
+  FarmRepository._internal({data.FarmRepository? dataRepo})
+      : _dataRepo = dataRepo ?? data.FarmRepository();
 
   final List<FarmItem> _farms = [];
+  bool _isLoading = false;
+  String? _error;
 
   List<FarmItem> get farms => List.unmodifiable(_farms);
-
-  void _initializeDefaultFarms() {
-    _farms.clear();
-    _farms.add(
-      FarmItem(
-        id: "demo-baramati-1",
-        name: "Baramati Pilot Plot",
-        village: "Malegaon",
-        taluka: "Baramati",
-        district: "Pune",
-        irrigationType: "irrigated",
-        waterSource: "canal",
-        polygonPoints: [
-          const LatLng(18.175, 74.525),
-          const LatLng(18.175, 74.535),
-          const LatLng(18.185, 74.535),
-          const LatLng(18.185, 74.525),
-        ],
-        areaHectares: 11.82,
-        areaAcres: 29.21,
-        centroid: const LatLng(18.180, 74.530),
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-    );
-  }
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
   FarmItem? getFarmById(String id) {
     try {
       return _farms.firstWhere((f) => f.id == id);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Load authenticated user's farms from FastAPI backend.
+  Future<void> loadFarms() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final realFarms = await _dataRepo.listFarms();
+      _farms.clear();
+      for (final f in realFarms) {
+        _farms.add(FarmItem.fromFarm(f));
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Create a new farm via FastAPI and prepend to active state.
+  Future<FarmItem> createFarm(FarmCreate payload) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final created = await _dataRepo.createFarm(payload);
+      final item = FarmItem.fromFarm(created);
+      _farms.insert(0, item);
+      return item;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Update an existing farm via FastAPI.
+  Future<FarmItem> updateFarmRemote(String farmId, FarmUpdate payload) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updated = await _dataRepo.updateFarm(farmId, payload);
+      final item = FarmItem.fromFarm(updated);
+      final idx = _farms.indexWhere((f) => f.id == farmId);
+      if (idx != -1) {
+        _farms[idx] = item;
+      }
+      return item;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Delete an existing farm via FastAPI.
+  Future<void> deleteFarmRemote(String farmId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _dataRepo.deleteFarm(farmId);
+      _farms.removeWhere((f) => f.id == farmId);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -69,9 +134,16 @@ class FarmRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Resets repository back to baseline (used for testing and teardown)
-  void resetToDefault() {
-    _initializeDefaultFarms();
+  /// Clears repository state (e.g. on user logout).
+  void clear() {
+    _farms.clear();
+    _error = null;
+    _isLoading = false;
     notifyListeners();
+  }
+
+  /// Resets repository back to empty baseline.
+  void resetToDefault() {
+    clear();
   }
 }

@@ -51,73 +51,7 @@ class _AssessmentHistoryScreenState extends State<AssessmentHistoryScreen> {
   }
 
   void _initializeHistoryRecords() {
-    final now = DateTime.now();
-    _records = [
-      AssessmentHistoryRecord(
-        id: 'hist-baramati-soil-1',
-        farmId: 'demo-baramati-1',
-        farmName: 'Baramati Pilot Plot',
-        taluka: 'Baramati',
-        assessmentType: 'Location-Based Soil Profile',
-        date: now.subtract(const Duration(hours: 3)),
-        summary: 'Deep Vertisol profile extracted from ISRIC SoilGrids 2.0 (depth 0-5cm). '
-            'Identified pH 7.29, organic carbon 0.58%, total nitrogen 1.25 g/kg.',
-        provenance: 'ISRIC SoilGrids 2.0 (250m Resolution)',
-        keyMetrics: {
-          'Soil pH': '7.29 (Alkaline)',
-          'Texture': 'Clay (52%)',
-          'Nitrogen Status': '1.25 g/kg Total',
-        },
-      ),
-      AssessmentHistoryRecord(
-        id: 'hist-baramati-crop-1',
-        farmId: 'demo-baramati-1',
-        farmName: 'Baramati Pilot Plot',
-        taluka: 'Baramati',
-        assessmentType: 'Crop Feasibility Assessment',
-        date: now.subtract(const Duration(days: 1, hours: 2)),
-        summary: 'Evaluated 12 pilot crops for canal-irrigated Vertisol conditions. '
-            'Top recommendations: Sugarcane (Cash Crop), Soybean (Pulse/Oilseed), and Sorghum (Cereal).',
-        provenance: 'MPKV Agricultural Package & ICAR-CRIDA Pilot Feasibility Matrix',
-        keyMetrics: {
-          'Top Crop': 'Sugarcane',
-          'Suitability': 'High (Canal)',
-          'Alternative': 'Soybean / Jowar',
-        },
-      ),
-      AssessmentHistoryRecord(
-        id: 'hist-indapur-soil-1',
-        farmId: 'pilot-indapur',
-        farmName: 'Indapur Agro Plot',
-        taluka: 'Indapur',
-        assessmentType: 'Regional Soil Intelligence',
-        date: now.subtract(const Duration(days: 3)),
-        summary: 'Medium-deep black soil profile. Moderately alkaline pH (7.45) with high clay content. '
-            'Ujjani canal command area context applied.',
-        provenance: 'ISRIC SoilGrids 2.0 & Pune District Soil Survey',
-        keyMetrics: {
-          'Soil pH': '7.45 (Alkaline)',
-          'Organic Carbon': '0.52%',
-          'Water Source': 'Canal Lift',
-        },
-      ),
-      AssessmentHistoryRecord(
-        id: 'hist-maval-soil-1',
-        farmId: 'pilot-maval',
-        farmName: 'Maval Terraced Farm',
-        taluka: 'Maval',
-        assessmentType: 'Location-Based Soil Profile',
-        date: now.subtract(const Duration(days: 5)),
-        summary: 'Western Ghats high-rainfall agro-climatic zone. Slightly acidic to neutral loam soil (pH 6.42). '
-            'Suited for Kharif Paddy (Rice) and horticulture.',
-        provenance: 'ISRIC SoilGrids 2.0 & Konkan-Western Ghats Agronomic Guidelines',
-        keyMetrics: {
-          'Soil pH': '6.42 (Slightly Acidic)',
-          'Texture': 'Clay Loam (38%)',
-          'Annual Rain': 'High (>1200mm)',
-        },
-      ),
-    ];
+    _records = [];
   }
 
   @override
@@ -143,9 +77,9 @@ class _AssessmentHistoryScreenState extends State<AssessmentHistoryScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildMetricCard('Total Runs', '${_records.length}', Icons.analytics_outlined),
-                _buildMetricCard('Soil Profiles', '3', Icons.terrain_outlined),
-                _buildMetricCard('Crop Feasibility', '1', Icons.grass_outlined),
-                _buildMetricCard('Regions', '4', Icons.location_on_outlined),
+                _buildMetricCard('Soil Profiles', '${_records.where((r) => r.assessmentType.contains("Soil")).length}', Icons.terrain_outlined),
+                _buildMetricCard('Crop Feasibility', '${_records.where((r) => r.assessmentType.contains("Crop")).length}', Icons.grass_outlined),
+                _buildMetricCard('Regions', '${_records.map((r) => r.taluka).toSet().length}', Icons.location_on_outlined),
               ],
             ),
           ),
@@ -180,7 +114,16 @@ class _AssessmentHistoryScreenState extends State<AssessmentHistoryScreen> {
           Expanded(
             child: filtered.isEmpty
                 ? const Center(
-                    child: Text('No assessments recorded for this filter.', style: TextStyle(color: Colors.black54)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history, size: 48, color: Colors.grey),
+                        SizedBox(height: 12),
+                        Text('No assessment history yet.', style: TextStyle(color: Colors.black54, fontSize: 16)),
+                        SizedBox(height: 4),
+                        Text('Assessments will appear here once you run soil or crop evaluations.', style: TextStyle(color: Colors.black38, fontSize: 13)),
+                      ],
+                    ),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
