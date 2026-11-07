@@ -198,6 +198,50 @@ def test_upload_invalid_format_rejected():
     assert "Unsupported file format" in resp.json()["detail"]
 
 
+def test_upload_signature_mismatch_rejected():
+    """Verify rejection when file extension does not match file magic bytes."""
+    user_id = str(uuid.uuid4())
+    farm_id = _create_test_farm(user_id)
+
+    # 1. Fake PDF with text bytes
+    files_fake_pdf = {"file": ("fake.pdf", io.BytesIO(b"This is a text file masquerading as pdf"), "application/pdf")}
+    resp = client.post(
+        f"/api/v1/farms/{farm_id}/soil-reports",
+        files=files_fake_pdf,
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert resp.status_code == 400
+    assert "signature" in resp.json()["detail"].lower()
+
+    # 2. Fake JPEG with text bytes
+    files_fake_jpeg = {"file": ("fake.jpg", io.BytesIO(b"Not a jpeg file"), "image/jpeg")}
+    resp_jpeg = client.post(
+        f"/api/v1/farms/{farm_id}/soil-reports",
+        files=files_fake_jpeg,
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert resp_jpeg.status_code == 400
+    assert "signature" in resp_jpeg.json()["detail"].lower()
+
+
+def test_upload_browser_octet_stream_normalized():
+    """Verify that browser-uploaded files with application/octet-stream are normalized by extension."""
+    user_id = str(uuid.uuid4())
+    farm_id = _create_test_farm(user_id)
+
+    pdf_bytes = b"%PDF-1.4 baramati official soil test"
+    files = {"file": ("browser_report.pdf", io.BytesIO(pdf_bytes), "application/octet-stream")}
+    resp = client.post(
+        f"/api/v1/farms/{farm_id}/soil-reports",
+        files=files,
+        data={"lab_name": "Government Agriculture Lab"},
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert resp.status_code == 201
+    assert resp.json()["mime_type"] == "application/pdf"
+    assert resp.json()["laboratory_name"] == "Government Agriculture Lab"
+
+
 def test_upload_empty_file_rejected():
     """Verify rejection of zero-byte file uploads."""
     user_id = str(uuid.uuid4())

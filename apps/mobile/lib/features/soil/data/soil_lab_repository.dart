@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_constants.dart';
@@ -83,8 +84,9 @@ class SoilLabRepository {
 
     request.headers['Accept'] = 'application/json';
 
-    // Add metadata form fields
+    // Add metadata form fields (supporting both laboratory_name and lab_name)
     if (laboratoryName != null && laboratoryName.isNotEmpty) {
+      request.fields['laboratory_name'] = laboratoryName;
       request.fields['lab_name'] = laboratoryName;
     }
     if (sampleDepth != null && sampleDepth.isNotEmpty) {
@@ -97,11 +99,24 @@ class SoilLabRepository {
       request.fields['sampling_point_name'] = samplingPointName;
     }
 
-    // Attach file
+    // Attach file with explicit MediaType
+    final effectiveMime = mimeType.isNotEmpty
+        ? mimeType
+        : (lowerName.endsWith('.pdf')
+            ? 'application/pdf'
+            : (lowerName.endsWith('.png') ? 'image/png' : 'image/jpeg'));
+    MediaType? mediaType;
+    try {
+      mediaType = MediaType.parse(effectiveMime);
+    } catch (_) {
+      mediaType = MediaType('application', 'octet-stream');
+    }
+
     final multipartFile = http.MultipartFile.fromBytes(
       'file',
       fileBytes,
       filename: fileName,
+      contentType: mediaType,
     );
     request.files.add(multipartFile);
 

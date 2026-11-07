@@ -19,7 +19,7 @@ target_metadata = Base.metadata
 
 
 def _get_target_url() -> str:
-    url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL
+    url = os.environ.get("DATABASE_URL") or getattr(settings, "SYNC_DATABASE_URL", None) or config.get_main_option("sqlalchemy.url")
     if url and url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     if url and "@localhost:" in url:

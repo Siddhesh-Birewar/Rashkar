@@ -243,6 +243,7 @@ async def upload_soil_report(
     farm_id: uuid.UUID,
     file: UploadFile = File(..., description="Soil report document (PDF, JPEG, PNG, max 15MB)"),
     laboratory_name: Optional[str] = Form(None),
+    lab_name: Optional[str] = Form(None),
     report_date: Optional[str] = Form(None),
     sample_collection_date: Optional[str] = Form(None),
     sample_depth_interval: Optional[str] = Form(None),
@@ -258,12 +259,23 @@ async def upload_soil_report(
     # 1. Enforce farm ownership
     _get_farm_and_verify_owner(farm_id, current_user, db)
 
+    effective_lab_name = laboratory_name or lab_name
+
     # 2. Validate file format
     filename = file.filename or "unknown.pdf"
     dot_idx = filename.rfind(".")
     ext = filename[dot_idx:].lower() if dot_idx != -1 else ""
 
     content_type = file.content_type or ""
+    # Normalize empty or generic octet-stream MIME types from web browsers based on extension
+    if not content_type or content_type == "application/octet-stream":
+        if ext == ".pdf":
+            content_type = "application/pdf"
+        elif ext in {".jpg", ".jpeg"}:
+            content_type = "image/jpeg"
+        elif ext == ".png":
+            content_type = "image/png"
+
     if ext not in ALLOWED_EXTENSIONS or (content_type and content_type not in ALLOWED_MIME_TYPES):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -282,6 +294,23 @@ async def upload_soil_report(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file is empty."
+        )
+
+    # Validate file magic bytes / signature to prevent extension spoofing
+    if ext == ".pdf" and not (content.startswith(b"%PDF") or b"%PDF" in content[:1024]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PDF document: file content does not match PDF signature."
+        )
+    elif ext in {".jpg", ".jpeg"} and not content.startswith(b"\xFF\xD8\xFF"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JPEG image: file content does not match JPEG signature."
+        )
+    elif ext == ".png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PNG image: file content does not match PNG signature."
         )
 
     # 4. Generate report ID & SHA256
@@ -308,7 +337,7 @@ async def upload_soil_report(
         mime_type=content_type or "application/pdf",
         file_hash_sha256=file_hash,
         upload_timestamp=datetime.utcnow(),
-        laboratory_name=laboratory_name,
+        laboratory_name=effective_lab_name,
         report_date=_parse_optional_date(report_date),
         sample_collection_date=_parse_optional_date(sample_collection_date),
         sample_depth_interval=sample_depth_interval,

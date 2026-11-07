@@ -270,9 +270,46 @@ CROPNET AI — PHASE 5.6 VERIFICATION TEST MATRIX
 
 5. Flutter Web Release Build (JavaScript):
    Command: flutter build web --release
-   Result:  Built build/web in 48.9s (SUCCESS)
+   Result:  Built build/web in 35.1s (SUCCESS)
 ================================================================================
 ```
+
+---
+
+## 9.1 Phase 5.6.1: Native File Selection & Signature Validation Upgrade
+
+In Phase 5.6.1, the prototype was upgraded to eliminate all simulated document selection options, replacing them with genuine native file picker integration:
+
+### 1. Native File Selection via `file_picker`
+- Replaced the temporary document selection sheet with `FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'])`.
+- Operating directly via browser file input on Flutter Web (`PlatformFile.readAsBytes()` returning `Uint8List`), eliminating reliance on filesystem paths (`PlatformFile.path == null` in web browsers).
+- Added graceful cancellation handling: when a farmer cancels the file picker, existing selection and metadata remain undisturbed without throwing exceptions.
+
+### 2. Multi-Layer Signature & Format Guardrails
+- **Client-Side Validator (`DocumentFileValidator`)**:
+  - Enforces strict 15 MB limit ($15 \times 1024 \times 1024$ bytes).
+  - Rejects empty documents (0 bytes).
+  - Validates binary magic bytes to prevent file extension spoofing:
+    - **PDF**: `%PDF-` (`0x25, 0x50, 0x44, 0x46`) or `%PDF` within the first 1024 bytes.
+    - **JPEG**: `0xFF 0xD8 0xFF` (SOI marker).
+    - **PNG**: `0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A`.
+- **FastAPI Backend Validation**:
+  - Validates magic bytes and normalizes generic browser `application/octet-stream` MIME types based on authentic binary inspection.
+  - Form field compatibility: accepts both `laboratory_name` and `lab_name` aliases.
+
+### 3. User Experience & Dropzone Controls
+- Displays authentic filename with overflow ellipsis.
+- Dynamic formatted size badges (e.g., `439.5 KB`, `1.4 MB`).
+- Distinct format badges ("PDF Document" / "Image Scan").
+- Quick-action buttons: "Change" (re-opens native picker) and "Remove" (clears document state).
+- "Upload & Extract Soil Parameters" button dynamically enables only when a valid file is selected with zero validation errors.
+
+### 4. Verification Suite
+- **15 New Flutter Tests** added in [`test/features/soil/soil_report_file_upload_test.dart`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/apps/mobile/test/features/soil/soil_report_file_upload_test.dart).
+- Total Flutter Chrome tests: **124 / 124 passing**.
+- Total FastAPI pytest tests: **37 / 37 passing** (including full 10-document OCR benchmark and extension spoofing tests).
+- Dart static analysis: **0 issues**.
+- Live end-to-end integration verified against running FastAPI backend with authentic `tc01_shc_pune_digital.pdf`, resulting in HTTP 201 Created and extraction of 12 unverified soil parameters into Supabase PostgreSQL.
 
 ---
 

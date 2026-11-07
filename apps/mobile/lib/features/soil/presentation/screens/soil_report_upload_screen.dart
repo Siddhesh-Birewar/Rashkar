@@ -1,10 +1,125 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_paths.dart';
 import '../../../../shared/widgets/centered_page_container.dart';
-import '../../data/soil_lab_repository.dart';
 import '../state/soil_lab_notifier.dart';
+
+/// Validation result produced by [DocumentFileValidator].
+class DocumentValidationResult {
+  final bool isValid;
+  final String? errorMessage;
+  final String mimeType;
+
+  const DocumentValidationResult.success(this.mimeType)
+      : isValid = true,
+        errorMessage = null;
+
+  const DocumentValidationResult.failure(this.errorMessage)
+      : isValid = false,
+        mimeType = '';
+}
+
+/// Strict client-side document validator enforcing 15MB limit, supported extensions,
+/// and binary magic byte signatures (preventing corrupt or spoofed uploads).
+class DocumentFileValidator {
+  static const int maxFileSizeBytes = 15 * 1024 * 1024; // 15 Megabytes
+
+  static DocumentValidationResult validate({
+    required String filename,
+    required List<int> bytes,
+    int? sizeBytes,
+  }) {
+    final effectiveSize = sizeBytes != null && sizeBytes > 0 ? sizeBytes : bytes.length;
+
+    if (effectiveSize == 0 || bytes.isEmpty) {
+      return const DocumentValidationResult.failure(
+        'Selected file is empty (0 bytes). Please choose a valid soil test document.',
+      );
+    }
+
+    if (effectiveSize > maxFileSizeBytes) {
+      final mb = (effectiveSize / (1024 * 1024)).toStringAsFixed(1);
+      return DocumentValidationResult.failure(
+        'File size ($mb MB) exceeds the maximum 15 MB limit. Please select a smaller or compressed document.',
+      );
+    }
+
+    final lower = filename.toLowerCase();
+    final dot = lower.lastIndexOf('.');
+    final ext = dot != -1 ? lower.substring(dot) : '';
+
+    if (ext == '.pdf') {
+      if (!_isValidPdf(bytes)) {
+        return const DocumentValidationResult.failure(
+          'Invalid PDF document: file signature does not match the standard PDF format.',
+        );
+      }
+      return const DocumentValidationResult.success('application/pdf');
+    } else if (ext == '.jpg' || ext == '.jpeg') {
+      if (!_isValidJpeg(bytes)) {
+        return const DocumentValidationResult.failure(
+          'Invalid JPEG image: file signature does not match the standard JPEG format.',
+        );
+      }
+      return const DocumentValidationResult.success('image/jpeg');
+    } else if (ext == '.png') {
+      if (!_isValidPng(bytes)) {
+        return const DocumentValidationResult.failure(
+          'Invalid PNG image: file signature does not match the standard PNG format.',
+        );
+      }
+      return const DocumentValidationResult.success('image/png');
+    } else {
+      return const DocumentValidationResult.failure(
+        'Unsupported document format. Please upload a PDF (.pdf), JPEG (.jpg, .jpeg), or PNG (.png) file.',
+      );
+    }
+  }
+
+  static bool _isValidPdf(List<int> bytes) {
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x25 && // %
+        bytes[1] == 0x50 && // P
+        bytes[2] == 0x44 && // D
+        bytes[3] == 0x46) { // F
+      return true;
+    }
+    // Search within first 1024 bytes for UTF-8 BOM or header comment
+    final searchLimit = bytes.length < 1024 ? bytes.length : 1024;
+    for (int i = 0; i <= searchLimit - 4; i++) {
+      if (bytes[i] == 0x25 &&
+          bytes[i + 1] == 0x50 &&
+          bytes[i + 2] == 0x44 &&
+          bytes[i + 3] == 0x46) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool _isValidJpeg(List<int> bytes) {
+    // JPEG SOI marker: 0xFF 0xD8 0xFF
+    return bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF;
+  }
+
+  static bool _isValidPng(List<int> bytes) {
+    // PNG magic header: 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A
+    return bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A;
+  }
+}
 
 /// Representation of a selected document file before uploading.
 class UploadDocumentFile {
@@ -36,11 +151,12 @@ class UploadDocumentFile {
   }
 }
 
-/// Typedef for custom or mock file picker handler (used for test automation and headless execution).
+/// Typedef for custom file picker handler (used for test automation and headless execution).
 typedef CustomFilePicker = Future<UploadDocumentFile?> Function();
 
 /// Screen enabling farmers to upload physical laboratory soil test documents (PDF/images)
-/// with 15MB client-side validation, sample metadata, and animated upload/processing states.
+/// using the native device/browser file picker, with 15MB client-side validation,
+/// magic-byte signature verification, sample metadata, and animated upload/processing states.
 class SoilReportUploadScreen extends StatefulWidget {
   final String farmId;
   final SoilLabNotifier? notifier;
@@ -98,133 +214,80 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
     super.dispose();
   }
 
-  void _validateAndSetFile(UploadDocumentFile file) {
-    setState(() {
-      _selectedFile = file;
-      _clientValidationError = null;
+  void _processSelectedFile({
+    required String filename,
+    required List<int> bytes,
+    required int sizeBytes,
+    String? fallbackMime,
+  }) {
+    final validation = DocumentFileValidator.validate(
+      filename: filename,
+      bytes: bytes,
+      sizeBytes: sizeBytes,
+    );
 
-      if (file.sizeBytes > SoilLabRepository.maxFileSizeBytes) {
-        _clientValidationError =
-            'File size (${file.formattedSize}) exceeds the maximum 15 MB limit. Please compress or select a smaller file.';
-      } else if (!file.isPdf && !file.isImage) {
-        _clientValidationError =
-            'Unsupported file format. Please upload a PDF, PNG, or JPEG soil report.';
-      }
+    setState(() {
+      final effectiveMime = validation.isValid
+          ? validation.mimeType
+          : (fallbackMime ?? 'application/octet-stream');
+
+      _selectedFile = UploadDocumentFile(
+        name: filename,
+        bytes: bytes,
+        mimeType: effectiveMime,
+        sizeBytes: sizeBytes > 0 ? sizeBytes : bytes.length,
+      );
+      _clientValidationError = validation.errorMessage;
+    });
+  }
+
+  void _clearFile() {
+    setState(() {
+      _selectedFile = null;
+      _clientValidationError = null;
     });
   }
 
   Future<void> _pickFile() async {
-    if (widget.customFilePicker != null) {
-      final file = await widget.customFilePicker!();
-      if (file != null) {
-        _validateAndSetFile(file);
+    try {
+      if (widget.customFilePicker != null) {
+        final file = await widget.customFilePicker!();
+        if (file != null) {
+          _processSelectedFile(
+            filename: file.name,
+            bytes: file.bytes,
+            sizeBytes: file.sizeBytes,
+            fallbackMime: file.mimeType,
+          );
+        }
+        return;
       }
-      return;
+
+      // Native browser/device file picker
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+
+      // User cancelled picker dialog -> maintain existing state gracefully
+      if (picked == null) {
+        return;
+      }
+
+      final bytes = await picked.readAsBytes();
+      final size = picked.lengthSync() ?? bytes.length;
+
+      _processSelectedFile(
+        filename: picked.name,
+        bytes: bytes,
+        sizeBytes: size,
+        fallbackMime: null,
+      );
+    } catch (e) {
+      setState(() {
+        _clientValidationError = 'Failed to select document: $e';
+      });
     }
-
-    // Default built-in file selection dialog for user testing & web
-    await _showDocumentSelectionSheet();
-  }
-
-  Future<void> _showDocumentSelectionSheet() async {
-    // Shows a clean selection modal allowing the user to select sample lab reports
-    // or enter document details for testing.
-    await showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.upload_file, color: Color(0xFF2E7D32)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Select Soil Test Document',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Choose a document format to simulate or upload official soil test results:',
-                  style: TextStyle(fontSize: 13, color: Colors.black54),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFFEBEE),
-                    child: Icon(Icons.picture_as_pdf, color: Color(0xFFC62828)),
-                  ),
-                  title: const Text('Government Soil Health Card (PDF)'),
-                  subtitle: const Text('Official SHC 2026 test report • 1.4 MB'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _validateAndSetFile(
-                      UploadDocumentFile(
-                        name: 'Soil_Health_Card_${widget.farmId.substring(0, 4)}.pdf',
-                        bytes: List<int>.filled(1400000, 0),
-                        mimeType: 'application/pdf',
-                        sizeBytes: 1400000,
-                      ),
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Icon(Icons.image, color: Color(0xFF2E7D32)),
-                  ),
-                  title: const Text('District Testing Laboratory Scanned Report (JPEG)'),
-                  subtitle: const Text('Scanned analytical certificate • 2.8 MB'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _validateAndSetFile(
-                      UploadDocumentFile(
-                        name: 'District_Soil_Lab_Scan_${widget.farmId.substring(0, 4)}.jpg',
-                        bytes: List<int>.filled(2800000, 0),
-                        mimeType: 'image/jpeg',
-                        sizeBytes: 2800000,
-                      ),
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFFF3E0),
-                    child: Icon(Icons.warning_amber, color: Color(0xFFE65100)),
-                  ),
-                  title: const Text('Large Document Test (> 15 MB)'),
-                  subtitle: const Text('Triggers client-side size validation error • 18.2 MB'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _validateAndSetFile(
-                      UploadDocumentFile(
-                        name: 'Oversized_Report_Scan.pdf',
-                        bytes: List<int>.filled(18200000, 0),
-                        mimeType: 'application/pdf',
-                        sizeBytes: 18200000,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _pickDate() async {
@@ -397,7 +460,9 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
         color: file != null ? Colors.white : const Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: file != null ? const Color(0xFF2E7D32) : Colors.grey.shade400,
+          color: file != null
+              ? (_clientValidationError == null ? const Color(0xFF2E7D32) : const Color(0xFFC62828))
+              : Colors.grey.shade400,
           width: file != null ? 2.0 : 1.5,
           strokeAlign: BorderSide.strokeAlignInside,
         ),
@@ -418,7 +483,7 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Supports PDF, JPEG, or PNG up to 15 MB.\nDigital reports and scanned Soil Health Cards supported.',
+                  'Supports PDF, JPEG, or PNG up to 15 MB.\nSelect your laboratory report or Soil Health Card directly from your device.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.3),
                 ),
@@ -493,10 +558,15 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: _pickFile,
+                  onPressed: (_notifier.isUploading || _notifier.isProcessing) ? null : _pickFile,
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Change'),
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFF2E7D32)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                  tooltip: 'Remove selected document',
+                  onPressed: (_notifier.isUploading || _notifier.isProcessing) ? null : _clearFile,
                 ),
               ],
             ),
@@ -751,7 +821,10 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
   }
 
   Widget _buildUploadButton() {
-    final canUpload = _selectedFile != null && _clientValidationError == null;
+    final canUpload = _selectedFile != null &&
+        _clientValidationError == null &&
+        !_notifier.isUploading &&
+        !_notifier.isProcessing;
 
     return SizedBox(
       width: double.infinity,
