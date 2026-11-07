@@ -89,11 +89,11 @@ def test_total_nitrogen_vs_available_nitrogen_separation():
 
 
 def test_pomegranate_hard_depth_and_drainage_disqualification():
-    """Verify pomegranate disqualification under shallow depth (20 cm) and poor drainage."""
+    """Verify pomegranate disqualification under poor drainage with depth triggering pit planting advisory."""
     ctx = FarmContextInput(
         taluka="Indapur",
         soil_ph=6.8, # Ideal pH
-        soil_depth_cm=20.0, # Critically shallow (< 45 cm)
+        soil_depth_cm=20.0, # Shallow (< 1 m)
         drainage="Poor / Waterlogged",
         target_crops=["pomegranate"]
     )
@@ -101,8 +101,8 @@ def test_pomegranate_hard_depth_and_drainage_disqualification():
     pom_outcome = next(o for o in res.crop_outcomes if o.crop_id == "pomegranate")
     assert pom_outcome.is_disqualified is True
     assert pom_outcome.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
-    assert any("inadequate for pomegranate" in f for f in pom_outcome.limiting_factors)
-    assert any("Poor drainage" in f for f in pom_outcome.limiting_factors)
+    assert any("Poor drainage" in f or "Waterlogging" in f for f in pom_outcome.limiting_factors)
+    assert any("pit planting" in w.lower() or "depth" in w.lower() for w in pom_outcome.uncertainty_notes)
 
 
 def test_pomegranate_daily_water_table_indexing():
@@ -182,8 +182,8 @@ def test_chickpea_decoupled_irrigation_and_rainfall_suspension():
     assert "ICRISAT" in guidance["icrisat_2010_framework"]["source"]
     assert "MPKV" in guidance["mpkv_2023_framework"]["source"]
     assert "Do NOT combine both into 4 irrigations" in guidance["anti_blending_warning"]
-    # Rainfall suspension warning must be triggered
-    assert any("SUSPEND any planned irrigation" in w for w in chk_outcome.uncertainty_notes)
+    # Rainfall suspension advisory must be triggered
+    assert any("SUSPEND and POSTPONE planned irrigation" in w or "POSTPONE" in w for w in chk_outcome.uncertainty_notes)
 
 
 def test_sugarcane_summer_water_depletion_disqualification():

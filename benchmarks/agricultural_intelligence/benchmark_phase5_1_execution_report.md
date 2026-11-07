@@ -1,6 +1,6 @@
 # CropNet AI — Phase 5.1 Benchmark Execution Report
 
-- **Execution Timestamp**: 2026-11-07T10:55:07.903831Z
+- **Execution Timestamp**: 2026-11-07T11:13:37.694875Z
 - **Total Benchmark Cases**: 30
 - **Passed Cases**: 30
 - **Failed Cases**: 0
@@ -13,7 +13,7 @@
 | Test ID | Domain | Track A (Retrieval) | Track B (Reasoning) | Status | Notes |
 |---------|--------|---------------------|---------------------|--------|-------|
 | AGRI-BENCH-001 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly separated Total N from Available N (< 280 kg/ha low flagged) |
-| AGRI-BENCH-002 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly disqualified pomegranate on 20 cm depth and poor drainage |
+| AGRI-BENCH-002 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly disqualified pomegranate on poor drainage and flagged shallow depth pit planting advisory |
 | AGRI-BENCH-003 | Soil Intelligence | 1.00 | 1.00 | PASS | Flagged low soil organic carbon |
 | AGRI-BENCH-004 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly withheld unconditional suitability pending EC data |
 | AGRI-BENCH-005 | Soil Intelligence | 1.00 | 1.00 | PASS | Verified pomegranate soil requirements: Light soil, pH 6.5-7.0 optimum, 8.5 max |
@@ -30,7 +30,7 @@
 | AGRI-BENCH-016 | Agricultural Decision Reasoning | 1.00 | 1.00 | PASS | Preserved annual water requirement as NULL, defined in L/tree/day |
 | AGRI-BENCH-017 | Irrigation Intelligence | 1.00 | 1.00 | PASS | Indexed ICAR-NRCP Table 1 Mrig Bahar daily water table |
 | AGRI-BENCH-018 | Irrigation Intelligence | 1.00 | 1.00 | PASS | Decoupled ICRISAT (physiological) and MPKV (calendar) irrigation frameworks |
-| AGRI-BENCH-019 | Irrigation Intelligence | 1.00 | 1.00 | PASS | Suspended chickpea irrigation due to >= 40 mm rainfall forecast |
+| AGRI-BENCH-019 | Irrigation Intelligence | 1.00 | 1.00 | PASS | Advised postponement and suspension of chickpea irrigation due to heavy rainfall forecast |
 | AGRI-BENCH-020 | Irrigation Intelligence | 1.00 | 1.00 | PASS | Flagged electrical conductivity and salinity testing requirement |
 | AGRI-BENCH-021 | Weather and Climate Intelligence | 1.00 | 1.00 | PASS | Gated sowing until 75-100 mm monsoon soaking rainfall received |
 | AGRI-BENCH-022 | Weather and Climate Intelligence | 1.00 | 1.00 | PASS | Triggered reproductive thermal warning: > 35°C causes flower drop and reduced pod set |

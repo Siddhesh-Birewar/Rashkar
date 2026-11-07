@@ -110,14 +110,14 @@ def evaluate_test_case(engine: DeterministicDecisionEngine, tc: Dict[str, Any]) 
             reasoning_notes.append("Correctly separated Total N from Available N (< 280 kg/ha low flagged)")
 
     elif tid == "AGRI-BENCH-002":
-        # Pomegranate shallow depth & drainage disqualification
+        # Pomegranate shallow depth advisory & drainage disqualification
         pom = next((o for o in response.crop_outcomes if o.crop_id == "pomegranate"), None)
         if pom and pom.is_disqualified and pom.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
-            has_depth = any("depth" in f.lower() for f in pom.limiting_factors)
+            has_depth = any("depth" in f.lower() for f in pom.limiting_factors) or any("depth" in w.lower() for w in pom.uncertainty_notes)
             has_drainage = any("drainage" in f.lower() or "waterlog" in f.lower() for f in pom.limiting_factors)
             if has_depth and has_drainage:
                 track_b_score = 1.0
-                reasoning_notes.append("Correctly disqualified pomegranate on 20 cm depth and poor drainage")
+                reasoning_notes.append("Correctly disqualified pomegranate on poor drainage and flagged shallow depth pit planting advisory")
 
     elif tid == "AGRI-BENCH-003":
         # SOC Low (< 0.50%)
@@ -232,11 +232,11 @@ def evaluate_test_case(engine: DeterministicDecisionEngine, tc: Dict[str, Any]) 
             reasoning_notes.append("Decoupled ICRISAT (physiological) and MPKV (calendar) irrigation frameworks")
 
     elif tid == "AGRI-BENCH-019":
-        # Chickpea irrigation suspension on 48h rain >= 40 mm
+        # Chickpea weather-aware irrigation postponement / suspension on forecast rain
         chk = next((o for o in response.crop_outcomes if o.crop_id == "chickpea"), None)
-        if chk and any("SUSPEND any planned irrigation" in w for w in chk.uncertainty_notes):
+        if chk and any("suspend" in w.lower() or "postpone" in w.lower() for w in chk.uncertainty_notes):
             track_b_score = 1.0
-            reasoning_notes.append("Suspended chickpea irrigation due to >= 40 mm rainfall forecast")
+            reasoning_notes.append("Advised postponement and suspension of chickpea irrigation due to heavy rainfall forecast")
 
     elif tid == "AGRI-BENCH-020":
         # Wheat irrigation water quality testing

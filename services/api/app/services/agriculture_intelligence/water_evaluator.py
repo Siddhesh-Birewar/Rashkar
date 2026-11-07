@@ -45,7 +45,7 @@ class WaterAvailabilityEvaluator:
         tier = EvidenceGate.get_tier(profile.water.source_id if profile.water else primary_src_id)
 
         # -------------------------------------------------------------
-        # 1. Sugarcane Summer Water Exhaustion Disqualification
+        # 1. Sugarcane Hydrological & Seasonal Water Constraint
         # -------------------------------------------------------------
         if crop_id == "sugarcane":
             capacity = (ctx.irrigation_capacity or "").lower()
@@ -53,23 +53,26 @@ class WaterAvailabilityEvaluator:
             if "seasonal" in capacity or "dry_by_february" in capacity or "february" in source:
                 res.is_disqualified = True
                 msg = (
-                    "Hydrological disqualification: Sugarcane requires 1500–2500 mm over 12–18 months. "
+                    "Hydrological disqualification: Sugarcane requires assured perennial irrigation throughout its 12–18 month duration "
+                    "(2000–3000 mm under furrow, or 1000–1500 mm under drip per MPKV PoP 2023 & MPKV Research 2023 Rec. 3). "
                     "A seasonal water source exhausted by February coincides with the critical summer tillering "
-                    "and stem elongation phase (March–May), causing desiccation and complete crop loss (IISR 2022 / MPKV 2023)."
+                    "and stem elongation phase (March–May), causing acute moisture stress, desiccation, and complete crop loss (MPKV PoP 2023). "
+                    "Sugarcane cannot be sustained without perennial irrigation."
                 )
+                res.warnings.append(msg)
                 res.limiting_factors.append(msg)
                 res.applied_rules.append(AppliedRuleRecord(
                     rule_id="RULE_SUGARCANE_SUMMER_WATER_DEPLETION",
                     domain="Irrigation Intelligence",
                     parameter_checked="irrigation_capacity",
-                    rule_statement="Sugarcane requires perennial water through summer tillering (March–May)",
+                    rule_statement="Sugarcane requires perennial water; summer tillering (March–May) is the critical moisture stress period (MPKV PoP 2023)",
                     condition_met=False,
-                    evidence_tier=tier,
+                    evidence_tier=EvidenceTier.VERIFIED,
                     citation=citation
                 ))
             elif ctx.irrigation_available is False:
                 res.is_disqualified = True
-                res.limiting_factors.append("Sugarcane cannot be grown rainfed in semi-arid Maharashtra.")
+                res.limiting_factors.append("Sugarcane cannot be grown rainfed in semi-arid Maharashtra (MPKV PoP 2023).")
 
         # -------------------------------------------------------------
         # 2. Pomegranate Bahar-Specific Daily Water Schedules
@@ -136,21 +139,28 @@ class WaterAvailabilityEvaluator:
             }
 
             # Weather-aware irrigation suspension check
-            # If irrigation is planned (e.g. around 20-25 DAS) but 48h forecast shows >= 40 mm rain
-            if ctx.forecast_rain_mm_48h and ctx.forecast_rain_mm_48h >= 40.0:
-                res.warnings.append(
-                    f"CRITICAL: Weather forecast indicates {ctx.forecast_rain_mm_48h} mm heavy rainfall within 48 hours. "
-                    "SUSPEND any planned irrigation immediately. Open field drainage furrows to discharge surface water. "
-                    "Chickpea is acutely vulnerable to soil saturation and collar rot."
+            if ctx.forecast_rain_mm_48h is not None and ctx.forecast_rain_mm_48h > 0:
+                rain_amt = ctx.forecast_rain_mm_48h
+                advisory_msg = (
+                    f"Weather-Aware Irrigation Advisory: Forecast indicates {rain_amt} mm precipitation within 48 hours. "
+                    "ICRISAT 2010 (pp. 8, 11) notes chickpea is acutely sensitive to water stagnation, poor aeration, and collar rot. "
+                    f"Current field drainage is '{ctx.drainage or 'unverified'}'. "
+                    "SUSPEND and POSTPONE planned irrigation immediately until the weather event concludes and evaluate soil root-zone moisture. "
+                    "Ensure field drainage furrows are open to discharge excess runoff."
                 )
+                res.warnings.append(advisory_msg)
                 res.applied_rules.append(AppliedRuleRecord(
                     rule_id="RULE_CHICKPEA_IRRIGATION_SUSPENSION_RAIN_FORECAST",
                     domain="Irrigation Intelligence",
                     parameter_checked="forecast_rain_mm_48h",
-                    rule_statement="Suspend chickpea irrigation when heavy rainfall (>= 40 mm) is forecast to prevent root rot",
+                    rule_statement="Advisory to suspend and postpone chickpea irrigation when rainfall is forecast, assessing drainage and soil moisture (ICRISAT 2010, pp. 8, 11)",
                     condition_met=True,
                     evidence_tier=EvidenceTier.VERIFIED,
                     citation=citation
                 ))
+                if not ctx.drainage:
+                    res.missing_parameters.append("drainage")
+                if not ctx.days_after_sowing and not ctx.growth_stage:
+                    res.missing_parameters.append("growth_stage")
 
         return res

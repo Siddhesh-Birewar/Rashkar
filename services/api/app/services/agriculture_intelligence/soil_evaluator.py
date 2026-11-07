@@ -48,29 +48,44 @@ class SoilConstraintEvaluator:
         tier = EvidenceGate.get_tier(soil_req.source_id or primary_src_id)
 
         # -------------------------------------------------------------
-        # 1. Effective Soil Depth Constraint
+        # 1. Effective Soil Depth (Diagnostic Evaluation)
         # -------------------------------------------------------------
         if ctx.soil_depth_cm is not None:
             min_depth = soil_req.min_soil_depth_cm
-            # Pomegranate requires at least 45-60 cm depth; 20 cm depth over bedrock is a hard disqualifier
-            if crop_id == "pomegranate" and ctx.soil_depth_cm < 45.0:
-                res.is_disqualified = True
-                msg = f"Soil depth of {ctx.soil_depth_cm} cm is critically inadequate for pomegranate (minimum 45–60 cm required). Shallow bedrock restricts taproot development and induces dieback."
-                res.limiting_factors.append(msg)
-                res.applied_rules.append(AppliedRuleRecord(
-                    rule_id="RULE_SOIL_DEPTH_POMEGRANATE",
-                    domain="Soil Intelligence",
-                    parameter_checked="soil_depth_cm",
-                    rule_statement="Pomegranate requires minimum 45–60 cm depth (ICAR-NRCP 2022)",
-                    condition_met=False,
-                    evidence_tier=tier,
-                    citation=citation
-                ))
-            elif min_depth and ctx.soil_depth_cm < (min_depth * 0.5):
-                # Severe depth deficit across other crops
-                res.is_disqualified = True
-                msg = f"Soil depth ({ctx.soil_depth_cm} cm) is severely below minimum required depth ({min_depth} cm)."
-                res.limiting_factors.append(msg)
+            if crop_id == "pomegranate":
+                # ICAR-NRCP & MANAGE 2022 (pp. 9–10) establishes pit planting for shallow/rocky soil
+                if ctx.soil_depth_cm < 100.0:
+                    msg = (
+                        f"Effective soil depth ({ctx.soil_depth_cm} cm) is below 1 m. "
+                        "According to ICAR-NRCP & MANAGE 2022 (pp. 9–10), if soil is not deep or is rocky/gravelly up to 1 m depth, "
+                        "planting must be performed in pits (1m x 1m x 1m) filled with 1:1 soil:sand/murrum and organic compost. "
+                        "Trench planting (0.75m x 0.75m) is restricted to soils deeper than 1 m. "
+                        "Depth does not categorically disqualify the parcel, but mandates specialized pit preparation."
+                    )
+                    res.warnings.append(msg)
+                    res.applied_rules.append(AppliedRuleRecord(
+                        rule_id="RULE_SOIL_DEPTH_POMEGRANATE",
+                        domain="Soil Intelligence",
+                        parameter_checked="soil_depth_cm",
+                        rule_statement="Pit planting (1m x 1m x 1m) required when soil depth is < 1 m or rocky (ICAR-NRCP 2022, pp. 9–10)",
+                        condition_met=True,
+                        evidence_tier=tier,
+                        citation=citation
+                    ))
+                else:
+                    res.applied_rules.append(AppliedRuleRecord(
+                        rule_id="RULE_SOIL_DEPTH_POMEGRANATE",
+                        domain="Soil Intelligence",
+                        parameter_checked="soil_depth_cm",
+                        rule_statement="Deep soil (> 1 m) allows trench planting (0.75m x 0.75m) per ICAR-NRCP 2022",
+                        condition_met=True,
+                        evidence_tier=tier,
+                        citation=citation
+                    ))
+            elif min_depth and ctx.soil_depth_cm < min_depth:
+                res.warnings.append(
+                    f"Soil depth ({ctx.soil_depth_cm} cm) is below recommended minimum depth ({min_depth} cm) for {profile.common_name}."
+                )
         else:
             res.missing_parameters.append("soil_depth_cm")
 
@@ -152,10 +167,10 @@ class SoilConstraintEvaluator:
                         evidence_tier=tier,
                         citation=citation
                     ))
-                elif ph > 8.5:
-                    res.is_disqualified = True
-                    res.limiting_factors.append(
-                        f"Soil pH {ph} is excessively alkaline for chickpea, impairing Rhizobium nodulation and iron uptake."
+                elif ph > 8.0:
+                    res.warnings.append(
+                        f"Soil pH {ph} exceeds the best-suited range of 6.0–8.0 (ICRISAT 2010, p. 8). "
+                        "Alkaline and calcareous soils may induce iron chlorosis and reduce Rhizobium nodulation efficiency."
                     )
                 elif ph < 6.0:
                     res.warnings.append(
@@ -188,16 +203,30 @@ class SoilConstraintEvaluator:
             res.missing_parameters.append("soil_texture")
 
         # -------------------------------------------------------------
-        # 5. Salinity (Electrical Conductivity) Constraint
+        # 5. Salinity (Electrical Conductivity) Diagnostic Risk
         # -------------------------------------------------------------
         q_lower = (ctx.user_query or "").lower()
         if ctx.electrical_conductivity_ds_m is not None:
             ec = ctx.electrical_conductivity_ds_m
-            if crop_id == "chickpea" and ec >= 1.5:
-                res.is_disqualified = True
-                res.limiting_factors.append(
-                    f"Soil Electrical Conductivity ({ec} dS/m) exceeds chickpea salinity threshold (1.5 dS/m). ICRISAT 2010 notes saline soil is unsuitable."
+            if crop_id == "chickpea":
+                # ICRISAT 2010 (p. 8) establishes that saline soils and fields with a high water table
+                # are not suitable for chickpea. No numeric EC cutoff is established in the source.
+                # Preserved as a diagnostic variable requiring interpretation.
+                res.warnings.append(
+                    f"Reported Soil Electrical Conductivity is {ec} dS/m. "
+                    "ICRISAT 2010 (p. 8) states that saline soils and fields with a high water table are not suitable for chickpea. "
+                    "Chickpea is salt-sensitive; soil salinity impairs germination, nodulation, and pod yield. "
+                    "Detailed soil testing, water table depth verification, and drainage inspection are required before planting."
                 )
+                res.applied_rules.append(AppliedRuleRecord(
+                    rule_id="RULE_CHICKPEA_SALINITY_RISK",
+                    domain="Soil Intelligence",
+                    parameter_checked="electrical_conductivity_ds_m",
+                    rule_statement="Saline soils and high water table fields are unsuitable for chickpea (ICRISAT 2010, p. 8)",
+                    condition_met=True,
+                    evidence_tier=tier,
+                    citation=citation
+                ))
         else:
             is_canal = (ctx.irrigation_source == "canal") or ("canal" in q_lower)
             is_well = (ctx.irrigation_source == "well") or ("well" in q_lower)
