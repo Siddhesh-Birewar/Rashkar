@@ -103,6 +103,33 @@ TARGETS = [
         "mobile": False,
         "wait": 3.5,
     },
+    {
+        "name": "soil_lab_upload_desktop.png",
+        "url": "http://localhost:8080/#/soil-testing/default/lab/upload",
+        "width": 1280,
+        "height": 800,
+        "device_scale": 1.0,
+        "mobile": False,
+        "wait": 4.0,
+    },
+    {
+        "name": "soil_lab_upload_mobile.png",
+        "url": "http://localhost:8080/#/soil-testing/default/lab/upload",
+        "width": 375,
+        "height": 667,
+        "device_scale": 2.0,
+        "mobile": True,
+        "wait": 4.0,
+    },
+    {
+        "name": "soil_lab_history_desktop.png",
+        "url": "http://localhost:8080/#/soil-testing/default/lab/history",
+        "width": 1280,
+        "height": 800,
+        "device_scale": 1.0,
+        "mobile": False,
+        "wait": 4.0,
+    },
 ]
 
 async def capture_target(ws, target):
