@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:cropnet_mobile/core/router/farm_state.dart';
 import 'package:cropnet_mobile/main.dart';
 
 void main() {
@@ -8,6 +10,25 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+
+    final testFarm = FarmItem(
+      id: 'test-farm-pune',
+      name: 'Baramati Pilot Plot',
+      taluka: 'Baramati',
+      district: 'Pune',
+      village: 'Malegaon',
+      polygonPoints: [
+        const LatLng(18.175, 74.525),
+        const LatLng(18.175, 74.535),
+        const LatLng(18.185, 74.535),
+        const LatLng(18.185, 74.525),
+      ],
+      areaHectares: 11.82,
+      areaAcres: 29.21,
+      centroid: const LatLng(18.18, 74.53),
+      createdAt: DateTime.now(),
+    );
+    FarmRepository.instance.addFarm(testFarm);
 
     // 1. Pump the app shell
     await tester.pumpWidget(const CropNetApp());

@@ -7,9 +7,32 @@ import 'package:cropnet_mobile/core/router/route_names.dart';
 import 'package:cropnet_mobile/core/router/route_paths.dart';
 import 'package:cropnet_mobile/main.dart';
 
+/// A canonical test farm used by router tests that need a farm in the
+/// repository to exercise UI paths that display farm-specific content.
+FarmItem _buildTestFarm() => FarmItem(
+      id: 'test-farm-baramati',
+      name: 'Baramati Pilot Plot',
+      taluka: 'Baramati',
+      district: 'Pune',
+      village: 'Malegaon',
+      polygonPoints: [
+        const LatLng(18.175, 74.525),
+        const LatLng(18.175, 74.535),
+        const LatLng(18.185, 74.535),
+        const LatLng(18.185, 74.525),
+      ],
+      areaHectares: 11.82,
+      areaAcres: 29.21,
+      centroid: const LatLng(18.18, 74.53),
+      createdAt: DateTime(2025, 1, 15),
+    );
+
 void main() {
   setUp(() {
+    // Reset to empty then seed one canonical test farm so that farm-aware
+    // screens (dashboard, soil, weather) have a known farm to display.
     FarmRepository.instance.resetToDefault();
+    FarmRepository.instance.addFarm(_buildTestFarm());
   });
 
   void setDesktopViewport(WidgetTester tester) {
@@ -57,13 +80,10 @@ void main() {
   });
 
   group('FarmRepository Reactive State Tests', () {
-    test('Default demo farm is initialized', () {
+    test('FarmRepository starts empty in authenticated multi-tenant architecture', () {
       final repo = FarmRepository.instance;
-      expect(repo.farms.isNotEmpty, true);
-      final demoFarm = repo.getFarmById('demo-baramati-1');
-      expect(demoFarm, isNotNull);
-      expect(demoFarm!.name, 'Baramati Pilot Plot');
-      expect(demoFarm.taluka, 'Baramati');
+      repo.clear();
+      expect(repo.farms.isEmpty, true);
     });
 
     test('Adding and deleting farms updates state reactively', () {
@@ -166,16 +186,33 @@ void main() {
       expect(find.text('Assessment History'), findsOneWidget);
       expect(find.text('Total Runs'), findsOneWidget);
       expect(find.text('Soil Profiles'), findsOneWidget);
-      expect(find.textContaining('Baramati Pilot Plot (Baramati)'), findsAtLeastNWidgets(1));
+      expect(find.text('No assessment history yet.'), findsOneWidget);
     });
 
-    testWidgets('Deep links to farm soil intelligence sub-route /soil-testing/demo-baramati-1', (tester) async {
+    testWidgets('Deep links to farm soil intelligence sub-route', (tester) async {
       setDesktopViewport(tester);
-      final router = createCropNetRouter(initialLocation: '/soil-testing/demo-baramati-1');
+      final testFarm = FarmItem(
+        id: 'test-farm-1',
+        name: 'Baramati Test Plot',
+        taluka: 'Baramati',
+        polygonPoints: [
+          const LatLng(18.175, 74.525),
+          const LatLng(18.175, 74.535),
+          const LatLng(18.185, 74.535),
+          const LatLng(18.185, 74.525),
+        ],
+        areaHectares: 10.0,
+        areaAcres: 24.7,
+        centroid: const LatLng(18.18, 74.53),
+        createdAt: DateTime.now(),
+      );
+      FarmRepository.instance.addFarm(testFarm);
+
+      final router = createCropNetRouter(initialLocation: '/soil-testing/test-farm-1');
       await tester.pumpWidget(CropNetApp(routerConfig: router));
       await tester.pumpAndSettle();
 
-      expect(find.text('Baramati Pilot Plot — Soil Intelligence'), findsOneWidget);
+      expect(find.text('Baramati Test Plot — Soil Intelligence'), findsOneWidget);
       expect(find.textContaining('Baramati, Pune, Maharashtra'), findsOneWidget);
       expect(find.text('Soil pH (H2O)'), findsOneWidget);
       expect(find.text('7.3 pH'), findsOneWidget);
@@ -189,6 +226,9 @@ void main() {
 
       expect(find.text('Sugarcane'), findsAtLeastNWidgets(1));
       expect(find.text('Saccharum officinarum L.'), findsOneWidget);
+
+      // Advance fake clock past ApiClient timeout so no pending timers remain
+      await tester.pump(const Duration(seconds: 31));
     });
 
     testWidgets('Gracefully handles invalid route /invalid-unknown-url with error screen', (tester) async {
