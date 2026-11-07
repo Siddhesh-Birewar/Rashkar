@@ -506,6 +506,14 @@ async def correct_measurement(
     db.commit()
     db.refresh(measurement)
 
+    # If report was already confirmed, resynchronize canonical profile
+    if report and report.review_status == ReviewStatus.CONFIRMED.value:
+        try:
+            from cropnet.services.api.app.api.v1.endpoints.farms import synchronize_farm_soil_profile
+            synchronize_farm_soil_profile(db, farm_id)
+        except Exception as e:
+            logger.warning("Could not synchronize farm profile after measurement update: %s", e)
+
     return _model_to_measurement_item(measurement)
 
 
@@ -558,6 +566,13 @@ async def confirm_soil_report(
 
     db.commit()
 
+    # Re-synchronize canonical farm soil profile with confirmed laboratory measurements
+    try:
+        from cropnet.services.api.app.api.v1.endpoints.farms import synchronize_farm_soil_profile
+        synchronize_farm_soil_profile(db, farm_id)
+    except Exception as e:
+        logger.warning("Could not synchronize farm profile after report confirmation: %s", e)
+
     return SoilReportConfirmResponse(
         report_id=report_id,
         status="confirmed",
@@ -565,6 +580,43 @@ async def confirm_soil_report(
         confirmed_measurement_count=len(measurements),
         confirmed_at=now
     )
+
+
+@router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_soil_report(
+    farm_id: uuid.UUID,
+    report_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove or revoke a soil test report.
+    Recalculates and updates the canonical soil profile using remaining valid evidence.
+    """
+    _get_farm_and_verify_owner(farm_id, current_user, db)
+
+    report = db.query(SoilTestReportModel).filter(
+        SoilTestReportModel.id == str(report_id),
+        SoilTestReportModel.farm_id == str(farm_id)
+    ).first()
+
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Soil report {report_id} not found"
+        )
+
+    db.query(SoilMeasurementModel).filter(SoilMeasurementModel.report_id == str(report_id)).delete()
+    db.delete(report)
+    db.commit()
+
+    try:
+        from cropnet.services.api.app.api.v1.endpoints.farms import synchronize_farm_soil_profile
+        synchronize_farm_soil_profile(db, farm_id)
+    except Exception as e:
+        logger.warning("Could not synchronize farm profile after report deletion: %s", e)
+
+    return None
 
 
 @router.post("/{report_id}/reprocess", response_model=SoilReportDetail)

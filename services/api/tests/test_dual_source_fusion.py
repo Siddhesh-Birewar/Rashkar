@@ -355,3 +355,61 @@ def test_advisory_evaluation_fuses_confirmed_lab_measurements(isolated_test_sess
     ctx_direct = eval_direct.json()["farm_context"]
     assert ctx_direct["soil_data_provenance"] == SoilDataProvenance.LABORATORY_MEASURED.value
     assert ctx_direct["soil_ph"] == 7.8
+
+
+def test_delete_soil_report_resynchronizes_profile(isolated_test_session):
+    """Verify that deleting a confirmed soil report triggers re-synchronization and returns to baseline."""
+    user_id = str(uuid.uuid4())
+    farm_id = _create_farm(user_id)
+
+    # 1. Analyse spatial soil baseline
+    client.post(
+        f"/api/v1/farms/{farm_id}/soil/analyse",
+        json={"depth": "0-5cm"},
+        headers={"X-Dev-User-Id": user_id}
+    )
+
+    # 2. Add confirmed report
+    report_id = str(uuid.uuid4())
+    report = SoilTestReportModel(
+        id=report_id,
+        user_id=user_id,
+        farm_id=farm_id,
+        original_filename="to_delete.pdf",
+        storage_path=f"{farm_id}/{report_id}/to_delete.pdf",
+        laboratory_name="Temporary Lab",
+        extraction_status=ExtractionStatus.CONFIRMED.value,
+        review_status=ReviewStatus.CONFIRMED.value,
+    )
+    isolated_test_session.add(report)
+    m_ph = SoilMeasurementModel(
+        id=str(uuid.uuid4()),
+        report_id=report_id,
+        farm_id=farm_id,
+        parameter_key="soil_ph",
+        original_parameter_name="pH",
+        original_value=8.5,
+        original_unit="pH",
+        verification_status=MeasurementVerificationStatus.FARMER_CONFIRMED.value,
+    )
+    isolated_test_session.add(m_ph)
+    isolated_test_session.commit()
+
+    # Verify profile is fused with 8.5
+    resp_fused = client.get(f"/api/v1/farms/{farm_id}/soil", headers={"X-Dev-User-Id": user_id})
+    assert resp_fused.status_code == 200
+    assert resp_fused.json()["ph"]["value"] == 8.5
+    assert resp_fused.json()["ph"]["verification_status"] == VerificationStatus.LABORATORY_VERIFIED.value
+
+    # 3. DELETE the report
+    del_resp = client.delete(
+        f"/api/v1/farms/{farm_id}/soil-reports/{report_id}",
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert del_resp.status_code == 204
+
+    # 4. Profile must be re-synchronized back to modelled estimate (or non-lab value)
+    resp_resync = client.get(f"/api/v1/farms/{farm_id}/soil", headers={"X-Dev-User-Id": user_id})
+    assert resp_resync.status_code == 200
+    assert resp_resync.json()["ph"]["verification_status"] == VerificationStatus.MAP_DERIVED_ESTIMATE.value
+

@@ -481,7 +481,8 @@ async def analyse_farm_soil(
     if not payload.force_refresh:
         cached = spatial_soil_service.get_latest_profile(db, str(farm_id), depth=payload.depth)
         if cached:
-            return cached
+            fused = _fuse_confirmed_laboratory_measurements(cached, farm_id, farm, db, depth=payload.depth)
+            return fused or cached
 
     # 2. Extract live from polygon boundary
     coords = farm["geometry"]["coordinates"][0]
@@ -496,7 +497,8 @@ async def analyse_farm_soil(
 
     # 3. Persist profile and parameter observations
     spatial_soil_service.save_profile(db, profile)
-    return profile
+    fused = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db, depth=payload.depth)
+    return fused or profile
 
 
 def _fuse_confirmed_laboratory_measurements(
@@ -640,7 +642,19 @@ def _fuse_confirmed_laboratory_measurements(
             "available_potassium", m, "Available Potassium (Laboratory Measured)", "Farmer-confirmed laboratory measurement (neutral ammonium acetate)."
         )
 
-    # 7. Preserve micronutrients and secondary parameters in additional_parameters
+    # 7. Dual-Source Preservation: keep all baseline SoilGrids modelled estimates
+    if profile.sand_percent and "isric_sand_percent" not in profile.additional_parameters:
+        profile.additional_parameters["isric_sand_percent"] = profile.sand_percent
+    if profile.silt_percent and "isric_silt_percent" not in profile.additional_parameters:
+        profile.additional_parameters["isric_silt_percent"] = profile.silt_percent
+    if profile.clay_percent and "isric_clay_percent" not in profile.additional_parameters:
+        profile.additional_parameters["isric_clay_percent"] = profile.clay_percent
+    if profile.total_nitrogen and "isric_total_nitrogen" not in profile.additional_parameters:
+        profile.additional_parameters["isric_total_nitrogen"] = profile.total_nitrogen
+    if profile.cation_exchange_capacity and "isric_cec" not in profile.additional_parameters:
+        profile.additional_parameters["isric_cec"] = profile.cation_exchange_capacity
+
+    # 8. Preserve micronutrients, heavy metals, and secondary parameters in additional_parameters
     for key, m in latest_by_param.items():
         if key not in ("soil_ph", "organic_carbon", "available_nitrogen", "available_phosphorus", "available_potassium"):
             param_meta = CANONICAL_SOIL_PARAMETERS.get(key, {})
@@ -656,6 +670,56 @@ def _fuse_confirmed_laboratory_measurements(
     profile.available_parameters_count = avail_count
 
     return profile
+
+
+def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[UnifiedSoilProfile]:
+    """
+    Recalculate, fuse, and persist the canonical soil profile snapshot for a farm
+    based on the latest confirmed laboratory test measurements and SoilGrids estimates.
+    Invalidates stale cache and pushes the updated profile into _SOIL_PROFILE_CACHE and PostgreSQL DB.
+    """
+    farm = _FARM_STORAGE.get(farm_id)
+    if not farm:
+        db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
+        if db_farm:
+            farm = {
+                "owner_id": uuid.UUID(db_farm.owner_id),
+                "geometry": db_farm.geometry_geojson,
+                "taluka": db_farm.taluka,
+                "district": db_farm.district,
+                "state": db_farm.state,
+                "calculated_area_hectares": db_farm.calculated_area_hectares,
+                "calculated_area_acres": db_farm.calculated_area_acres,
+                "id": db_farm.id,
+                "name": db_farm.name
+            }
+            _FARM_STORAGE[farm_id] = farm
+
+    if not farm:
+        return None
+
+    # Get latest profile or generate one if not yet extracted
+    profile = spatial_soil_service.get_latest_profile(db, str(farm_id))
+    if not profile and farm.get("geometry", {}).get("coordinates"):
+        coords = farm["geometry"]["coordinates"][0]
+        poly = Polygon(coords)
+        profile = spatial_soil_service.generate_farm_soil_profile(
+            farm_id=str(farm_id),
+            polygon=poly,
+            taluka=farm.get("taluka"),
+            farm_area_hectares=farm.get("calculated_area_hectares")
+        )
+
+    fused = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db)
+    if fused:
+        fused.version = (profile.version + 1) if profile else 2
+        fused.created_at = datetime.utcnow()
+        spatial_soil_service.save_profile(db, fused)
+        return fused
+    elif profile:
+        spatial_soil_service.save_profile(db, profile)
+        return profile
+    return None
 
 
 @router.get("/{farm_id}/soil", response_model=UnifiedSoilProfile)
