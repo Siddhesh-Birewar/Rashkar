@@ -7,19 +7,6 @@ import types
 import pytest
 from pydantic import ValidationError
 
-# Ensure this worktree root is bound as the 'cropnet' package
-worktree_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-if "cropnet" in sys.modules:
-    del sys.modules["cropnet"]
-    for k in list(sys.modules.keys()):
-        if k.startswith("cropnet."):
-            del sys.modules[k]
-
-cropnet_mod = types.ModuleType("cropnet")
-cropnet_mod.__path__ = [worktree_root]
-cropnet_mod.__file__ = os.path.join(worktree_root, "__init__.py")
-sys.modules["cropnet"] = cropnet_mod
-
 from cropnet.services.api.app.core.config import Settings
 from cropnet.services.api.app.main import app
 from fastapi.testclient import TestClient
