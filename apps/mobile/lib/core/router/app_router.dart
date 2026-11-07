@@ -7,6 +7,10 @@ import 'package:cropnet_mobile/core/router/history_screen.dart';
 import 'package:cropnet_mobile/core/router/route_error_screen.dart';
 import 'package:cropnet_mobile/core/router/route_names.dart';
 import 'package:cropnet_mobile/core/router/route_paths.dart';
+import 'package:cropnet_mobile/features/auth/auth_service.dart';
+import 'package:cropnet_mobile/features/auth/auth_state.dart';
+import 'package:cropnet_mobile/features/auth/presentation/login_screen.dart';
+import 'package:cropnet_mobile/features/auth/presentation/register_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -36,6 +40,27 @@ GoRouter createCropNetRouter({
     initialLocation: initialLocation,
     observers: observers,
     debugLogDiagnostics: false,
+    refreshListenable: AuthStateNotifier.instance,
+    redirect: (context, state) {
+      final auth = AuthService.instance;
+      // In unconfigured development mode, don't force redirect to login
+      if (!auth.isConfigured) return null;
+
+      final authNotifier = AuthStateNotifier.instance;
+      if (authNotifier.isLoading) return null;
+
+      final isAuth = authNotifier.isAuthenticated;
+      final location = state.matchedLocation;
+      final isAuthRoute = location == RoutePaths.login || location == RoutePaths.register;
+
+      if (!isAuth && !isAuthRoute) {
+        return RoutePaths.login;
+      }
+      if (isAuth && isAuthRoute) {
+        return RoutePaths.home;
+      }
+      return null;
+    },
     errorBuilder: (context, state) => AppRouteErrorScreen(
       error: state.error,
       uri: state.uri.toString(),
@@ -239,6 +264,18 @@ GoRouter createCropNetRouter({
       ),
 
       // Standalone top-level routes
+      GoRoute(
+        path: RoutePaths.login,
+        name: RouteNames.login,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.register,
+        name: RouteNames.register,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const RegisterScreen(),
+      ),
       GoRoute(
         path: RoutePaths.about,
         name: RouteNames.about,
