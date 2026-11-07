@@ -10,6 +10,9 @@ import 'package:cropnet_mobile/features/history/assessment_history_repository.da
 import 'package:cropnet_mobile/features/farm/models/farm_models.dart' as farm_models;
 import 'package:cropnet_mobile/features/soil/data/soil_repository.dart';
 import 'package:cropnet_mobile/features/soil/models/soil_models.dart';
+import 'package:cropnet_mobile/features/soil/models/soil_lab_models.dart';
+import 'package:cropnet_mobile/features/soil/data/soil_lab_repository.dart';
+import 'package:cropnet_mobile/features/soil/presentation/widgets/lab_vs_soilgrids_comparison_widget.dart';
 import 'package:cropnet_mobile/features/weather/data/weather_repository.dart';
 import 'package:cropnet_mobile/features/weather/models/weather_models.dart';
 import 'package:cropnet_mobile/features/crop/data/crop_repository.dart';
@@ -1214,7 +1217,9 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
   bool _isLoading = false;
   String? _errorMessage;
   final SoilRepository _soilRepo = SoilRepository();
+  final SoilLabRepository _labRepo = SoilLabRepository();
   UnifiedSoilProfile? _soilProfile;
+  SoilReportDetail? _latestConfirmedReport;
 
   @override
   void initState() {
@@ -1222,7 +1227,23 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
     _loadSoilProfile();
   }
 
+  bool get _isLabConfirmed {
+    if (_latestConfirmedReport != null && _latestConfirmedReport!.isConfirmed) return true;
+    if (_soilProfile != null) {
+      if (_soilProfile!.availableNitrogen?.verificationStatus == VerificationStatus.laboratoryVerified ||
+          _soilProfile!.availablePhosphorus?.verificationStatus == VerificationStatus.laboratoryVerified ||
+          _soilProfile!.availablePotassium?.verificationStatus == VerificationStatus.laboratoryVerified ||
+          _soilProfile!.ph?.verificationStatus == VerificationStatus.laboratoryVerified) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _recordAssessmentInHistory(Map<String, dynamic> soil) {
+    final prov = _isLabConfirmed
+        ? 'Physical Soil Laboratory Ground Truth (${_latestConfirmedReport?.laboratoryName ?? "Accredited Soil Lab"})'
+        : 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020';
     AssessmentHistoryRepository.instance.recordSoilAssessment(
       farm: widget.farm,
       ph: (soil['ph'] as num).toDouble(),
@@ -1230,7 +1251,7 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
       soc: (soil['soc'] as num).toDouble(),
       cec: (soil['cec'] as num).toDouble(),
       depth: _selectedDepth,
-      provenance: 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020',
+      provenance: prov,
     );
   }
 
@@ -1241,8 +1262,15 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
     });
     try {
       final profile = await _soilRepo.getFarmSoilProfile(widget.farm.id, depth: _selectedDepth);
+      SoilReportDetail? labReport;
+      try {
+        labReport = await _labRepo.getLatestConfirmedReport(widget.farm.id);
+      } catch (_) {}
       if (mounted) {
-        setState(() => _soilProfile = profile);
+        setState(() {
+          _soilProfile = profile;
+          _latestConfirmedReport = labReport;
+        });
         final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
         _recordAssessmentInHistory(soil);
       }
@@ -1253,8 +1281,15 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
           forceRefresh: false,
           depth: _selectedDepth,
         );
+        SoilReportDetail? labReport;
+        try {
+          labReport = await _labRepo.getLatestConfirmedReport(widget.farm.id);
+        } catch (_) {}
         if (mounted) {
-          setState(() => _soilProfile = profile);
+          setState(() {
+            _soilProfile = profile;
+            _latestConfirmedReport = labReport;
+          });
           final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
           _recordAssessmentInHistory(soil);
         }
@@ -1284,14 +1319,21 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
         forceRefresh: true,
         depth: _selectedDepth,
       );
+      SoilReportDetail? labReport;
+      try {
+        labReport = await _labRepo.getLatestConfirmedReport(widget.farm.id);
+      } catch (_) {}
       if (mounted) {
-        setState(() => _soilProfile = profile);
+        setState(() {
+          _soilProfile = profile;
+          _latestConfirmedReport = labReport;
+        });
         final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
         _recordAssessmentInHistory(soil);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF2E7D32),
-            content: Text('Soil profile refreshed from SoilGrids 2.0 WCS.'),
+            content: Text('Soil profile synchronized with latest laboratory and SoilGrids data.'),
           ),
         );
       }
@@ -1579,26 +1621,110 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Soil Chemical & Biological Properties', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Soil Chemical & Biological Properties', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                              if (_isLabConfirmed)
+                                _buildProvenanceBadge(
+                                  label: 'LABORATORY MEASURED — CONFIRMED',
+                                  color: const Color(0xFF1B5E20),
+                                  bgColor: const Color(0xFFE8F5E9),
+                                  borderColor: const Color(0xFF81C784),
+                                  icon: Icons.check_circle_outline,
+                                )
+                              else
+                                _buildProvenanceBadge(
+                                  label: 'SOILGRIDS — MODELLED ESTIMATE',
+                                  color: const Color(0xFFE65100),
+                                  bgColor: const Color(0xFFFFF3E0),
+                                  borderColor: const Color(0xFFFFB74D),
+                                  icon: Icons.public,
+                                ),
+                            ],
+                          ),
                           const SizedBox(height: 10),
 
                           _buildParamRow(
                             'Soil pH (H2O)',
-                            '${soil["ph"]}',
+                            ((_soilProfile?.ph?.value ?? _latestConfirmedReport?.getEffectiveValue('soil_ph') ?? (soil['ph'] as num).toDouble())).toStringAsFixed(2),
                             'pH',
-                            '± ${soil["ph_unc"]}',
-                            soil["ph"] < 6.5 ? 'Slightly Acidic' : (soil["ph"] <= 7.5 ? 'Neutral' : 'Alkaline'),
+                            (_soilProfile?.ph?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('soil_ph') != null) ? null : '± ${soil["ph_unc"]}',
+                            ((_soilProfile?.ph?.value ?? (soil['ph'] as num).toDouble()) < 6.5) ? 'Slightly Acidic' : (((_soilProfile?.ph?.value ?? (soil['ph'] as num).toDouble()) <= 7.5) ? 'Neutral' : 'Alkaline'),
                             Colors.green.shade700,
+                            provenanceBadge: (_soilProfile?.ph?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('soil_ph') != null)
+                                ? 'LABORATORY MEASURED'
+                                : 'SOILGRIDS ESTIMATE',
+                            provenanceColor: (_soilProfile?.ph?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('soil_ph') != null)
+                                ? const Color(0xFF1B5E20)
+                                : const Color(0xFFE65100),
+                            provenanceBgColor: (_soilProfile?.ph?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('soil_ph') != null)
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFF3E0),
+                            provenanceBorderColor: (_soilProfile?.ph?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('soil_ph') != null)
+                                ? const Color(0xFF81C784)
+                                : const Color(0xFFFFB74D),
+                            secondaryModelledNote: (_soilProfile?.additionalParameters['isric_ph']?.value != null)
+                                ? 'ISRIC SoilGrids 2.0 modeled baseline: ${_soilProfile!.additionalParameters['isric_ph']!.value!.toStringAsFixed(2)} pH'
+                                : null,
                           ),
                           const Divider(height: 16),
 
                           _buildParamRow(
                             'Soil Organic Carbon (SOC)',
-                            '${soil["soc"]}',
-                            'g/kg',
-                            '± ${soil["soc_unc"]} g/kg',
-                            soil["soc"] >= 15.0 ? 'High Organic Content' : 'Moderate',
+                            ((_soilProfile?.organicCarbon?.value ?? _latestConfirmedReport?.getEffectiveValue('organic_carbon') ?? (soil['soc'] as num).toDouble()) /
+                                    ((_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null) ? 1.0 : 10.0))
+                                .toStringAsFixed(2),
+                            (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null) ? '%' : 'g/kg',
+                            (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null) ? null : '± ${soil["soc_unc"]} g/kg',
+                            ((_soilProfile?.organicCarbon?.value ?? (soil['soc'] as num).toDouble()) >= 15.0) ? 'High Organic Content' : 'Moderate',
                             const Color(0xFF5D4037),
+                            provenanceBadge: (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null)
+                                ? 'LABORATORY MEASURED'
+                                : 'SOILGRIDS ESTIMATE',
+                            provenanceColor: (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null)
+                                ? const Color(0xFF1B5E20)
+                                : const Color(0xFFE65100),
+                            provenanceBgColor: (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null)
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFF3E0),
+                            provenanceBorderColor: (_soilProfile?.organicCarbon?.verificationStatus == VerificationStatus.laboratoryVerified || _latestConfirmedReport?.getEffectiveValue('organic_carbon') != null)
+                                ? const Color(0xFF81C784)
+                                : const Color(0xFFFFB74D),
+                            secondaryModelledNote: (_soilProfile?.additionalParameters['isric_soc']?.value != null)
+                                ? 'ISRIC SoilGrids baseline: ${((_soilProfile!.additionalParameters['isric_soc']!.value!) / 10.0).toStringAsFixed(2)} %'
+                                : null,
+                          ),
+                          const Divider(height: 16),
+
+                          // Electrical Conductivity (EC)
+                          _buildParamRow(
+                            'Electrical Conductivity (EC)',
+                            (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity'))!.toStringAsFixed(2)
+                                : 'Not tested',
+                            (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null ? 'dS/m' : '',
+                            null,
+                            (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? (((_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity'))! < 1.0)
+                                    ? 'Non-Saline (Optimal)'
+                                    : 'Slightly Saline')
+                                : 'Physical lab test required',
+                            (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? const Color(0xFF00796B)
+                                : const Color(0xFFC62828),
+                            provenanceBadge: (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? 'LABORATORY MEASURED'
+                                : 'NOT AVAILABLE — PHYSICAL TEST REQUIRED',
+                            provenanceColor: (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? const Color(0xFF1B5E20)
+                                : const Color(0xFFC62828),
+                            provenanceBgColor: (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFEBEE),
+                            provenanceBorderColor: (_soilProfile?.additionalParameters['electrical_conductivity']?.value ?? _latestConfirmedReport?.getEffectiveValue('electrical_conductivity')) != null
+                                ? const Color(0xFF81C784)
+                                : const Color(0xFFEF9A9A),
                           ),
                           const Divider(height: 16),
 
@@ -1609,7 +1735,18 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Total Nitrogen (N)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                  Row(
+                                    children: [
+                                      const Text('Total Nitrogen (N)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                      const SizedBox(width: 6),
+                                      _buildProvenanceBadge(
+                                        label: 'SOILGRIDS — MODELLED ESTIMATE',
+                                        color: const Color(0xFFE65100),
+                                        bgColor: const Color(0xFFFFF3E0),
+                                        borderColor: const Color(0xFFFFB74D),
+                                      ),
+                                    ],
+                                  ),
                                   Text('${soil["total_n"]} g/kg', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
                                 ],
                               ),
@@ -1645,6 +1782,10 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                             null,
                             soil["cec"] >= 30.0 ? 'High Nutrient Retention' : 'Moderate Retention',
                             const Color(0xFF00796B),
+                            provenanceBadge: 'SOILGRIDS ESTIMATE',
+                            provenanceColor: const Color(0xFFE65100),
+                            provenanceBgColor: const Color(0xFFFFF3E0),
+                            provenanceBorderColor: const Color(0xFFFFB74D),
                           ),
                         ],
                       ),
@@ -1652,102 +1793,30 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                   ),
                   const SizedBox(height: 14),
 
-                  // 7. Strict Nutrients Transparency (NPK MUST REMAIN UNAVAILABLE)
-                  Card(
-                    elevation: 2,
-                    color: const Color(0xFFFFF8E1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: const BorderSide(color: Color(0xFFFFB74D), width: 1.5),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFC62828),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'CRITICAL AGRONOMIC SAFEGUARD',
-                                  style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFEBEE),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFEF9A9A)),
-                            ),
-                            child: const Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.shield_outlined, color: Color(0xFFC62828), size: 24),
-                                SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Lab Soil Test Required — not inferred from digital map',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13.5,
-                                          color: Color(0xFFC62828),
-                                        ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Digital raster maps (ISRIC SoilGrids) model total elemental nitrogen and physical soil properties. They CANNOT quantify bioavailable plant nutrients (NH4+, NO3-, Olsen P, or available K). In accordance with strict agronomic safeguards, digital map extracts must never fabricate available NPK from total nitrogen.',
-                                        style: TextStyle(fontSize: 11.5, color: Color(0xFFB71C1C), height: 1.3),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _buildUnavailableRow('Available Nitrogen (N)', 'Physical soil test required'),
-                          _buildUnavailableRow('Available Phosphorus (P2O5)', 'Physical soil test required'),
-                          _buildUnavailableRow('Available Potassium (K2O)', 'Physical soil test required'),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1B5E20),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: const Icon(Icons.upload_file, size: 20),
-                              label: const Text(
-                                'Upload Soil Test Report to Unlock NPK',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                              onPressed: () {
-                                context.push(RoutePaths.soilLabWorkspacePath(widget.farm.id));
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  // 7. Strict Nutrients Transparency — Unlocked if lab confirmed, else locked with safeguard
+                  if (_isLabConfirmed)
+                    _buildUnlockedNutrientCard(context)
+                  else
+                    _buildLockedNutrientCard(context),
+                  const SizedBox(height: 14),
+
+                  // 8. Dual-Source Scientific Comparison Matrix
+                  LabVsSoilgridsComparisonWidget(
+                    labReport: _latestConfirmedReport,
+                    soilgridsProfile: _soilProfile,
+                    onUploadReport: () {
+                      context.push(RoutePaths.soilLabUploadPath(widget.farm.id));
+                    },
                   ),
                   const SizedBox(height: 14),
 
-                  // 8. Scientific Provenance Card
+                  // 9. Micronutrient Ground Truth Panel (when available)
+                  if (_isLabConfirmed) ...[
+                    _buildMicronutrientPanel(),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // 10. Scientific Provenance Card
                   Card(
                     elevation: 1,
                     child: Padding(
@@ -1755,13 +1824,30 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Data Provenance & Scientific Attribution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Data Provenance & Scientific Attribution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                              _buildProvenanceBadge(
+                                label: _isLabConfirmed ? 'DUAL-SOURCE SYNC ACTIVE' : 'GEOSPATIAL BASELINE',
+                                color: _isLabConfirmed ? const Color(0xFF1B5E20) : const Color(0xFF1565C0),
+                                bgColor: _isLabConfirmed ? const Color(0xFFE8F5E9) : const Color(0xFFE3F2FD),
+                                borderColor: _isLabConfirmed ? const Color(0xFF81C784) : const Color(0xFF90CAF9),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 6),
-                          _buildProvenanceRow('Primary Source', 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020'),
-                          _buildProvenanceRow('Standard Protocol', 'OGC WCS 2.0.1 (Web Coverage Service)'),
+                          _buildProvenanceRow('Primary Baseline', 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020'),
+                          if (_isLabConfirmed)
+                            _buildProvenanceRow(
+                              'Physical Lab Truth',
+                              '${_latestConfirmedReport?.laboratoryName ?? "Accredited Laboratory"} (${_latestConfirmedReport?.sampleDepth ?? "0-15cm"})',
+                            ),
+                          _buildProvenanceRow('Standard Protocol', 'OGC WCS 2.0.1 + ICAR Analytical Standards'),
+                          _buildProvenanceRow('Decision Authority', 'Deterministic Decision Engine (MPKV Rahuri / ICAR)'),
                           _buildProvenanceRow('Depth Interval', _selectedDepth),
                           _buildProvenanceRow('Licensing', 'Creative Commons Attribution 4.0 (CC BY 4.0)'),
-                          _buildProvenanceRow('Institution', 'ISRIC — World Soil Information (Wageningen, Netherlands)'),
+                          _buildProvenanceRow('Institution', 'ISRIC World Soil Information & Local Farm Testing Lab'),
                         ],
                       ),
                     ),
@@ -1809,23 +1895,445 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
     );
   }
 
-  Widget _buildParamRow(String label, String value, String unit, String? uncertainty, String interpretation, Color color) {
+  Widget _buildProvenanceBadge({
+    required String label,
+    required Color color,
+    required Color bgColor,
+    required Color borderColor,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParamRow(
+    String label,
+    String value,
+    String unit,
+    String? uncertainty,
+    String interpretation,
+    Color color, {
+    String? provenanceBadge,
+    Color? provenanceColor,
+    Color? provenanceBgColor,
+    Color? provenanceBorderColor,
+    String? secondaryModelledNote,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  if (provenanceBadge != null)
+                    _buildProvenanceBadge(
+                      label: provenanceBadge,
+                      color: provenanceColor ?? const Color(0xFF1B5E20),
+                      bgColor: provenanceBgColor ?? const Color(0xFFE8F5E9),
+                      borderColor: provenanceBorderColor ?? const Color(0xFF81C784),
+                    ),
+                ],
+              ),
+              if (secondaryModelledNote != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2.0),
+                  child: Text(
+                    secondaryModelledNote,
+                    style: const TextStyle(color: Color(0xFFE65100), fontSize: 10.5, fontStyle: FontStyle.italic),
+                  ),
+                ),
               if (uncertainty != null)
                 Text('Uncertainty: $uncertainty', style: const TextStyle(color: Colors.black45, fontSize: 11)),
               Text(interpretation, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
+        const SizedBox(width: 8),
         Text('$value $unit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
       ],
+    );
+  }
+
+  Widget _buildUnlockedNutrientCard(BuildContext context) {
+    final nVal = _soilProfile?.availableNitrogen?.value ?? _latestConfirmedReport?.getEffectiveValue('available_nitrogen');
+    final pVal = _soilProfile?.availablePhosphorus?.value ?? _latestConfirmedReport?.getEffectiveValue('available_phosphorus');
+    final kVal = _soilProfile?.availablePotassium?.value ?? _latestConfirmedReport?.getEffectiveValue('available_potassium');
+
+    return Card(
+      elevation: 2,
+      color: const Color(0xFFF1F8E9),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: Color(0xFF81C784), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildProvenanceBadge(
+                  label: 'LABORATORY MEASURED — CONFIRMED',
+                  color: const Color(0xFF1B5E20),
+                  bgColor: const Color(0xFFC8E6C9),
+                  borderColor: const Color(0xFF4CAF50),
+                  icon: Icons.check_circle,
+                ),
+                Text(
+                  _latestConfirmedReport?.sampleDate != null
+                      ? 'Tested: ${_latestConfirmedReport!.sampleDate!.day}/${_latestConfirmedReport!.sampleDate!.month}/${_latestConfirmedReport!.sampleDate!.year}'
+                      : 'Verified Record',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.verified, color: Color(0xFF2E7D32), size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Bioavailable Macronutrients Unlocked (NPK)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Official laboratory ground truth from ${_latestConfirmedReport?.laboratoryName ?? "Soil Testing Lab"} overrides modelled estimates and enables precision nutrient management.',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF2E7D32), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildNutrientRow(
+              name: 'Available Nitrogen (N)',
+              value: nVal != null ? '${nVal.toStringAsFixed(0)} kg/ha' : 'Pending Test',
+              statusBadge: nVal == null
+                  ? 'NOT TESTED'
+                  : (nVal < 280 ? 'LOW (<280)' : (nVal <= 560 ? 'MEDIUM (280-560)' : 'HIGH (>560)')),
+              statusColor: nVal == null
+                  ? Colors.grey
+                  : (nVal < 280 ? const Color(0xFFD32F2F) : (nVal <= 560 ? const Color(0xFF2E7D32) : const Color(0xFF1976D2))),
+              methodText: 'Alkaline Permanganate Method (Subbiah & Asija)',
+            ),
+            const Divider(height: 12),
+            _buildNutrientRow(
+              name: 'Available Phosphorus (P2O5)',
+              value: pVal != null ? '${pVal.toStringAsFixed(1)} kg/ha' : 'Pending Test',
+              statusBadge: pVal == null
+                  ? 'NOT TESTED'
+                  : (pVal < 10.0 ? 'LOW (<10)' : (pVal <= 25.0 ? 'MEDIUM (10-25)' : 'HIGH (>25)')),
+              statusColor: pVal == null
+                  ? Colors.grey
+                  : (pVal < 10.0 ? const Color(0xFFD32F2F) : (pVal <= 25.0 ? const Color(0xFF2E7D32) : const Color(0xFF1976D2))),
+              methodText: "Olsen's Method (0.5M NaHCO3 extraction)",
+            ),
+            const Divider(height: 12),
+            _buildNutrientRow(
+              name: 'Available Potassium (K2O)',
+              value: kVal != null ? '${kVal.toStringAsFixed(0)} kg/ha' : 'Pending Test',
+              statusBadge: kVal == null
+                  ? 'NOT TESTED'
+                  : (kVal < 110.0 ? 'LOW (<110)' : (kVal <= 280.0 ? 'MEDIUM (110-280)' : 'HIGH (>280)')),
+              statusColor: kVal == null
+                  ? Colors.grey
+                  : (kVal < 110.0 ? const Color(0xFFD32F2F) : (kVal <= 280.0 ? const Color(0xFF2E7D32) : const Color(0xFF1976D2))),
+              methodText: 'Neutral 1N Ammonium Acetate Extraction',
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1B5E20),
+                      side: const BorderSide(color: Color(0xFF2E7D32)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.history, size: 18),
+                    label: const Text('Report History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    onPressed: () {
+                      context.push(RoutePaths.soilLabHistoryPath(widget.farm.id));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B5E20),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.upload_file, size: 18),
+                    label: const Text('Upload New Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    onPressed: () {
+                      context.push(RoutePaths.soilLabUploadPath(widget.farm.id));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockedNutrientCard(BuildContext context) {
+    return Card(
+      elevation: 2,
+      color: const Color(0xFFFFF8E1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: Color(0xFFFFB74D), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildProvenanceBadge(
+                  label: 'NOT AVAILABLE — PHYSICAL TEST REQUIRED',
+                  color: const Color(0xFFC62828),
+                  bgColor: const Color(0xFFFFEBEE),
+                  borderColor: const Color(0xFFEF9A9A),
+                  icon: Icons.shield_outlined,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEF9A9A)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.shield_outlined, color: Color(0xFFC62828), size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Lab Soil Test Required — not inferred from digital map',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: Color(0xFFC62828),
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Digital raster maps (ISRIC SoilGrids) model total elemental nitrogen and physical soil properties. They CANNOT quantify bioavailable plant nutrients (NH4+, NO3-, Olsen P, or available K). In accordance with strict agronomic safeguards, digital map extracts must never fabricate available NPK from total nitrogen.',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFFB71C1C), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            _buildUnavailableRow('Available Nitrogen (N)', 'Physical soil test required'),
+            _buildUnavailableRow('Available Phosphorus (P2O5)', 'Physical soil test required'),
+            _buildUnavailableRow('Available Potassium (K2O)', 'Physical soil test required'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1B5E20),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.upload_file, size: 20),
+                label: const Text(
+                  'Upload Soil Test Report to Unlock NPK',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                onPressed: () {
+                  context.push(RoutePaths.soilLabWorkspacePath(widget.farm.id));
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMicronutrientPanel() {
+    final zn = _soilProfile?.additionalParameters['zinc']?.value ?? _latestConfirmedReport?.getEffectiveValue('zinc');
+    final fe = _soilProfile?.additionalParameters['iron']?.value ?? _latestConfirmedReport?.getEffectiveValue('iron');
+    final mn = _soilProfile?.additionalParameters['manganese']?.value ?? _latestConfirmedReport?.getEffectiveValue('manganese');
+    final cu = _soilProfile?.additionalParameters['copper']?.value ?? _latestConfirmedReport?.getEffectiveValue('copper');
+    final b = _soilProfile?.additionalParameters['boron']?.value ?? _latestConfirmedReport?.getEffectiveValue('boron');
+    final s = _soilProfile?.additionalParameters['sulfur']?.value ?? _latestConfirmedReport?.getEffectiveValue('sulfur');
+
+    if (zn == null && fe == null && mn == null && cu == null && b == null && s == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Micronutrient Ground Truth Panel', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                _buildProvenanceBadge(
+                  label: 'LABORATORY MEASURED',
+                  color: const Color(0xFF1B5E20),
+                  bgColor: const Color(0xFFE8F5E9),
+                  borderColor: const Color(0xFF81C784),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'DTPA-extractable micronutrients from confirmed soil laboratory test report.',
+              style: TextStyle(fontSize: 11.5, color: Colors.black54),
+            ),
+            const SizedBox(height: 10),
+            if (zn != null)
+              _buildParamRow('Zinc (Zn)', zn.toStringAsFixed(2), 'mg/kg', null, zn < 0.6 ? 'Deficient (<0.6 mg/kg)' : 'Sufficient (Adequate)', zn < 0.6 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            if (fe != null) ...[
+              const Divider(height: 12),
+              _buildParamRow('Iron (Fe)', fe.toStringAsFixed(2), 'mg/kg', null, fe < 4.5 ? 'Deficient (<4.5 mg/kg)' : 'Sufficient (Adequate)', fe < 4.5 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            ],
+            if (mn != null) ...[
+              const Divider(height: 12),
+              _buildParamRow('Manganese (Mn)', mn.toStringAsFixed(2), 'mg/kg', null, mn < 2.0 ? 'Deficient (<2.0 mg/kg)' : 'Sufficient (Adequate)', mn < 2.0 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            ],
+            if (cu != null) ...[
+              const Divider(height: 12),
+              _buildParamRow('Copper (Cu)', cu.toStringAsFixed(2), 'mg/kg', null, cu < 0.2 ? 'Deficient (<0.2 mg/kg)' : 'Sufficient (Adequate)', cu < 0.2 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            ],
+            if (b != null) ...[
+              const Divider(height: 12),
+              _buildParamRow('Boron (B)', b.toStringAsFixed(2), 'mg/kg', null, b < 0.5 ? 'Deficient (<0.5 mg/kg)' : 'Sufficient (Adequate)', b < 0.5 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            ],
+            if (s != null) ...[
+              const Divider(height: 12),
+              _buildParamRow('Sulfur (S)', s.toStringAsFixed(2), 'mg/kg', null, s < 10.0 ? 'Deficient (<10.0 mg/kg)' : 'Sufficient (Adequate)', s < 10.0 ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNutrientRow({
+    required String name,
+    required String value,
+    required String statusBadge,
+    required Color statusColor,
+    required String methodText,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(methodText, style: const TextStyle(fontSize: 10.5, color: Colors.black54)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  statusBadge,
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: statusColor),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
