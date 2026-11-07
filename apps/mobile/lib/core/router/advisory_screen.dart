@@ -476,32 +476,33 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on, size: 18, color: Color(0xFF1B5E20)),
-                const SizedBox(width: 6),
-                Text('${isMr ? "तालुका" : "Region"}: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                DropdownButton<String>(
-                  value: _selectedTaluka,
-                  isDense: true,
-                  underline: const SizedBox(),
-                  items: _pilotTalukas.map((t) {
-                    return DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null && val != _selectedTaluka) {
-                      setState(() {
-                        _selectedTaluka = val;
-                        _resetConversation();
-                      });
-                    }
-                  },
-                ),
-                if (farms.isNotEmpty) ...[
-                  const SizedBox(width: 12),
-                  Text('• ${isMr ? "शेत" : "Farm"}: ', style: const TextStyle(fontSize: 13, color: Colors.black54)),
-                  Flexible(
-                    child: DropdownButton<String>(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, size: 18, color: Color(0xFF1B5E20)),
+                  const SizedBox(width: 6),
+                  Text('${isMr ? "तालुका" : "Region"}: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  DropdownButton<String>(
+                    value: _selectedTaluka,
+                    isDense: true,
+                    underline: const SizedBox(),
+                    items: _pilotTalukas.map((t) {
+                      return DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null && val != _selectedTaluka) {
+                        setState(() {
+                          _selectedTaluka = val;
+                          _resetConversation();
+                        });
+                      }
+                    },
+                  ),
+                  if (farms.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Text('• ${isMr ? "शेत" : "Farm"}: ', style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                    DropdownButton<String>(
                       value: _selectedFarmId ?? farms.first.id,
                       isDense: true,
                       underline: const SizedBox(),
@@ -522,24 +523,24 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
                         }
                       },
                     ),
+                  ],
+                  const SizedBox(width: 16),
+                  // Evaluate Farm Button
+                  ElevatedButton.icon(
+                    icon: _isEvaluating
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.play_arrow, size: 16),
+                    label: Text(_isEvaluating ? (isMr ? 'मूल्यांकन चालू...' : 'Evaluating...') : (isMr ? 'मूल्यांकन करा' : 'Evaluate Farm')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B5E20),
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
+                    onPressed: _isEvaluating ? null : () => _runDeterministicEvaluation(),
                   ),
                 ],
-                const Spacer(),
-                // Evaluate Farm Button
-                ElevatedButton.icon(
-                  icon: _isEvaluating
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.play_arrow, size: 16),
-                  label: Text(_isEvaluating ? (isMr ? 'मूल्यांकन चालू...' : 'Evaluating...') : (isMr ? 'मूल्यांकन करा' : 'Evaluate Farm')),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B5E20),
-                    foregroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  ),
-                  onPressed: _isEvaluating ? null : () => _runDeterministicEvaluation(),
-                ),
-              ],
+              ),
             ),
           ),
 
