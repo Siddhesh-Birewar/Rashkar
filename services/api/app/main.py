@@ -64,7 +64,13 @@ try:
 except ImportError:
     from .api.v1.endpoints.soil_reports import router as soil_reports_router
 
+try:
+    from cropnet.services.api.app.api.v1.endpoints.water import router as water_router
+except ImportError:
+    from .api.v1.endpoints.water import router as water_router
+
 app.include_router(soil_reports_router, prefix=settings.API_V1_PREFIX)
+app.include_router(water_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
