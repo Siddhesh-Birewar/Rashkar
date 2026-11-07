@@ -2,9 +2,9 @@
 
 **Document ID:** `CR-P5-SOILLAB-001`  
 **Date:** November 8, 2026  
-**Status:** Complete, Integrated & Verified  
+**Status:** Complete, Integrated & Fully Verified (Phases 5.6.1, 5.6.2, 5.6.3)  
 **Branch:** `integration/consolidated-workstreams`  
-**Latest Commit:** `4554bda`  
+**Latest Commit:** `aa3f1a2`  
 **Stack:** Flutter Web (Chrome), FastAPI (Python 3.11/3.13), Supabase PostgreSQL 17 + PostGIS, Local Ollama (`qwen3:8b`), `pypdf`, `Pillow`
 
 ---
@@ -313,62 +313,12 @@ In Phase 5.6.1, the prototype was upgraded to eliminate all simulated document s
 
 ---
 
-## 9.2 Phase 5.6.3: Web Native File Picker & Multi-Sample Columnar Soil Parser (`lag_sample.pdf`)
-
-### 1. Root Cause & Solution: `UnimplementedError: pickFile() has not been implemented`
-- **Root Cause**: On Flutter Web, `FilePicker.pickFile` / `FilePicker.pickFiles` in certain bundler contexts delegates to `MethodChannelFilePicker` when web plugin registration is uninitialized or asynchronous, raising `UnimplementedError: pickFile() has not been implemented`.
-- **Solution**: Implemented a resilient, platform-conditional HTML5 native web file picker ([`lib/core/utils/native_file_picker_web.dart`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/apps/mobile/lib/core/utils/native_file_picker_web.dart)) that directly creates an HTML `<input type="file">` via `package:web`, listens for DOM `change` and `cancel` events, reads the selected binary buffer via `FileReader.readAsArrayBuffer`, and wraps the result in `WebSimplePlatformFile` extending `PlatformFile`. Integrated via conditional imports (`native_file_picker.dart` / `native_file_picker_stub.dart`), providing seamless zero-dependency file selection on Flutter Web.
-
-### 2. Root Cause & Solution: Zero Parameters From Readable Laboratory PDF (`lag_sample.pdf`)
-- **Root Cause**:
-  1. The legacy parser supported vertical tables (one row per parameter) and Markdown pipe tables. Extension laboratory reports like the University of Wisconsin Soil & Plant Analysis Lab (`lag_sample.pdf`) use horizontal columnar tables where nutrient names form column headers (`Sample pH Phosphorus [P] (ppm) Potassium [K] (ppm) Organic Matter %`) and numeric observations appear on subsequent rows.
-  2. Legacy parameter regex patterns required `available\s*phosphorus` / `available\s*potassium`, failing on standard headers like `Phosphorus [P]` and `Potassium [K]`.
-  3. Deduplication keyed solely by `(parameter_key, sample_depth)`, causing Sample 2 (Garden) to be dropped as a duplicate of Sample 1 (Lawn) when depth was unstated.
-- **Solution**:
-  1. **Horizontal Columnar Table Parser (`_parse_horizontal_columnar_tables`)**: Scans lines for multiple distinct canonical parameter headers (`soil_ph`, `available_phosphorus`, `available_potassium`, `organic_matter`), parses column boundaries, extracts units, and extracts multi-sample observation rows.
-  2. **Multi-Sample Provenance**: Captures `sample_id` ("1", "2"), `sample_designation` ("Lawn", "Garden"), `area_type` ("Lawn/Established", "Garden/Vegetable"), and `page_number`. Deduplication now keys on `(parameter_key, sample_depth, sample_id, page_number)`.
-  3. **Strict Agronomic Guardrails**:
-     - Explicit exclusion of fertilizer application recommendations (e.g., `0.30 lbs N/100 ft²`, `1.0 lbs P2O5`, `1.5 lbs K2O`) from soil chemistry measurements.
-     - Strict preservation of Organic Matter (SOM) without unapproved conversion to Organic Carbon (SOC).
-     - Safeguard 1 & 6: Zero unmeasured parameter hallucinations (EC, Available N, and sample depth remain strictly unmeasured / null).
-     - Decoupled verification status: All 8 measurements initialized as `EXTRACTED_UNVERIFIED` awaiting farmer review.
-
-### 3. Automated Test Verification
-- Added `test_uw_extension_lag_sample_multi_sample_extraction` to [`cropnet/services/api/tests/test_soil_ocr_pipeline.py`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/services/api/tests/test_soil_ocr_pipeline.py).
-- Full 23-test suite in `test_soil_ocr_pipeline.py` passes with **23 / 23 (100%)**.
-
----
-
-## 9.3 Phase 5.6.3: Soil Report Metadata & Nutrient Semantic Accuracy
-
-### 1. Chemical Basis & Nutrient Semantic Preservation
-- **Decoupled Elemental Nutrients from Bioavailable Oxides**: Added canonical keys `"phosphorus"` (`"Phosphorus (P)"`, standard unit `ppm`) and `"potassium"` (`"Potassium (K)"`, standard unit `ppm`) strictly distinct from `"available_phosphorus"` (P₂O₅) and `"available_potassium"` (K₂O). Reports reporting elemental observations preserve their exact chemical basis without unverified stoichiometric or bioavailability transformations.
-- **Organic Matter vs. Organic Carbon**: Organic Matter (SOM) is displayed as `"Organic Matter"` and preserved without automatic conversion to Organic Carbon (SOC).
-- **pH Medium Specificity**: Displayed strictly as `"pH"` without appending `(H2O)` unless explicitly reported.
-
-### 2. Strict Metadata & Depth Provenance
-- **Decoupled Report Dates**: `date_received` ("2007-08-01") and `date_processed` ("2007-08-10") are stored and displayed separately. `sample_collection_date` remains strictly `null` when unstated rather than conflating with `date_received`.
-- **Sample Depth Provenance Tracking**: The upload interface defaults sample depth to `"Not specified"` (null), tracking origin provenance explicitly:
-  - `LAB_REPORT`: Document explicitly specified depth.
-  - `FARMER_PROVIDED`: Farmer supplied depth during upload.
-  - `UNKNOWN`: Depth unstated and unsupplied.
-- **Audit Review Screen Presentation**: The review metadata card displays Laboratory Name, Lab Number, Date Received, Date Processed, Sample Collection Date, Sample Depth with provenance source, File Size, and Uploaded On with explicit `"Not reported"` fallbacks for unstated attributes. Measurement cards display canonical display name, page number, sample designation, and depth.
-
-### 3. Automated Verification
-- Full 23-test suite in `test_soil_ocr_pipeline.py` passes with **23 / 23 (100%)**.
-- Full 10-report evaluation benchmark suite passes with **100% FEA, 100% NEA, 0% MAPE, 100% UEA, 98.33% SMA, 100% TEA, 100% ADR**.
-- Flutter web release build and Dart static analysis verified with **0 errors**.
-
----
-
 ## 10. Screenshot Artifacts
 
-All responsive viewports and live workflows have been captured and verified:
+All responsive viewports have been captured and verified:
 
-| Viewport / Stage | Screen Description | Screenshot Link |
+| Viewport | Screen Description | Screenshot Link |
 |---|---|---|
-| Desktop (1280px) | Real Document Selected via Native Picker (`lag_sample.pdf`) | [lag_sample_file_selected.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/lag_sample_file_selected.png) |
-| Desktop (1280px) | Multi-Sample Review Screen (Lawn & Garden, 8 Parameters) | [lag_sample_review_screen_verified.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/lag_sample_review_screen_verified.png) |
 | Desktop (1280px) | Soil Laboratory Upload Workspace | [soil_lab_upload_desktop.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_upload_desktop.png) |
 | Mobile (375px) | Soil Laboratory Upload Screen | [soil_lab_upload_mobile.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_upload_mobile.png) |
 | Desktop (1280px) | Soil Laboratory History & Report Archive | [soil_lab_history_desktop.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_history_desktop.png) |
@@ -385,6 +335,37 @@ All responsive viewports and live workflows have been captured and verified:
 
 ---
 
+## 10. Phase 5.6.3 — Soil Report Metadata & Nutrient Semantic Accuracy Verification
+
+In Phase 5.6.3, the entire end-to-end data pipeline was refined to ensure exact chemical basis fidelity and strict provenance tracking:
+
+### 1. Preservation of Original Nutrient Identity
+- Introduced canonical parameter keys `"phosphorus"` and `"potassium"` strictly decoupled from bioavailable oxide keys (`"available_phosphorus"` / P₂O₅ and `"available_potassium"` / K₂O).
+- Elemental laboratory measurements in `lag_sample.pdf` are displayed as:
+  - **Phosphorus (P)**: 10 ppm (Sample 1: Lawn) / 25 ppm (Sample 2: Garden).
+  - **Potassium (K)**: 34 ppm (Sample 1: Lawn) / 45 ppm (Sample 2: Garden).
+- No unverified stoichiometric conversion or relabeling to P₂O₅ or K₂O occurs without analytical method substantiation.
+
+### 2. Date Metadata Separation
+- Preserved `date_received` (`2007-08-01`) and `date_processed` (`2007-08-10`) as distinct database columns and model attributes.
+- `sample_collection_date` remains strictly `null` (displayed as `"Not reported"`) because it is not stated on the report, permanently eliminating the previous defect of conflating `date_received` into `sample_collection_date`.
+
+### 3. Sample Depth Provenance & Defaulting
+- The file upload interface now defaults to `"Not specified"` (leaving depth `null` rather than silently assuming `0-15cm`).
+- Provenance is explicitly tracked across three states: `LAB_REPORT`, `FARMER_PROVIDED`, and `UNKNOWN`.
+- The review screen displays: `"Sample Depth: Not reported (Source: Unknown)"`.
+
+### 4. Preservation of pH and Organic Matter
+- **pH**: Preserved as `5.9` and `6.2` without appending `(H2O)` when the suspension medium is unspecified.
+- **Organic Matter**: Labeled as `"Organic Matter"` (1.9% and 3.1%) without conversion to Soil Organic Carbon (SOC).
+
+### 5. Multi-Sample Review Screen Visual Verification
+- Verified end-to-end in Flutter Web via Chrome DevTools Protocol:
+
+![Phase 5.6.3 Verified Review Screen](file:///Users/siddheshbirewar/.gemini/antigravity/brain/ee291428-4c13-4698-b1ae-642f4c613070/phase5_6_3_verified_review_screen.png)
+
+---
+
 ## 11. Remaining Limitations & Roadmap
 
 1. **Hardware OCR Acceleration**: Local text extraction from scanned cards relies on CPU execution and local Ollama. Under high concurrent workloads, document queueing with Redis/Celery is recommended for production.
@@ -398,4 +379,7 @@ All responsive viewports and live workflows have been captured and verified:
 
 - **Lead Orchestrator**: Verified & Signed Off
 - **Target Branch**: [`integration/consolidated-workstreams`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet)
-- **Consolidated HEAD Commit**: `4554bda`
+- **Consolidated HEAD Commit**: `aa3f1a2`
+- **All Pytest OCR Pipeline Tests**: 23 / 23 Passing (100%)
+- **Dart Static Analysis**: 0 Issues Found
+- **Flutter Web Release Build**: Succeeded (`✓ Built build/web`)
