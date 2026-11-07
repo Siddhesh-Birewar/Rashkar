@@ -339,6 +339,28 @@ In Phase 5.6.1, the prototype was upgraded to eliminate all simulated document s
 
 ---
 
+## 9.3 Phase 5.6.3: Soil Report Metadata & Nutrient Semantic Accuracy
+
+### 1. Chemical Basis & Nutrient Semantic Preservation
+- **Decoupled Elemental Nutrients from Bioavailable Oxides**: Added canonical keys `"phosphorus"` (`"Phosphorus (P)"`, standard unit `ppm`) and `"potassium"` (`"Potassium (K)"`, standard unit `ppm`) strictly distinct from `"available_phosphorus"` (P₂O₅) and `"available_potassium"` (K₂O). Reports reporting elemental observations preserve their exact chemical basis without unverified stoichiometric or bioavailability transformations.
+- **Organic Matter vs. Organic Carbon**: Organic Matter (SOM) is displayed as `"Organic Matter"` and preserved without automatic conversion to Organic Carbon (SOC).
+- **pH Medium Specificity**: Displayed strictly as `"pH"` without appending `(H2O)` unless explicitly reported.
+
+### 2. Strict Metadata & Depth Provenance
+- **Decoupled Report Dates**: `date_received` ("2007-08-01") and `date_processed` ("2007-08-10") are stored and displayed separately. `sample_collection_date` remains strictly `null` when unstated rather than conflating with `date_received`.
+- **Sample Depth Provenance Tracking**: The upload interface defaults sample depth to `"Not specified"` (null), tracking origin provenance explicitly:
+  - `LAB_REPORT`: Document explicitly specified depth.
+  - `FARMER_PROVIDED`: Farmer supplied depth during upload.
+  - `UNKNOWN`: Depth unstated and unsupplied.
+- **Audit Review Screen Presentation**: The review metadata card displays Laboratory Name, Lab Number, Date Received, Date Processed, Sample Collection Date, Sample Depth with provenance source, File Size, and Uploaded On with explicit `"Not reported"` fallbacks for unstated attributes. Measurement cards display canonical display name, page number, sample designation, and depth.
+
+### 3. Automated Verification
+- Full 23-test suite in `test_soil_ocr_pipeline.py` passes with **23 / 23 (100%)**.
+- Full 10-report evaluation benchmark suite passes with **100% FEA, 100% NEA, 0% MAPE, 100% UEA, 98.33% SMA, 100% TEA, 100% ADR**.
+- Flutter web release build and Dart static analysis verified with **0 errors**.
+
+---
+
 ## 10. Screenshot Artifacts
 
 All responsive viewports and live workflows have been captured and verified:

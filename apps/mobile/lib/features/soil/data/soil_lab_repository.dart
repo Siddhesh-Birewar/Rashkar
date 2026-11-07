@@ -31,6 +31,7 @@ class SoilLabRepository {
     required String mimeType,
     String? laboratoryName,
     String? sampleDepth,
+    String? depthProvenance,
     DateTime? sampleCollectionDate,
     String? samplingPointName,
     void Function(double progress)? onProgress,
@@ -91,6 +92,9 @@ class SoilLabRepository {
     }
     if (sampleDepth != null && sampleDepth.isNotEmpty) {
       request.fields['sample_depth_interval'] = sampleDepth;
+    }
+    if (depthProvenance != null && depthProvenance.isNotEmpty) {
+      request.fields['depth_provenance'] = depthProvenance;
     }
     if (sampleCollectionDate != null) {
       request.fields['sample_collection_date'] = sampleCollectionDate.toIso8601String();

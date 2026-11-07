@@ -97,20 +97,24 @@ class CanonicalSoilParameters {
   CanonicalSoilParameters._();
 
   static const Map<String, String> displayNames = {
-    'soil_ph': 'Soil pH (H2O)',
-    'ph': 'Soil pH (H2O)',
+    'soil_ph': 'pH',
+    'ph': 'pH',
     'electrical_conductivity': 'Electrical Conductivity (EC)',
     'ec': 'Electrical Conductivity (EC)',
     'organic_carbon': 'Soil Organic Carbon (SOC)',
     'oc': 'Soil Organic Carbon (SOC)',
-    'organic_matter': 'Soil Organic Matter (SOM)',
-    'som': 'Soil Organic Matter (SOM)',
+    'organic_matter': 'Organic Matter',
+    'som': 'Organic Matter',
     'available_nitrogen': 'Available Nitrogen (N)',
     'available_n': 'Available Nitrogen (N)',
     'total_nitrogen': 'Total Nitrogen (N)',
     'total_n': 'Total Nitrogen (N)',
+    'phosphorus': 'Phosphorus (P)',
+    'p': 'Phosphorus (P)',
     'available_phosphorus': 'Available Phosphorus (P2O5)',
     'available_p': 'Available Phosphorus (P2O5)',
+    'potassium': 'Potassium (K)',
+    'k': 'Potassium (K)',
     'available_potassium': 'Available Potassium (K2O)',
     'available_k': 'Available Potassium (K2O)',
     'sulphur': 'Available Sulphur (S)',
@@ -141,8 +145,12 @@ class CanonicalSoilParameters {
     'available_n': 'kg/ha',
     'total_nitrogen': 'g/kg',
     'total_n': 'g/kg',
+    'phosphorus': 'ppm',
+    'p': 'ppm',
     'available_phosphorus': 'kg/ha',
     'available_p': 'kg/ha',
+    'potassium': 'ppm',
+    'k': 'ppm',
     'available_potassium': 'kg/ha',
     'available_k': 'kg/ha',
     'sulphur': 'mg/kg',
@@ -167,14 +175,18 @@ class CanonicalSoilParameters {
     'ec': 'chemical',
     'organic_carbon': 'biological',
     'oc': 'biological',
-    'organic_matter': 'biological',
-    'som': 'biological',
+    'organic_matter': 'chemical',
+    'som': 'chemical',
     'available_nitrogen': 'macronutrient',
     'available_n': 'macronutrient',
     'total_nitrogen': 'macronutrient',
     'total_n': 'macronutrient',
+    'phosphorus': 'macronutrient',
+    'p': 'macronutrient',
     'available_phosphorus': 'macronutrient',
     'available_p': 'macronutrient',
+    'potassium': 'macronutrient',
+    'k': 'macronutrient',
     'available_potassium': 'macronutrient',
     'available_k': 'macronutrient',
     'sulphur': 'secondary',
@@ -282,6 +294,10 @@ class SoilMeasurementItem {
 
   bool get isConfirmed =>
       verificationStatus == MeasurementVerificationStatus.farmerConfirmed;
+
+  String? get sampleId => labReferenceRange?['sample_id'] as String?;
+  String? get sampleDesignation => labReferenceRange?['sample_designation'] as String?;
+  String? get areaType => labReferenceRange?['area_type'] as String?;
 
   SoilMeasurementItem copyWith({
     String? id,
@@ -616,10 +632,14 @@ class SoilReportDetail {
   final String? laboratoryName;
   final String? labAddress;
   final String? labAccreditation;
+  final String? labNumber;
   final String? sampleIdCode;
   final DateTime? reportDate;
   final DateTime? sampleDate;
+  final DateTime? dateReceived;
+  final DateTime? dateProcessed;
   final String? sampleDepth;
+  final String depthProvenance;
   final double? sampleDepthMinCm;
   final double? sampleDepthMaxCm;
   final String? samplingPointName;
@@ -643,10 +663,14 @@ class SoilReportDetail {
     this.laboratoryName,
     this.labAddress,
     this.labAccreditation,
+    this.labNumber,
     this.sampleIdCode,
     this.reportDate,
     this.sampleDate,
+    this.dateReceived,
+    this.dateProcessed,
     this.sampleDepth,
+    this.depthProvenance = 'UNKNOWN',
     this.sampleDepthMinCm,
     this.sampleDepthMaxCm,
     this.samplingPointName,
@@ -655,6 +679,17 @@ class SoilReportDetail {
     this.extractionError,
     this.measurements = const [],
   });
+
+  String get depthProvenanceDisplay {
+    switch (depthProvenance.toUpperCase()) {
+      case 'LAB_REPORT':
+        return 'Lab Report';
+      case 'FARMER_PROVIDED':
+        return 'Farmer Provided';
+      default:
+        return 'Unknown';
+    }
+  }
 
   /// Retrieve measurement item by canonical parameter key (e.g. 'soil_ph', 'available_nitrogen').
   SoilMeasurementItem? getMeasurement(String key) {
@@ -698,10 +733,14 @@ class SoilReportDetail {
     String? laboratoryName,
     String? labAddress,
     String? labAccreditation,
+    String? labNumber,
     String? sampleIdCode,
     DateTime? reportDate,
     DateTime? sampleDate,
+    DateTime? dateReceived,
+    DateTime? dateProcessed,
     String? sampleDepth,
+    String? depthProvenance,
     double? sampleDepthMinCm,
     double? sampleDepthMaxCm,
     String? samplingPointName,
@@ -725,10 +764,14 @@ class SoilReportDetail {
       laboratoryName: laboratoryName ?? this.laboratoryName,
       labAddress: labAddress ?? this.labAddress,
       labAccreditation: labAccreditation ?? this.labAccreditation,
+      labNumber: labNumber ?? this.labNumber,
       sampleIdCode: sampleIdCode ?? this.sampleIdCode,
       reportDate: reportDate ?? this.reportDate,
       sampleDate: sampleDate ?? this.sampleDate,
+      dateReceived: dateReceived ?? this.dateReceived,
+      dateProcessed: dateProcessed ?? this.dateProcessed,
       sampleDepth: sampleDepth ?? this.sampleDepth,
+      depthProvenance: depthProvenance ?? this.depthProvenance,
       sampleDepthMinCm: sampleDepthMinCm ?? this.sampleDepthMinCm,
       sampleDepthMaxCm: sampleDepthMaxCm ?? this.sampleDepthMaxCm,
       samplingPointName: samplingPointName ?? this.samplingPointName,
@@ -786,6 +829,7 @@ class SoilReportDetail {
       labAddress: json['lab_address'] as String? ?? json['labAddress'] as String?,
       labAccreditation: json['lab_accreditation'] as String? ??
           json['labAccreditation'] as String?,
+      labNumber: json['lab_number'] as String? ?? json['labNumber'] as String?,
       sampleIdCode: json['sample_id_code'] as String? ?? json['sampleIdCode'] as String?,
       reportDate: json['report_date'] != null
           ? DateTime.tryParse(json['report_date'].toString())
@@ -797,9 +841,22 @@ class SoilReportDetail {
           : (json['sampleDate'] != null
               ? DateTime.tryParse(json['sampleDate'].toString())
               : null),
+      dateReceived: json['date_received'] != null
+          ? DateTime.tryParse(json['date_received'].toString())
+          : (json['dateReceived'] != null
+              ? DateTime.tryParse(json['dateReceived'].toString())
+              : null),
+      dateProcessed: json['date_processed'] != null
+          ? DateTime.tryParse(json['date_processed'].toString())
+          : (json['dateProcessed'] != null
+              ? DateTime.tryParse(json['dateProcessed'].toString())
+              : null),
       sampleDepth: json['sample_depth_interval'] as String? ??
           json['sample_depth'] as String? ??
           json['sampleDepth'] as String?,
+      depthProvenance: json['depth_provenance'] as String? ??
+          json['depthProvenance'] as String? ??
+          'UNKNOWN',
       sampleDepthMinCm: (json['sample_depth_min_cm'] ?? json['sampleDepthMinCm']) != null
           ? (json['sample_depth_min_cm'] ?? json['sampleDepthMinCm'] as num).toDouble()
           : null,

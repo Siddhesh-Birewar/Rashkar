@@ -38,11 +38,17 @@ PARAMETER_PATTERNS = [
     # Electrical Conductivity (EC)
     ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता)", re.IGNORECASE)),
     
-    # Available Phosphorus (P2O5 / P) - note P206 is OCR confusion
-    ("available_phosphorus", re.compile(r"\b((?:available\s*)?phosphorus(?:\s*\[P\]|\s*\(P\))?|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद)", re.IGNORECASE)),
+    # Available Phosphorus (P2O5 / Avail P) - note P206 is OCR confusion
+    ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद)\b", re.IGNORECASE)),
+
+    # Elemental / Reported Phosphorus [P]
+    ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?|\b\[P\]|\(P\)|\bP\b(?!\s*h\b|\s*H\b|\s*[oO]\b|\s*value|\s*level|\s*scale|\s*2o5|\s*205|\s*206))\b", re.IGNORECASE)),
     
-    # Available Potassium (K2O / K) - note K20 is OCR confusion
-    ("available_potassium", re.compile(r"\b((?:available\s*)?potassium(?:\s*\[K\]|\s*\(K\))?|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)", re.IGNORECASE)),
+    # Available Potassium (K2O / Avail K) - note K20 is OCR confusion
+    ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)\b", re.IGNORECASE)),
+
+    # Elemental / Reported Potassium [K]
+    ("potassium", re.compile(r"\b(potassium(?:\s*\[K\]|\s*\(K\))?|\b\[K\]|\(K\)|\bK\b(?!\s*g\b|\s*m\b|\s*[oO]\b|\s*cal|\s*2o|\s*20))\b", re.IGNORECASE)),
     
     # Sulphur / Sulfur
     ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|available\s*sulphur|available\s*sulfur|\bs\b\s*\(available\)|\bso4\b|गंधक)", re.IGNORECASE)),
@@ -67,8 +73,10 @@ PARAMETER_PATTERNS = [
 PARAMETER_COL_DEFS = [
     ("sample_col", re.compile(r"\b(sample(?:\s*no|\s*id|\s*#)?)\b", re.IGNORECASE)),
     ("soil_ph", re.compile(r"\b(p[hH](?:\s*\(1:2\.?5?\))?)\b(?!\s*os|\s*hate)", re.IGNORECASE)),
-    ("available_phosphorus", re.compile(r"\b((?:available\s*)?phosphorus(?:\s*\[P\]|\s*\(P\))?|avail(?:able|\.)?\s*p\b|p2o5|p205|उपलब्ध\s*स्फुरद)", re.IGNORECASE)),
-    ("available_potassium", re.compile(r"\b((?:available\s*)?potassium(?:\s*\[K\]|\s*\(K\))?|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)", re.IGNORECASE)),
+    ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|उपलब्ध\s*स्फुरद)\b", re.IGNORECASE)),
+    ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?)\b", re.IGNORECASE)),
+    ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)\b", re.IGNORECASE)),
+    ("potassium", re.compile(r"\b(potassium(?:\s*\[K\]|\s*\(K\))?)\b", re.IGNORECASE)),
     ("organic_matter", re.compile(r"\b(organic\s*matter|soil\s*organic\s*matter|s\.?o\.?m\.?\b|सेंद्रिय\s*पदार्थ)", re.IGNORECASE)),
     ("organic_carbon", re.compile(r"\b(organic\s*carbon|s\.?o\.?c\.?\b|o\.?c\.?\b|सेंद्रिय\s*कर्ब)", re.IGNORECASE)),
     ("available_nitrogen", re.compile(r"\b(available\s*nitrogen|avail(?:able|\.)?\s*n\b|उपलब्ध\s*नत्र)", re.IGNORECASE)),
@@ -159,14 +167,25 @@ class SoilReportParser:
                         meta.laboratory_name = cleaned.split("|")[0].strip()
                         break
 
-        # 2. Sample ID / Lab Number
+        # 2. Sample ID and Lab Number
+        lab_num_match = re.search(
+            r"(?<![A-Za-z])(?:Lab\s*(?:Number|No|#))\s*[:=\-]?\s*([A-Za-z0-9\-_/]+)",
+            text,
+            re.IGNORECASE,
+        )
+        if lab_num_match:
+            meta.lab_number = lab_num_match.group(1).strip()
+            meta.sample_id = meta.lab_number
+
         sample_id_match = re.search(
-            r"(?:Sample\s*(?:ID|No|Number|Code|Ref)|Lab\s*(?:Number|No|Sample\s*No))\s*[:=\-]?\s*([A-Za-z0-9\-_/]+)",
+            r"(?<![A-Za-z])(?:Sample\s*(?:ID|No|Number|Code|Ref|#))\s*[:=\-]?\s*([A-Za-z0-9\-_/]+)",
             text,
             re.IGNORECASE,
         )
         if sample_id_match:
             meta.sample_id = sample_id_match.group(1).strip()
+            if not meta.lab_number:
+                meta.lab_number = meta.sample_id
 
         # 3. Farmer / Client Name
         farmer_match = re.search(
@@ -180,25 +199,47 @@ class SoilReportParser:
         # Detect regional conventions (e.g. US date convention MM/DD/YYYY)
         is_us_doc = bool(re.search(r"\b(?:WI|Wisconsin|USA|County|lbs?|Extension)\b", text, re.IGNORECASE))
 
-        # 4. Report Date / Date Processed
-        report_date_match = re.search(
-            r"(?:Report\s*Date|Date\s*of\s*Report|Issue\s*Date|Date\s*of\s*Issue|Date\s*processed|Processed\s*Date)\s*[:=\-]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+        # 4. Date Received (Stored distinctly from Collection Date!)
+        recv_date_match = re.search(
+            r"(?<![A-Za-z])(?:Date\s*received|Received\s*Date)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
             text,
             re.IGNORECASE,
         )
-        if report_date_match:
-            meta.report_date = self._normalize_date(report_date_match.group(1).strip(), is_us=is_us_doc)
+        if recv_date_match:
+            meta.date_received = self._normalize_date(recv_date_match.group(1).strip(), is_us=is_us_doc)
 
-        # 5. Collection Date / Date Received
+        # 5. Date Processed
+        proc_date_match = re.search(
+            r"(?<![A-Za-z])(?:Date\s*processed|Processed\s*Date)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+            text,
+            re.IGNORECASE,
+        )
+        if proc_date_match:
+            meta.date_processed = self._normalize_date(proc_date_match.group(1).strip(), is_us=is_us_doc)
+
+        # 6. Sample Collection Date (Strictly separate from Date Received - leaves null if not in document!)
         coll_date_match = re.search(
-            r"(?:Collection\s*Date|Date\s*of\s*Collection|Sampling\s*Date|Date\s*of\s*Sampling|Date\s*received|Received\s*Date)\s*[:=\-]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+            r"(?<![A-Za-z])(?:Collection\s*Date|Date\s*of\s*Collection|Sampling\s*Date|Date\s*of\s*Sampling)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
             text,
             re.IGNORECASE,
         )
         if coll_date_match:
             meta.collection_date = self._normalize_date(coll_date_match.group(1).strip(), is_us=is_us_doc)
+        else:
+            meta.collection_date = None
 
-        # 6. Sample Depth (Safeguard 6: preserve exact reported, do not guess)
+        # 7. Report Date (Issue date / date of report)
+        report_date_match = re.search(
+            r"(?<![A-Za-z])(?:Report\s*Date|Date\s*of\s*Report|Issue\s*Date|Date\s*of\s*Issue)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+            text,
+            re.IGNORECASE,
+        )
+        if report_date_match:
+            meta.report_date = self._normalize_date(report_date_match.group(1).strip(), is_us=is_us_doc)
+        elif meta.date_processed:
+            meta.report_date = meta.date_processed
+
+        # 8. Sample Depth & Provenance (Safeguard 6: preserve exact reported, do not guess)
         depth_match = re.search(
             r"(?:Sampling\s*Depth|Sample\s*Depth|Depth)\s*[:=\-]\s*([0-9]+\s*[-–to]\s*[0-9]+\s*(?:cm|in|inch|inches)?)",
             text,
@@ -206,6 +247,10 @@ class SoilReportParser:
         )
         if depth_match:
             meta.sample_depth = depth_match.group(1).strip()
+            meta.depth_provenance = "LAB_REPORT"
+        else:
+            meta.sample_depth = None
+            meta.depth_provenance = "UNKNOWN"
 
         # 7. Sampling Point
         point_match = re.search(
@@ -537,7 +582,20 @@ class SoilReportParser:
             re.IGNORECASE
         )
 
+        in_rec_section = False
         for line in lines:
+            line_str = line.strip()
+            line_lower = line_str.lower()
+
+            # Safeguard: Do not extract fertilizer recommendation table numbers as soil measurements
+            if any(h in line_lower for h in ["recommendations", "fertilizer to apply", "nutrient need", "lime to apply"]):
+                in_rec_section = True
+            if any(h in line_lower for h in ["laboratory analysis", "soil test results", "analytical results", "test parameters"]):
+                in_rec_section = False
+
+            if in_rec_section and not any(h in line_lower for h in ["laboratory analysis", "soil test results"]):
+                continue
+
             if line.startswith("|") or "<td" in line.lower() or "<table" in line.lower():
                 continue
 
@@ -886,6 +944,12 @@ class SoilReportParser:
                     continue
                 # Ensure Organic Matter is not classified as Organic Carbon
                 if canon_key == "organic_carbon" and re.search(r"\bmatter\b", t_lower):
+                    continue
+                # Ensure elemental Phosphorus is not classified as Available Phosphorus
+                if canon_key == "available_phosphorus" and not re.search(r"\b(?:available|avail|p2o5|p205|p206|p2o|उपलब्ध)\b", t_lower):
+                    continue
+                # Ensure elemental Potassium is not classified as Available Potassium
+                if canon_key == "available_potassium" and not re.search(r"\b(?:available|avail|k2o|k20|उपलब्ध)\b", t_lower):
                     continue
                 return canon_key, False, None
 

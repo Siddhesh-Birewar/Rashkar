@@ -184,10 +184,11 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
 
   final _labNameController = TextEditingController();
   final _samplingPointController = TextEditingController();
-  String _sampleDepth = '0-15cm';
+  String _sampleDepth = 'Not specified';
   DateTime? _sampleDate;
 
   final List<String> _depthOptions = [
+    'Not specified',
     '0-15cm',
     '15-30cm',
     '0-30cm',
@@ -332,6 +333,10 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
   Future<void> _handleUpload() async {
     if (_selectedFile == null || _clientValidationError != null) return;
 
+    final isSpecified = _sampleDepth.isNotEmpty && _sampleDepth != 'Not specified';
+    final effectiveDepth = isSpecified ? _sampleDepth : null;
+    final depthProv = isSpecified ? 'FARMER_PROVIDED' : 'UNKNOWN';
+
     final response = await _notifier.uploadReport(
       fileBytes: _selectedFile!.bytes,
       fileName: _selectedFile!.name,
@@ -339,7 +344,8 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
       laboratoryName: _labNameController.text.trim().isNotEmpty
           ? _labNameController.text.trim()
           : null,
-      sampleDepth: _sampleDepth,
+      sampleDepth: effectiveDepth,
+      depthProvenance: depthProv,
       sampleCollectionDate: _sampleDate,
       samplingPointName: _samplingPointController.text.trim().isNotEmpty
           ? _samplingPointController.text.trim()

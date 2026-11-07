@@ -87,6 +87,7 @@ class SoilLabNotifier extends ChangeNotifier {
     required String mimeType,
     String? laboratoryName,
     String? sampleDepth,
+    String? depthProvenance,
     DateTime? sampleCollectionDate,
     String? samplingPointName,
   }) async {
@@ -104,6 +105,7 @@ class SoilLabNotifier extends ChangeNotifier {
         mimeType: mimeType,
         laboratoryName: laboratoryName,
         sampleDepth: sampleDepth,
+        depthProvenance: depthProvenance,
         sampleCollectionDate: sampleCollectionDate,
         samplingPointName: samplingPointName,
         onProgress: (progress) {

@@ -318,16 +318,34 @@ class _SoilReportReviewScreenState extends State<SoilReportReviewScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Divider(),
-                _buildMetadataRow('Laboratory', report.laboratoryName ?? 'Not specified on report'),
-                _buildMetadataRow('Sample Depth', report.sampleDepth ?? 'Not specified'),
+                _buildMetadataRow('Laboratory', report.laboratoryName ?? 'Not reported'),
+                _buildMetadataRow('Lab Number', report.labNumber ?? 'Not reported'),
                 _buildMetadataRow(
-                  'Sample Date',
-                  report.sampleDate != null
-                      ? '${report.sampleDate!.year}-${report.sampleDate!.month.toString().padLeft(2, '0')}-${report.sampleDate!.day.toString().padLeft(2, '0')}'
-                      : 'Not recorded',
+                  'Date Received',
+                  report.dateReceived != null ? _formatDate(report.dateReceived!) : 'Not reported',
                 ),
-                _buildMetadataRow('File Size', '${(report.fileSizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB'),
-                _buildMetadataRow('Uploaded On', report.uploadTimestamp.toLocal().toString().split('.').first),
+                _buildMetadataRow(
+                  'Date Processed',
+                  report.dateProcessed != null ? _formatDate(report.dateProcessed!) : 'Not reported',
+                ),
+                _buildMetadataRow(
+                  'Sample Collection Date',
+                  report.sampleDate != null ? _formatDate(report.sampleDate!) : 'Not reported',
+                ),
+                _buildMetadataRow(
+                  'Sample Depth',
+                  report.sampleDepth != null
+                      ? '${report.sampleDepth} (Source: ${report.depthProvenanceDisplay})'
+                      : 'Not reported (Source: Unknown)',
+                ),
+                _buildMetadataRow(
+                  'File Size',
+                  '${(report.fileSizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB',
+                ),
+                _buildMetadataRow(
+                  'Uploaded On',
+                  report.uploadTimestamp.toLocal().toString().split('.').first,
+                ),
               ],
             ),
           ),
@@ -602,10 +620,20 @@ class _SoilReportReviewScreenState extends State<SoilReportReviewScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        'Key: ${item.parameterKey} • Category: ${item.parameterCategory}',
-                        style: const TextStyle(fontSize: 11, color: Colors.black54),
-                      ),
+                      Builder(builder: (_) {
+                        final details = <String>[
+                          'Key: ${item.parameterKey}',
+                          if (item.pageNumber != null) 'Page: ${item.pageNumber}',
+                          if (item.sampleDesignation != null && item.sampleDesignation!.isNotEmpty)
+                            'Sample: ${item.sampleDesignation}',
+                          if (item.sampleDepth != null && item.sampleDepth!.isNotEmpty)
+                            'Depth: ${item.sampleDepth}',
+                        ];
+                        return Text(
+                          details.join(' • '),
+                          style: const TextStyle(fontSize: 11, color: Colors.black54),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -1000,6 +1028,10 @@ class _SoilReportReviewScreenState extends State<SoilReportReviewScreen> {
     );
   }
 
+  static String _formatDate(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildMetadataRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
@@ -1007,7 +1039,7 @@ class _SoilReportReviewScreenState extends State<SoilReportReviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 155,
             child: Text(
               label,
               style: const TextStyle(fontSize: 12, color: Colors.black54),

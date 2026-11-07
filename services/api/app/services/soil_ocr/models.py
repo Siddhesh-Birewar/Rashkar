@@ -40,7 +40,9 @@ CANONICAL_NUTRIENT_KEYS = [
     "available_nitrogen",
     "total_nitrogen",
     "available_phosphorus",
+    "phosphorus",
     "available_potassium",
+    "potassium",
     "sulphur",
     "zinc",
     "iron",
@@ -74,25 +76,28 @@ PARAMETER_ALIASES: Dict[str, str] = {
     # Available Nitrogen
     "available_nitrogen": "available_nitrogen",
     "avail_n": "available_nitrogen",
-    "n": "available_nitrogen",
     "उपलब्ध_नत्र": "available_nitrogen",
     # Total Nitrogen - strictly distinct from Available Nitrogen!
     "total_nitrogen": "total_nitrogen",
     "total_n": "total_nitrogen",
     "एकूण_नत्र": "total_nitrogen",
-    # Available Phosphorus
+    # Elemental / Reported Phosphorus (P)
+    "phosphorus": "phosphorus",
+    "p": "phosphorus",
+    # Available Phosphorus (P2O5 / Avail P)
     "available_phosphorus": "available_phosphorus",
     "available_p": "available_phosphorus",
     "available_p_p2o5": "available_phosphorus",
     "p2o5": "available_phosphorus",
-    "p": "available_phosphorus",
     "उपलब्ध_स्फुरद": "available_phosphorus",
-    # Available Potassium
+    # Elemental / Reported Potassium (K)
+    "potassium": "potassium",
+    "k": "potassium",
+    # Available Potassium (K2O / Avail K)
     "available_potassium": "available_potassium",
     "available_k": "available_potassium",
     "available_k_k2o": "available_potassium",
     "k2o": "available_potassium",
-    "k": "available_potassium",
     "उपलब्ध_पालाश": "available_potassium",
     # Secondary & Micronutrients
     "sulphur": "sulphur",
@@ -168,10 +173,14 @@ class SoilReportMetadata(BaseModel):
     """
     laboratory_name: Optional[str] = Field(None, description="Testing laboratory or institution name")
     sample_id: Optional[str] = Field(None, description="Laboratory sample ID, barcode, or reference code")
+    lab_number: Optional[str] = Field(None, description="Laboratory accession/report number")
     farmer_name: Optional[str] = Field(None, description="Reported farmer or customer name")
     report_date: Optional[str] = Field(None, description="Report issuance date (YYYY-MM-DD or raw)")
     collection_date: Optional[str] = Field(None, description="Sample collection date (YYYY-MM-DD or raw)")
+    date_received: Optional[str] = Field(None, description="Date sample was received by the laboratory (YYYY-MM-DD or raw)")
+    date_processed: Optional[str] = Field(None, description="Date sample was processed/analyzed by the laboratory (YYYY-MM-DD or raw)")
     sample_depth: Optional[str] = Field(None, description="Reported sampling depth interval (Safeguard 6: do not guess)")
+    depth_provenance: Optional[str] = Field("UNKNOWN", description="Depth provenance: LAB_REPORT, FARMER_PROVIDED, UNKNOWN")
     sampling_point: Optional[str] = Field(None, description="Specific field plot, survey number, or sampling point")
     village: Optional[str] = Field(None, description="Village name")
     taluka: Optional[str] = Field(None, description="Taluka / Tehsil")

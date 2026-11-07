@@ -40,11 +40,15 @@ class SoilTestReportModel(Base):
 
     # Laboratory & Sampling Metadata
     laboratory_name = Column(String(200), nullable=True)
+    lab_number = Column(String(100), nullable=True)
     report_date = Column(DateTime, nullable=True)
     sample_collection_date = Column(DateTime, nullable=True)
+    date_received = Column(DateTime, nullable=True)
+    date_processed = Column(DateTime, nullable=True)
     sample_depth_interval = Column(String(50), nullable=True)  # e.g., "0-15cm", "15-30cm"
     sample_depth_min_cm = Column(Float, nullable=True)
     sample_depth_max_cm = Column(Float, nullable=True)
+    depth_provenance = Column(String(50), nullable=True, default="UNKNOWN")  # LAB_REPORT, FARMER_PROVIDED, UNKNOWN
     sampling_point_name = Column(String(150), nullable=True)  # e.g., "North Field Plot 1"
     sampling_point_latitude = Column(Float, nullable=True)
     sampling_point_longitude = Column(Float, nullable=True)

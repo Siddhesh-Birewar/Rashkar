@@ -40,7 +40,7 @@ class MeasurementVerificationStatus(str, Enum):
 # Canonical soil parameter keys mapping
 CANONICAL_SOIL_PARAMETERS: Dict[str, Dict[str, Any]] = {
     "soil_ph": {
-        "display_name": "Soil pH",
+        "display_name": "pH",
         "standard_unit": "pH",
         "category": "chemical",
         "normal_range": (3.5, 10.5),
@@ -58,7 +58,7 @@ CANONICAL_SOIL_PARAMETERS: Dict[str, Dict[str, Any]] = {
         "normal_range": (0.0, 10.0),
     },
     "organic_matter": {
-        "display_name": "Soil Organic Matter (SOM)",
+        "display_name": "Organic Matter",
         "standard_unit": "%",
         "category": "chemical",
         "normal_range": (0.0, 20.0),
@@ -75,11 +75,23 @@ CANONICAL_SOIL_PARAMETERS: Dict[str, Dict[str, Any]] = {
         "category": "macronutrient",
         "normal_range": (0.0, 50.0),
     },
+    "phosphorus": {
+        "display_name": "Phosphorus (P)",
+        "standard_unit": "ppm",
+        "category": "macronutrient",
+        "normal_range": (0.0, 500.0),
+    },
     "available_phosphorus": {
         "display_name": "Available Phosphorus (P2O5)",
         "standard_unit": "kg/ha",
         "category": "macronutrient",
         "normal_range": (0.0, 300.0),
+    },
+    "potassium": {
+        "display_name": "Potassium (K)",
+        "standard_unit": "ppm",
+        "category": "macronutrient",
+        "normal_range": (0.0, 2000.0),
     },
     "available_potassium": {
         "display_name": "Available Potassium (K2O)",
@@ -137,6 +149,7 @@ class SoilMeasurementItem(BaseModel):
     parameter_key: str
     parameter_category: Optional[str] = "macronutrient"
     original_parameter_name: str
+    display_name: Optional[str] = None
 
     original_value: Optional[float] = None
     original_value_text: Optional[str] = None
@@ -188,9 +201,13 @@ class SoilReportSummary(BaseModel):
     original_filename: str
     upload_timestamp: datetime
     laboratory_name: Optional[str] = None
+    lab_number: Optional[str] = None
     report_date: Optional[datetime] = None
     sample_collection_date: Optional[datetime] = None
+    date_received: Optional[datetime] = None
+    date_processed: Optional[datetime] = None
     sample_depth_interval: Optional[str] = None
+    depth_provenance: Optional[str] = "UNKNOWN"
     sampling_point_name: Optional[str] = None
     extraction_status: ExtractionStatus = ExtractionStatus.UPLOADED
     review_status: ReviewStatus = ReviewStatus.NEEDS_REVIEW
@@ -250,4 +267,5 @@ class SoilReportUploadMetadata(BaseModel):
     report_date: Optional[datetime] = None
     sample_collection_date: Optional[datetime] = None
     sample_depth_interval: Optional[str] = None
+    depth_provenance: Optional[str] = "UNKNOWN"
     sampling_point_name: Optional[str] = None

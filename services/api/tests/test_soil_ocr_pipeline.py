@@ -491,13 +491,18 @@ def test_uw_extension_lag_sample_multi_sample_extraction():
     assert result.extraction_status == ReportExtractionStatus.EXTRACTION_COMPLETED.value
     assert len(result.measurements) == 8, f"Expected 8 measurements, found {len(result.measurements)}"
 
-    # Metadata extraction
+    # Metadata extraction (Phase 5.6.3: strict provenance, no date or depth conflation)
     assert result.metadata.laboratory_name == "UW Soil & Plant Analysis Lab"
     assert result.metadata.sample_id == "54321"
+    assert result.metadata.lab_number == "54321"
     assert result.metadata.farmer_name == "Bucky Badger"
     assert result.metadata.district == "Dane"
-    assert result.metadata.collection_date == "2007-08-01"
+    assert result.metadata.date_received == "2007-08-01"
+    assert result.metadata.date_processed == "2007-08-10"
     assert result.metadata.report_date == "2007-08-10"
+    assert result.metadata.collection_date is None  # Strictly not in document, must not map from date_received
+    assert result.metadata.sample_depth is None     # Strictly unstated, must not default or infer
+    assert result.metadata.depth_provenance == "UNKNOWN"
 
     # Separate Sample 1 (Lawn, Page 1) and Sample 2 (Garden, Page 2)
     s1_meas = {m.parameter_key: m for m in result.measurements if m.sample_id == "1" or m.page_number == 1}
@@ -506,22 +511,22 @@ def test_uw_extension_lag_sample_multi_sample_extraction():
     assert len(s1_meas) == 4
     assert len(s2_meas) == 4
 
-    # Sample 1 (Lawn) Assertions
+    # Sample 1 (Lawn) Assertions - Phase 5.6.3: strictly elemental phosphorus & potassium
     assert s1_meas["soil_ph"].original_value == 5.9
-    assert s1_meas["available_phosphorus"].original_value == 10.0
-    assert s1_meas["available_phosphorus"].original_unit == "ppm"
-    assert s1_meas["available_potassium"].original_value == 34.0
-    assert s1_meas["available_potassium"].original_unit == "ppm"
+    assert s1_meas["phosphorus"].original_value == 10.0
+    assert s1_meas["phosphorus"].original_unit == "ppm"
+    assert s1_meas["potassium"].original_value == 34.0
+    assert s1_meas["potassium"].original_unit == "ppm"
     assert s1_meas["organic_matter"].original_value == 1.9
     assert s1_meas["organic_matter"].original_unit == "%"
     assert s1_meas["soil_ph"].sample_designation == "Lawn"
 
-    # Sample 2 (Garden) Assertions
+    # Sample 2 (Garden) Assertions - Phase 5.6.3: strictly elemental phosphorus & potassium
     assert s2_meas["soil_ph"].original_value == 6.2
-    assert s2_meas["available_phosphorus"].original_value == 25.0
-    assert s2_meas["available_phosphorus"].original_unit == "ppm"
-    assert s2_meas["available_potassium"].original_value == 45.0
-    assert s2_meas["available_potassium"].original_unit == "ppm"
+    assert s2_meas["phosphorus"].original_value == 25.0
+    assert s2_meas["phosphorus"].original_unit == "ppm"
+    assert s2_meas["potassium"].original_value == 45.0
+    assert s2_meas["potassium"].original_unit == "ppm"
     assert s2_meas["organic_matter"].original_value == 3.1
     assert s2_meas["organic_matter"].original_unit == "%"
     assert s2_meas["soil_ph"].sample_designation == "Garden"
@@ -537,10 +542,14 @@ def test_uw_extension_lag_sample_multi_sample_extraction():
     # 2. No unverified organic_carbon conversion
     assert "organic_carbon" not in all_keys
 
-    # 3. No hallucinated unmeasured parameters
+    # 3. No unverified conversion of elemental P/K to available P2O5/K2O
+    assert "available_phosphorus" not in all_keys
+    assert "available_potassium" not in all_keys
+
+    # 4. No hallucinated unmeasured parameters
     assert "available_nitrogen" not in all_keys
     assert "electrical_conductivity" not in all_keys
 
-    # 4. Decoupled verification status
+    # 5. Decoupled verification status
     for m in result.measurements:
         assert m.verification_status == MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value

@@ -91,6 +91,9 @@ def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
     sample_designation = ref.get("sample_designation") if isinstance(ref, dict) else None
     area_type = ref.get("area_type") if isinstance(ref, dict) else None
 
+    param_meta = CANONICAL_SOIL_PARAMETERS.get(m.parameter_key, {})
+    disp_name = param_meta.get("display_name", m.original_parameter_name)
+
     return SoilMeasurementItem(
         id=uuid.UUID(m.id),
         report_id=uuid.UUID(m.report_id),
@@ -98,6 +101,7 @@ def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
         parameter_key=m.parameter_key,
         parameter_category=m.parameter_category,
         original_parameter_name=m.original_parameter_name,
+        display_name=disp_name,
         original_value=m.original_value,
         original_value_text=m.original_value_text,
         original_unit=m.original_unit,
@@ -134,9 +138,13 @@ def _model_to_report_summary(r: SoilTestReportModel) -> SoilReportSummary:
         original_filename=r.original_filename,
         upload_timestamp=r.upload_timestamp,
         laboratory_name=r.laboratory_name,
+        lab_number=r.lab_number,
         report_date=r.report_date,
         sample_collection_date=r.sample_collection_date,
+        date_received=r.date_received,
+        date_processed=r.date_processed,
         sample_depth_interval=r.sample_depth_interval,
+        depth_provenance=r.depth_provenance or "UNKNOWN",
         sampling_point_name=r.sampling_point_name,
         extraction_status=ExtractionStatus(r.extraction_status),
         review_status=ReviewStatus(r.review_status),
@@ -198,12 +206,22 @@ def _execute_report_extraction(
             # Propagate extracted metadata if not manually supplied
             if result.metadata.laboratory_name and not report.laboratory_name:
                 report.laboratory_name = result.metadata.laboratory_name
+            if result.metadata.lab_number and not report.lab_number:
+                report.lab_number = result.metadata.lab_number
+            if result.metadata.date_received and not report.date_received:
+                report.date_received = _parse_optional_date(result.metadata.date_received)
+            if result.metadata.date_processed and not report.date_processed:
+                report.date_processed = _parse_optional_date(result.metadata.date_processed)
             if result.metadata.report_date and not report.report_date:
                 report.report_date = _parse_optional_date(result.metadata.report_date)
             if result.metadata.collection_date and not report.sample_collection_date:
                 report.sample_collection_date = _parse_optional_date(result.metadata.collection_date)
-            if result.metadata.sample_depth and not report.sample_depth_interval:
-                report.sample_depth_interval = result.metadata.sample_depth
+            if result.metadata.sample_depth:
+                if not report.sample_depth_interval:
+                    report.sample_depth_interval = result.metadata.sample_depth
+                    report.depth_provenance = "LAB_REPORT"
+            elif not report.sample_depth_interval:
+                report.depth_provenance = "UNKNOWN"
             if result.metadata.sampling_point and not report.sampling_point_name:
                 report.sampling_point_name = result.metadata.sampling_point
 
@@ -269,6 +287,7 @@ async def upload_soil_report(
     report_date: Optional[str] = Form(None),
     sample_collection_date: Optional[str] = Form(None),
     sample_depth_interval: Optional[str] = Form(None),
+    depth_provenance: Optional[str] = Form(None),
     sampling_point_name: Optional[str] = Form(None),
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -348,6 +367,13 @@ async def upload_soil_report(
         content_type=content_type or "application/pdf"
     )
 
+    # Clean depth & provenance
+    clean_depth = sample_depth_interval.strip() if sample_depth_interval else None
+    if clean_depth and clean_depth.lower() in {"not specified", "none", "null", ""}:
+        clean_depth = None
+
+    prov = (depth_provenance or "FARMER_PROVIDED") if clean_depth else "UNKNOWN"
+
     # 6. Persist initial record to database
     report = SoilTestReportModel(
         id=report_id,
@@ -362,7 +388,8 @@ async def upload_soil_report(
         laboratory_name=effective_lab_name,
         report_date=_parse_optional_date(report_date),
         sample_collection_date=_parse_optional_date(sample_collection_date),
-        sample_depth_interval=sample_depth_interval,
+        sample_depth_interval=clean_depth,
+        depth_provenance=prov,
         sampling_point_name=sampling_point_name,
         extraction_status=ExtractionStatus.UPLOADED.value,
         review_status=ReviewStatus.NEEDS_REVIEW.value,
