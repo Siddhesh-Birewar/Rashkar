@@ -1,0 +1,211 @@
+"""
+CropNet AI — Phase 5.1 Agricultural Intelligence Schemas.
+
+Pydantic input and output models for deterministic agricultural reasoning,
+evidence-gated decision states, and targeted follow-up question selection.
+"""
+from enum import Enum
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class DecisionState(str, Enum):
+    """
+    Standardized machine-readable agronomic outcomes.
+    Absence of evidence is not evidence of suitability.
+    """
+    VERIFIED_SUITABLE = "VERIFIED_SUITABLE"
+    REGIONAL_SCREENING_ONLY = "REGIONAL_SCREENING_ONLY"
+    CONDITIONALLY_SUITABLE_PENDING_DATA = "CONDITIONALLY_SUITABLE_PENDING_DATA"
+    REQUIRES_REGIONAL_VALIDATION = "REQUIRES_REGIONAL_VALIDATION"
+    UNSUITABLE_VERIFIED_CONSTRAINT = "UNSUITABLE_VERIFIED_CONSTRAINT"
+    ABSTAIN_INSUFFICIENT_EVIDENCE = "ABSTAIN_INSUFFICIENT_EVIDENCE"
+
+
+class EvidenceTier(str, Enum):
+    """
+    Canonical 4-tier evidence gating classifications.
+    """
+    VERIFIED = "VERIFIED"
+    CONDITIONALLY_SUPPORTED = "CONDITIONALLY_SUPPORTED"
+    UNVERIFIED_BIBLIOGRAPHIC = "UNVERIFIED_BIBLIOGRAPHIC"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+class SoilDataProvenance(str, Enum):
+    """
+    Provenance distinction for soil input data.
+    """
+    LABORATORY_MEASURED = "laboratory_measured"
+    SPATIALLY_ESTIMATED_ISRIC = "spatially_estimated_isric"
+    USER_REPORTED = "user_reported"
+    UNKNOWN = "unknown"
+
+
+class FarmContextInput(BaseModel):
+    """
+    Structured farm context input for deterministic agricultural reasoning.
+    All parameters support explicit NULLs. Missing parameters are never fabricated.
+    """
+    farm_id: Optional[str] = Field(None, description="Registered farm UUID if known")
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, description="Latitude in decimal degrees")
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, description="Longitude in decimal degrees")
+    taluka: Optional[str] = Field(None, description="Taluka name (e.g. Baramati, Indapur, Maval, Mulshi)")
+    district: Optional[str] = Field(default="Pune", description="District name")
+
+    # Soil chemical and physical parameters
+    soil_ph: Optional[float] = Field(None, ge=3.0, le=11.0, description="Soil pH (1:2.5 soil:water)")
+    soil_organic_carbon_pct: Optional[float] = Field(None, ge=0.0, le=10.0, description="Soil Organic Carbon percentage (SOC %)")
+    soil_texture: Optional[str] = Field(None, description="Soil texture class (e.g. Light soil, Coarse sand, Clay Loam, Vertisol)")
+    soil_depth_cm: Optional[float] = Field(None, ge=0.0, le=300.0, description="Effective soil depth in centimeters")
+    drainage: Optional[str] = Field(None, description="Drainage condition (e.g. Well-drained, Moderate, Poor / Waterlogged)")
+    standing_water_days: Optional[int] = Field(None, ge=0, le=60, description="Days standing water persists after rainfall")
+    electrical_conductivity_ds_m: Optional[float] = Field(None, ge=0.0, le=30.0, description="Soil EC in dS/m (1:2 extract)")
+    
+    # Nutrient availability (Strict separation of Total vs Available N)
+    available_nitrogen_kg_ha: Optional[float] = Field(None, ge=0.0, le=1000.0, description="Available Nitrogen (alkaline permanganate extractable)")
+    total_nitrogen_pct: Optional[float] = Field(None, ge=0.0, le=5.0, description="Total Nitrogen % (Kjeldahl - organically bound)")
+    available_phosphorus_kg_ha: Optional[float] = Field(None, ge=0.0, le=200.0, description="Olsen Available P in kg/ha")
+    available_potassium_kg_ha: Optional[float] = Field(None, ge=0.0, le=1500.0, description="Available K in kg/ha")
+    
+    # Soil provenance
+    soil_data_provenance: SoilDataProvenance = Field(
+        default=SoilDataProvenance.UNKNOWN,
+        description="Whether soil parameters are laboratory tested or coarse spatial estimates"
+    )
+    soil_measurement_date: Optional[str] = Field(None, description="ISO measurement date for lab soil test")
+
+    # Hydrology & Irrigation
+    irrigation_available: Optional[bool] = Field(None, description="Whether irrigation water is accessible")
+    irrigation_source: Optional[str] = Field(None, description="Irrigation source (canal, well, borewell, dryland/rainfed)")
+    irrigation_capacity: Optional[str] = Field(None, description="Hydrological capacity (perennial, seasonal_dry_by_february, critical_only)")
+    irrigation_water_salinity_tested: Optional[bool] = Field(None, description="Whether irrigation water has been tested for EC/SAR")
+    irrigation_water_ec_ds_m: Optional[float] = Field(None, ge=0.0, le=25.0, description="Irrigation water EC in dS/m")
+
+    # Orchard & Bahar Specifics (Pomegranate)
+    tree_age_years: Optional[int] = Field(None, ge=1, le=30, description="Orchard tree age in years")
+    target_bahar: Optional[str] = Field(None, description="Regulated Bahar (mrig_bahar, hasta_bahar, ambia_bahar)")
+    water_scarcity_period: Optional[str] = Field(None, description="Critical water deficit window (e.g. post_february_summer)")
+
+    # Cropping context & Season
+    previous_crop: Optional[str] = Field(None, description="Previous crop harvested from parcel")
+    target_season: Optional[str] = Field(None, description="Cropping season (kharif, rabi, summer, annual)")
+    target_year: Optional[int] = Field(None, description="Target cultivation year (e.g. 2026)")
+    proposed_sowing_date: Optional[str] = Field(None, description="Planned sowing date (YYYY-MM-DD)")
+    actual_recorded_rain_mm: Optional[float] = Field(None, ge=0.0, le=1000.0, description="Actual recorded soaking rainfall before sowing (mm)")
+    monsoon_arrived: Optional[bool] = Field(None, description="Whether South-West Monsoon has officially arrived")
+
+    # Real-time weather & forecast
+    forecast_max_temp_c: Optional[float] = Field(None, description="Forecasted maximum daily temperature in Celsius")
+    forecast_min_temp_c: Optional[float] = Field(None, description="Forecasted minimum daily temperature in Celsius")
+    reproductive_temp_max_c: Optional[float] = Field(None, description="Maximum daily temperature during reproductive stage in Celsius")
+    reproductive_temp_mean_c: Optional[float] = Field(None, description="Mean daily temperature during reproductive stage in Celsius")
+    sowing_window_rain_mm: Optional[float] = Field(None, ge=0.0, le=1000.0, description="Actual recorded soaking rainfall before sowing (mm)")
+    forecast_rain_mm_48h: Optional[float] = Field(None, ge=0.0, description="Forecasted precipitation over next 48 hours in mm")
+    growth_stage: Optional[str] = Field(None, description="Current growth stage (vegetative, reproductive/flowering, pod_filling, mature)")
+    days_after_sowing: Optional[int] = Field(None, ge=0, le=365, description="Days after sowing (DAS)")
+
+    # Targeted query parameters
+    target_crops: Optional[List[str]] = Field(None, description="Specific crops to evaluate (None evaluates all 10 priority crops)")
+    user_query: Optional[str] = Field(None, description="User's natural language query in English or Marathi")
+    language: str = Field(default="en", description="Preferred output language: 'en' or 'mr'")
+
+
+class CitationMetadata(BaseModel):
+    """
+    Granular citation metadata for transparency and provenance.
+    """
+    source_id: str
+    organization: str
+    publication_title: str
+    publication_year: Optional[int] = None
+    section_or_pages: Optional[str] = None
+    evidence_tier: EvidenceTier
+
+
+class AppliedRuleRecord(BaseModel):
+    """
+    Record of a specific deterministic rule evaluated for a crop.
+    """
+    rule_id: str
+    domain: str
+    parameter_checked: str
+    rule_statement: str
+    condition_met: bool
+    evidence_tier: EvidenceTier
+    citation: Optional[CitationMetadata] = None
+
+
+class CropEvaluationOutcome(BaseModel):
+    """
+    Detailed deterministic evaluation outcome for a single candidate crop.
+    """
+    crop_id: str
+    common_name: str
+    scientific_name: str
+    marathi_name: Optional[str] = None
+    decision_state: DecisionState
+    is_disqualified: bool = False
+    
+    # Transparent reasoning breakdowns
+    limiting_factors: List[str] = Field(default_factory=list)
+    reproductive_risk_warnings: List[str] = Field(default_factory=list)
+    irrigation_guidance: Optional[Dict[str, Any]] = None
+    pomegranate_daily_water: Optional[Dict[str, Any]] = None
+    missing_information: List[str] = Field(default_factory=list)
+    uncertainty_notes: List[str] = Field(default_factory=list)
+    
+    # Provenance
+    applied_rules: List[AppliedRuleRecord] = Field(default_factory=list)
+    citations: List[CitationMetadata] = Field(default_factory=list)
+    explanation: str
+
+
+class FollowUpQuestion(BaseModel):
+    """
+    Diagnostic follow-up question selected to resolve decision uncertainty.
+    """
+    question_id: str
+    target_parameter: str
+    priority: int = Field(..., description="1 = Critical blocker, 2 = Diagnostic, 3 = Optimization")
+    question_text_en: str
+    question_text_mr: str
+    question_type: str = Field(..., description="choice | numeric | boolean")
+    options: Optional[List[str]] = None
+    agronomic_rationale: str
+
+
+class FarmEvaluationResponse(BaseModel):
+    """
+    Complete response payload for farm agricultural evaluation.
+    """
+    decision_id: str
+    evaluated_at: datetime
+    input_validation_status: str
+    contradictions_detected: List[str] = Field(default_factory=list)
+    missing_parameters_flagged: List[str] = Field(default_factory=list)
+    taluka_resolved: Optional[str] = None
+    target_season: Optional[str] = None
+    language: str = "en"
+    
+    # Evaluated outcomes across crops
+    crop_outcomes: List[CropEvaluationOutcome] = Field(default_factory=list)
+    
+    # Global follow-up questions
+    follow_up_questions: List[FollowUpQuestion] = Field(default_factory=list)
+    
+    # Governance & Decoupling Disclaimer
+    governance_notice: str = (
+        "CropNet AI evaluates biological and environmental feasibility. "
+        "Agronomic suitability does not equate to commercial profitability or guaranteed net returns. "
+        "Absence of evidence is never treated as evidence of suitability."
+    )
+
+
+class FollowUpAnswerRequest(BaseModel):
+    """
+    Payload for submitting follow-up answers to re-evaluate a farm.
+    """
+    decision_id: str
+    answers: Dict[str, Any] = Field(..., description="Key-value mapping of target_parameter to farmer response")

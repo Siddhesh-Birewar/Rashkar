@@ -457,6 +457,33 @@ class CropKnowledgeService:
             })
         return None
 
+    def get_source(
+        self,
+        source_id: str,
+        db: Optional[Session] = None
+    ) -> Optional[AgriculturalKnowledgeSourceResponse]:
+        """
+        Retrieve a registered agricultural knowledge source by its ID.
+        Checks DB first (if session provided), falls back to in-memory cache.
+        """
+        if db is not None:
+            try:
+                src = db.query(AgriculturalKnowledgeSourceModel).filter_by(id=source_id).first()
+                if src:
+                    return AgriculturalKnowledgeSourceResponse(
+                        id=src.id,
+                        organization=src.organization,
+                        publication_title=src.publication_title,
+                        publication_year=src.publication_year,
+                        document_url_or_ref=src.document_url_or_ref,
+                        section_or_pages=src.section_or_pages,
+                        evidence_quality=src.evidence_quality,
+                        last_verified_date=src.last_verified_date
+                    )
+            except Exception as e:
+                logger.debug("DB source fetch error: %s, falling back to cache", e)
+        return _SOURCES_CACHE.get(source_id)
+
     def get_crop_sources(
         self,
         crop_id: str,
