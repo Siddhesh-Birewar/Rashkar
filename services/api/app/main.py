@@ -47,9 +47,15 @@ app.add_middleware(
 async def request_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     start_time = time.time()
-    
-    response = await call_next(request)
-    
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        process_time = time.time() - start_time
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "request_id": request_id},
+            headers={"X-Request-ID": request_id, "X-Process-Time": f"{process_time:.4f}s"}
+        )
     process_time = time.time() - start_time
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Process-Time"] = f"{process_time:.4f}s"
@@ -69,8 +75,14 @@ try:
 except ImportError:
     from .api.v1.endpoints.water import router as water_router
 
+try:
+    from cropnet.services.api.app.api.v1.endpoints.satellite import router as satellite_router
+except ImportError:
+    from .api.v1.endpoints.satellite import router as satellite_router
+
 app.include_router(soil_reports_router, prefix=settings.API_V1_PREFIX)
 app.include_router(water_router, prefix=settings.API_V1_PREFIX)
+app.include_router(satellite_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
