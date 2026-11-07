@@ -38,6 +38,10 @@ abstract final class RoutePaths {
   /// About CropNet AI
   static const String about = '/about';
 
+  /// Authentication
+  static const String login = '/login';
+  static const String register = '/register';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';

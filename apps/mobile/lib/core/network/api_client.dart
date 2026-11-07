@@ -5,11 +5,15 @@ import 'package:http/http.dart' as http;
 import 'api_constants.dart';
 import 'api_exception.dart';
 
+/// Callback signature for dynamic authentication token acquisition (e.g. Supabase JWT).
+typedef AuthTokenProvider = FutureOr<String?> Function();
+
 /// Reusable HTTP client and networking core for CropNet AI.
 ///
 /// Features:
 /// - Environment-aware base URL configuration
 /// - Bearer token and development user ID header injection
+/// - Dynamic authentication token provider support (Supabase session)
 /// - Standardized timeout execution (default 30 seconds)
 /// - Robust HTTP status code mapping (400, 401, 403, 404, 422, 500+)
 /// - Safe JSON serialization/deserialization with error trapping
@@ -20,6 +24,7 @@ class ApiClient {
   final Duration defaultTimeout;
   String? bearerToken;
   String? devUserId;
+  final AuthTokenProvider? authTokenProvider;
 
   ApiClient({
     String? baseUrl,
@@ -27,6 +32,7 @@ class ApiClient {
     this.defaultTimeout = const Duration(seconds: 30),
     this.bearerToken,
     this.devUserId = ApiConstants.defaultDevUserId,
+    this.authTokenProvider,
   })  : baseUrl = (baseUrl ?? ApiConstants.defaultBaseUrl).replaceAll(RegExp(r'/+$'), ''),
         _httpClient = httpClient ?? http.Client();
 
@@ -54,14 +60,23 @@ class ApiClient {
   }
 
   /// Build default HTTP headers including content type and auth headers.
-  Map<String, String> _buildHeaders(Map<String, String>? customHeaders) {
+  Future<Map<String, String>> _buildHeaders(Map<String, String>? customHeaders) async {
     final headers = <String, String>{
       'Content-Type': 'application/json; charset=utf-8',
       'Accept': 'application/json',
     };
 
-    if (bearerToken != null && bearerToken!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $bearerToken';
+    String? token = bearerToken;
+    if (authTokenProvider != null) {
+      try {
+        token = await authTokenProvider!();
+      } catch (_) {
+        // Fallback to static bearerToken if provider fails
+      }
+    }
+
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     } else if (devUserId != null && devUserId!.isNotEmpty) {
       headers[ApiConstants.devUserIdHeader] = devUserId!;
     }
@@ -82,8 +97,9 @@ class ApiClient {
     T Function(dynamic json)? fromJson,
   }) async {
     final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
     return _send<T>(
-      () => _httpClient.get(uri, headers: _buildHeaders(headers)),
+      () => _httpClient.get(uri, headers: requestHeaders),
       timeout: timeout ?? defaultTimeout,
       fromJson: fromJson,
     );
@@ -99,9 +115,10 @@ class ApiClient {
     T Function(dynamic json)? fromJson,
   }) async {
     final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
     final encodedBody = body != null ? jsonEncode(body) : null;
     return _send<T>(
-      () => _httpClient.post(uri, headers: _buildHeaders(headers), body: encodedBody),
+      () => _httpClient.post(uri, headers: requestHeaders, body: encodedBody),
       timeout: timeout ?? defaultTimeout,
       fromJson: fromJson,
     );
@@ -117,9 +134,10 @@ class ApiClient {
     T Function(dynamic json)? fromJson,
   }) async {
     final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
     final encodedBody = body != null ? jsonEncode(body) : null;
     return _send<T>(
-      () => _httpClient.put(uri, headers: _buildHeaders(headers), body: encodedBody),
+      () => _httpClient.put(uri, headers: requestHeaders, body: encodedBody),
       timeout: timeout ?? defaultTimeout,
       fromJson: fromJson,
     );
@@ -134,8 +152,9 @@ class ApiClient {
     T Function(dynamic json)? fromJson,
   }) async {
     final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
     return _send<T>(
-      () => _httpClient.delete(uri, headers: _buildHeaders(headers)),
+      () => _httpClient.delete(uri, headers: requestHeaders),
       timeout: timeout ?? defaultTimeout,
       fromJson: fromJson,
     );

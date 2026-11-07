@@ -14,4 +14,6 @@ abstract final class RouteNames {
   static const String weatherDetail = 'weatherDetail';
   static const String cropDetail = 'cropDetail';
   static const String about = 'about';
+  static const String login = 'login';
+  static const String register = 'register';
 }
