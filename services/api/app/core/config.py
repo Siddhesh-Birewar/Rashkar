@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     ENABLE_ECONOMIC_RANKING: bool = False
     ENABLE_YIELD_PREDICTION: bool = False
 
+    # Local LLM Runtime (Ollama / Qwen3:8B)
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    OLLAMA_MODEL: str = "qwen3:8b"
+    OLLAMA_TIMEOUT_SECONDS: int = 90
+    OLLAMA_TEMPERATURE: float = 0.2
+    OLLAMA_MAX_TOKENS: int = 450
+    OLLAMA_ENABLED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=[
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))), ".env"),

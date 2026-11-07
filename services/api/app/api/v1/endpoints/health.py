@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from cropnet.services.api.app.core.config import settings
@@ -8,6 +8,7 @@ from cropnet.services.api.app.services.soil_providers.soilgrids import SoilGrids
 from cropnet.services.api.app.services.soil_providers.openlandmap import OpenLandMapProvider
 from cropnet.services.api.app.services.soil_providers.natmo import NATMOProvider
 from cropnet.services.api.app.services.soil_providers.bhoomi import BhoomiProvider
+from cropnet.services.api.app.services.llm.ollama_client import OllamaClient
 
 router = APIRouter()
 
@@ -19,6 +20,7 @@ class HealthCheckResponse(BaseModel):
     timestamp: datetime
     active_pilot_regions: list[str]
     soil_data_providers: Dict[str, Any]
+    llm_runtime: Optional[Dict[str, Any]] = None
 
 
 @router.get("/health", response_model=HealthCheckResponse)
@@ -27,6 +29,10 @@ async def health_check():
     olm = OpenLandMapProvider()
     natmo = NATMOProvider()
     bhoomi = BhoomiProvider()
+    ollama = OllamaClient()
+
+    ollama_online = ollama.is_available()
+    model_online = ollama.is_model_available() if ollama_online else False
 
     return HealthCheckResponse(
         status="healthy",
@@ -55,5 +61,14 @@ async def health_check():
                 "operational": False,
                 "status": "Service unavailable (HTTP 500) & cartographic WMS display tiles only"
             }
+        },
+        llm_runtime={
+            "provider": "ollama_local",
+            "base_url": settings.OLLAMA_BASE_URL,
+            "configured_model": settings.OLLAMA_MODEL,
+            "ollama_server_online": ollama_online,
+            "model_available": model_online,
+            "operational": ollama_online and model_online,
+            "fallback_available": True
         }
     )

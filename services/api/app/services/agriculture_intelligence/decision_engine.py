@@ -145,6 +145,7 @@ class DeterministicDecisionEngine:
                 taluka_resolved=None,
                 target_season=None,
                 language=ctx.language or "en",
+                farm_context=ctx,
                 crop_outcomes=[],
                 follow_up_questions=followups
             )
@@ -207,6 +208,7 @@ class DeterministicDecisionEngine:
                 taluka_resolved=val_res.resolved_taluka,
                 target_season=ctx.target_season,
                 language=ctx.language or "en",
+                farm_context=ctx,
                 crop_outcomes=[
                     CropEvaluationOutcome(
                         crop_id="unregistered_crop",
@@ -338,6 +340,7 @@ class DeterministicDecisionEngine:
             taluka_resolved=val_res.resolved_taluka,
             target_season=ctx.target_season,
             language=ctx.language or "en",
+            farm_context=ctx,
             crop_outcomes=outcomes,
             follow_up_questions=follow_ups
         )
@@ -407,6 +410,21 @@ class DeterministicDecisionEngine:
                     ctx_dict["target_bahar"] = str(v)
             elif k == "drainage":
                 ctx_dict["drainage"] = str(v)
+            elif k in ("water_table_depth", "chickpea_water_table_depth"):
+                if isinstance(v, str):
+                    if "< 1" in v or "shallow" in v.lower() or "high" in v.lower() or "waterlog" in v.lower():
+                        ctx_dict["water_table_depth"] = "shallow"
+                        ctx_dict["water_table_depth_m"] = 0.5
+                    elif "1–2" in v or "moderate" in v.lower():
+                        ctx_dict["water_table_depth"] = "moderate"
+                        ctx_dict["water_table_depth_m"] = 1.5
+                    elif "> 2" in v or "deep" in v.lower():
+                        ctx_dict["water_table_depth"] = "deep"
+                        ctx_dict["water_table_depth_m"] = 3.0
+                    else:
+                        ctx_dict["water_table_depth"] = v
+                elif isinstance(v, (int, float)):
+                    ctx_dict["water_table_depth_m"] = float(v)
             elif k in ctx_dict:
                 ctx_dict[k] = v
 

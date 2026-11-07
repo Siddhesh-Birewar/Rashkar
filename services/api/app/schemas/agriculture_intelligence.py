@@ -213,6 +213,7 @@ class FarmEvaluationResponse(BaseModel):
     taluka_resolved: Optional[str] = None
     target_season: Optional[str] = None
     language: str = "en"
+    farm_context: Optional[FarmContextInput] = None
     
     # Evaluated outcomes across crops
     crop_outcomes: List[CropEvaluationOutcome] = Field(default_factory=list)
@@ -234,3 +235,51 @@ class FollowUpAnswerRequest(BaseModel):
     """
     decision_id: str
     answers: Dict[str, Any] = Field(..., description="Key-value mapping of target_parameter to farmer response")
+
+
+class ExplainDecisionRequest(BaseModel):
+    """
+    Request payload to generate a natural farmer-friendly explanation of a validated decision.
+    """
+    decision_id: str = Field(..., description="UUID of the validated decision")
+    language: Optional[str] = Field(default="en", description="Target explanation language: 'en' or 'mr'")
+    focus_crop: Optional[str] = Field(None, description="Optional specific crop_id to focus the explanation on")
+
+
+class ConversationMessage(BaseModel):
+    """
+    Individual message in a bounded conversational dialogue.
+    """
+    role: str = Field(..., description="'user' or 'assistant'")
+    content: str = Field(..., description="Message text")
+    timestamp: Optional[datetime] = Field(default=None, description="Message timestamp")
+
+
+class ConversationRequest(BaseModel):
+    """
+    Request payload for natural farmer follow-up dialogue grounded in a validated decision.
+    """
+    decision_id: str = Field(..., description="UUID of the existing validated decision")
+    message: str = Field(..., description="Farmer's query or diagnostic response")
+    language: Optional[str] = Field(default="en", description="Language preference: 'en' or 'mr'")
+    history: Optional[List[ConversationMessage]] = Field(default_factory=list, description="Bounded prior conversation turns")
+    submitted_answers: Optional[Dict[str, Any]] = Field(None, description="Optional diagnostic parameter updates to trigger deterministic re-evaluation")
+
+
+class AgriculturalExplanationResponse(BaseModel):
+    """
+    Validated natural language explanation response with strictly bound factual metadata.
+    """
+    decision_id: str
+    language: str
+    explanation_text: str
+    generation_source: str = Field(..., description="'llm_qwen3_8b' or 'deterministic_fallback'")
+    validation_passed: bool = Field(..., description="Whether output passed numerical and constraint guardrails")
+    validation_warnings: List[str] = Field(default_factory=list, description="Guardrail warnings or failure notes")
+    decision_state_summary: Dict[str, str] = Field(default_factory=dict, description="Crop ID to machine-readable decision state mapping")
+    authoritative_citations: List[CitationMetadata] = Field(default_factory=list, description="Institutional citations attached directly from deterministic engine")
+    follow_up_questions: List[FollowUpQuestion] = Field(default_factory=list, description="Targeted follow-up questions from deterministic engine")
+    governance_notice: str = (
+        "CropNet AI explanations are strictly derived from validated deterministic agronomic decisions. "
+        "The language model is a communication layer and does not establish agronomic suitability or thresholds."
+    )
