@@ -11,8 +11,13 @@ import 'package:cropnet_mobile/features/weather/data/weather_repository.dart';
 import 'package:cropnet_mobile/features/weather/models/weather_models.dart';
 import 'package:cropnet_mobile/features/crop/data/crop_repository.dart';
 import 'package:cropnet_mobile/features/crop/models/crop_models.dart';
+import 'package:cropnet_mobile/features/auth/auth_service.dart';
+import 'package:cropnet_mobile/features/auth/auth_state.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.instance.initialize();
+  AuthStateNotifier.instance.initialize();
   runApp(const CropNetApp());
 }
 

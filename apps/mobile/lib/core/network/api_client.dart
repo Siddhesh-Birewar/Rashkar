@@ -19,6 +19,9 @@ typedef AuthTokenProvider = FutureOr<String?> Function();
 /// - Safe JSON serialization/deserialization with error trapping
 /// - Pluggable [http.Client] for seamless unit and integration testing
 class ApiClient {
+  /// Global default token provider injected by authentication service.
+  static AuthTokenProvider? defaultAuthTokenProvider;
+
   final String baseUrl;
   final http.Client _httpClient;
   final Duration defaultTimeout;
@@ -67,9 +70,10 @@ class ApiClient {
     };
 
     String? token = bearerToken;
-    if (authTokenProvider != null) {
+    final provider = authTokenProvider ?? defaultAuthTokenProvider;
+    if (provider != null) {
       try {
-        token = await authTokenProvider!();
+        token = await provider();
       } catch (_) {
         // Fallback to static bearerToken if provider fails
       }

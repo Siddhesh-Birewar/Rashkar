@@ -28,6 +28,8 @@ class AuthService {
 
   /// Initialize Supabase Flutter SDK if credentials are provided.
   Future<void> initialize() async {
+    ApiClient.defaultAuthTokenProvider = tokenProvider;
+
     if (!isConfigured) {
       _initialized = true;
       return;
