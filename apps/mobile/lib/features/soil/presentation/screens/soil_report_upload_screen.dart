@@ -263,11 +263,22 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
         return;
       }
 
-      // Native browser/device file picker
-      final picked = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-      );
+      // Native browser/device file picker with dual fallback
+      PlatformFile? picked;
+      try {
+        picked = await FilePicker.pickFile(
+          type: FileType.custom,
+          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+        );
+      } catch (_) {
+        final files = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+        );
+        if (files.isNotEmpty) {
+          picked = files.first;
+        }
+      }
 
       // User cancelled picker dialog -> maintain existing state gracefully
       if (picked == null) {
