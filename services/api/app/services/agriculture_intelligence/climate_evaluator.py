@@ -2,14 +2,16 @@
 CropNet AI — Deterministic Climate & Weather Evaluator.
 
 Evaluates ambient and forecast temperatures against growth-stage thresholds,
-validates sowing moisture prerequisites against real-time weather vs climatology,
-and qualifies thermal sensitivities according to verified primary literature.
+validates sowing moisture prerequisites, and qualifies thermal sensitivities.
+Phase 5.1.2: Hardened evidence boundaries; unverified compendium thresholds
+no longer enforce hard disqualification; all rules carry complete metadata.
 """
 from typing import List, Optional, Dict, Any
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmContextInput,
     AppliedRuleRecord,
     EvidenceTier,
+    EnforcementLevel,
     CitationMetadata
 )
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse
@@ -78,7 +80,15 @@ class ClimateSuitabilityEvaluator:
                     rule_statement="Daily max temperature > 35°C during reproductive stage causes flower drop and reduced pod set (ICRISAT 2010, p. 3)",
                     condition_met=True,
                     evidence_tier=tier,
-                    citation=citation
+                    citation=citation,
+                    claim_verification_status="VERIFIED",
+                    source_id="icrisat_chickpea_2010",
+                    document_title="Chickpea Seed Production Manual",
+                    section_or_pages="p. 3",
+                    supporting_statement="High temperatures (>35°C) during reproductive development cause flower drop and reduce pod set.",
+                    applicability_conditions="reproductive_temp_max_c > 35.0",
+                    enforcement_level=EnforcementLevel.ADVISORY_ONLY,
+                    can_trigger_disqualification=False
                 ))
 
             # Low-temperature threshold (mean of max and min < 15°C during reproductive stage)
@@ -107,62 +117,103 @@ class ClimateSuitabilityEvaluator:
                     rule_statement="Mean of daily max and min temperatures < 15°C during reproductive stage causes flower drop and delayed pod set (ICRISAT 2010, p. 3)",
                     condition_met=True,
                     evidence_tier=tier,
-                    citation=citation
+                    citation=citation,
+                    claim_verification_status="VERIFIED",
+                    source_id="icrisat_chickpea_2010",
+                    document_title="Chickpea Seed Production Manual",
+                    section_or_pages="p. 3",
+                    supporting_statement="Mean of maximum and minimum daily temperature < 15°C during reproductive development causes flower drop and delayed pod set.",
+                    applicability_conditions="reproductive_temp_mean_c < 15.0",
+                    enforcement_level=EnforcementLevel.ADVISORY_ONLY,
+                    can_trigger_disqualification=False
                 ))
 
         # -------------------------------------------------------------
         # 2. Climatology vs Real-Time Sowing Rain Prerequisite
+        # Phase 5.1.2: Unverified MPKV thresholds cannot enforce hard disqualification
         # -------------------------------------------------------------
         rain_received = ctx.sowing_window_rain_mm if ctx.sowing_window_rain_mm is not None else ctx.actual_recorded_rain_mm
         if rain_received is not None and rain_received < 75.0:
-            res.is_disqualified = True
             msg = (
-                "Operational block: Sowing into dry soil relying on 30-year historical climate averages "
-                "without real-time monsoon onset will result in seed baking and germination failure. "
-                "DO NOT SOW UNTIL MONSOON ARRIVES. A minimum of 75–100 mm actual recorded soaking rainfall is mandatory before sowing (MPKV PoP 2023)."
+                "Operational moisture advisory: Sowing into dry soil relying purely on 30-year historical climate averages "
+                "without confirmed real-time monsoon onset will result in seed desiccation and germination failure. "
+                "DO NOT SOW UNTIL MONSOON ARRIVES. Regional farm advisory recommends awaiting 75–100 mm actual soaking rainfall before Kharif sowing."
             )
+            res.warnings.append(msg)
             res.limiting_factors.append(msg)
             res.applied_rules.append(AppliedRuleRecord(
                 rule_id="RULE_KHARIF_SOWING_MOISTURE_GATE",
                 domain="Weather and Climate Intelligence",
                 parameter_checked="sowing_window_rain_mm",
-                rule_statement="Mandatory 75–100 mm soaking rain before Kharif sowing; historical normals != real-time forecast",
+                rule_statement="Awaiting 75–100 mm soaking rain before Kharif sowing is advised in regional practice; climatology != real-time forecast",
                 condition_met=False,
-                evidence_tier=EvidenceTier.VERIFIED,
-                citation=citation
+                evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
+                citation=citation,
+                claim_verification_status="CONDITIONALLY_SUPPORTED",
+                source_id="mpkv_pop_2023",
+                document_title="Package of Practices for Field Crops of Western Maharashtra",
+                section_or_pages="Compendium requires physical inspection",
+                supporting_statement="Sowing should be undertaken only after receiving 75–100 mm soaking rainfall.",
+                applicability_conditions="sowing_window_rain_mm < 75.0",
+                enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                can_trigger_disqualification=False
             ))
         elif ctx.proposed_sowing_date and ctx.target_season == "kharif":
             if ctx.monsoon_arrived is False:
-                res.is_disqualified = True
                 msg = (
-                    "Operational block: Sowing into dry soil relying on 30-year historical climate averages "
-                    "without real-time monsoon onset will result in seed baking and germination failure. "
-                    "A minimum of 75–100 mm actual recorded soaking rainfall is mandatory before sowing (MPKV PoP 2023)."
+                    "Operational moisture advisory: Sowing into dry soil relying on 30-year historical climate averages "
+                    "without real-time monsoon onset will result in seed desiccation and germination failure. "
+                    "DO NOT SOW UNTIL MONSOON ARRIVES. A minimum of 75–100 mm actual soaking rainfall is advised before sowing."
                 )
+                res.warnings.append(msg)
                 res.limiting_factors.append(msg)
                 res.applied_rules.append(AppliedRuleRecord(
                     rule_id="RULE_KHARIF_SOWING_MOISTURE_GATE",
                     domain="Weather and Climate Intelligence",
                     parameter_checked="actual_recorded_rain_mm",
-                    rule_statement="Mandatory 75–100 mm soaking rain before Kharif sowing; historical normals != real-time forecast",
+                    rule_statement="Awaiting 75–100 mm soaking rain before Kharif sowing is advised in regional practice; climatology != real-time forecast",
                     condition_met=False,
-                    evidence_tier=EvidenceTier.VERIFIED,
-                    citation=citation
+                    evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
+                    citation=citation,
+                    claim_verification_status="CONDITIONALLY_SUPPORTED",
+                    source_id="mpkv_pop_2023",
+                    document_title="Package of Practices for Field Crops of Western Maharashtra",
+                    section_or_pages="Compendium requires physical inspection",
+                    supporting_statement="Sowing should be undertaken only after receiving 75–100 mm soaking rainfall.",
+                    applicability_conditions="monsoon_arrived is False",
+                    enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                    can_trigger_disqualification=False
                 ))
 
         # -------------------------------------------------------------
         # 3. Kharif Bajra Sowing Window
         # -------------------------------------------------------------
         if crop_id == "bajra" and ctx.target_season == "kharif" and ctx.proposed_sowing_date:
-            # Check calendar month and day
             try:
                 dt = ctx.proposed_sowing_date
-                # Sowing window is June 15 to July 15
                 if "-07-16" <= dt[-5:] or dt[-5:] < "06-15":
-                    res.warnings.append(
-                        "Kharif Bajra optimum sowing window is June 15 to July 15 (MPKV PoP 2023 / IIMR 2022). "
-                        "Sowing later than July 15 significantly increases downy mildew susceptibility and terminal drought risk."
+                    warn_b = (
+                        "Kharif Bajra optimum sowing window in Maharashtra is June 15 to July 15. "
+                        "Sowing later than July 15 significantly increases downy mildew susceptibility and shoot fly damage."
                     )
+                    res.warnings.append(warn_b)
+                    res.applied_rules.append(AppliedRuleRecord(
+                        rule_id="RULE_BAJRA_KHARIF_SOWING_WINDOW",
+                        domain="Weather and Climate Intelligence",
+                        parameter_checked="proposed_sowing_date",
+                        rule_statement="Kharif Bajra sowing window is June 15 to July 15 (MPKV / IIMR)",
+                        condition_met=False,
+                        evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
+                        citation=citation,
+                        claim_verification_status="CONDITIONALLY_SUPPORTED",
+                        source_id="mpkv_pop_2023",
+                        document_title="Package of Practices for Field Crops of Western Maharashtra",
+                        section_or_pages="Compendium requires physical inspection",
+                        supporting_statement="Optimum sowing window for Kharif bajra is June 15 to July 15.",
+                        applicability_conditions="kharif proposed_sowing_date outside 06-15 to 07-15",
+                        enforcement_level=EnforcementLevel.ADVISORY_ONLY,
+                        can_trigger_disqualification=False
+                    ))
             except Exception:
                 pass
 

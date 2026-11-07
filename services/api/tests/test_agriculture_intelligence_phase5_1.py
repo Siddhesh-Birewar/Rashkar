@@ -183,11 +183,12 @@ def test_chickpea_decoupled_irrigation_and_rainfall_suspension():
     assert "MPKV" in guidance["mpkv_2023_framework"]["source"]
     assert "Do NOT combine both into 4 irrigations" in guidance["anti_blending_warning"]
     # Rainfall suspension advisory must be triggered
-    assert any("SUSPEND and POSTPONE planned irrigation" in w or "POSTPONE" in w for w in chk_outcome.uncertainty_notes)
+    assert any("Weather-Aware Irrigation Advisory" in w for w in chk_outcome.uncertainty_notes)
+    assert any("postpone" in w.lower() for w in chk_outcome.uncertainty_notes)
 
 
 def test_sugarcane_summer_water_depletion_disqualification():
-    """Verify sugarcane disqualification when well water dries by February."""
+    """Verify sugarcane disqualification when well water dries by February with no alternative."""
     ctx = FarmContextInput(
         taluka="Indapur",
         target_crops=["sugarcane"],
@@ -197,11 +198,11 @@ def test_sugarcane_summer_water_depletion_disqualification():
     cane = next(o for o in res.crop_outcomes if o.crop_id == "sugarcane")
     assert cane.is_disqualified is True
     assert cane.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
-    assert any("exhausted by February coincides with the critical summer tillering" in f for f in cane.limiting_factors)
+    assert any("exhausted by February" in f for f in cane.limiting_factors)
 
 
 def test_kharif_dry_sowing_rainfall_gate():
-    """Verify block on dry sowing before monsoon arrives relying on 30-year climatology."""
+    """Verify operational advisory on dry sowing before monsoon arrives relying on 30-year climatology."""
     ctx = FarmContextInput(
         taluka="Baramati",
         target_crops=["groundnut"],
@@ -212,9 +213,10 @@ def test_kharif_dry_sowing_rainfall_gate():
     )
     res = engine.evaluate_farm(ctx)
     gnut = next(o for o in res.crop_outcomes if o.crop_id == "groundnut")
-    assert gnut.is_disqualified is True
-    assert gnut.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
-    assert any("75–100 mm actual recorded soaking rainfall" in f for f in gnut.limiting_factors)
+    # Phase 5.1.2: Unverified MPKV thresholds cannot enforce hard constraints
+    assert gnut.is_disqualified is False
+    assert any("DO NOT SOW UNTIL MONSOON ARRIVES" in f for f in (gnut.limiting_factors + gnut.uncertainty_notes))
+    assert any("75–100 mm" in f for f in (gnut.limiting_factors + gnut.uncertainty_notes))
 
 
 def test_regional_screening_vs_validation_pilot_talukas():
@@ -309,3 +311,78 @@ def test_api_endpoints_lifecycle():
     data3 = resp3.json()
     assert data3["decision_id"] != dec_id # New updated evaluation ID
     assert len(data3["crop_outcomes"]) == 1
+
+
+def test_phase5_1_2_negative_evidence_boundaries():
+    """Verify Section 8 negative test requirements for Phase 5.1.2."""
+    # 1. Three-day waterlogging does not trigger an unsupported hard threshold
+    ctx_waterlog = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["pomegranate"],
+        standing_water_days=3,
+        drainage="Moderate" # Not confirmed ill-drained
+    )
+    res_waterlog = engine.evaluate_farm(ctx_waterlog)
+    pom_w = next(o for o in res_waterlog.crop_outcomes if o.crop_id == "pomegranate")
+    assert pom_w.is_disqualified is False
+    assert any("three-day numerical boundary" in w for w in pom_w.uncertainty_notes)
+
+    # 2. Pomegranate pH > 8.5 does not automatically imply universal unsuitability
+    ctx_ph = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["pomegranate"],
+        soil_ph=8.8 # High alkaline
+    )
+    res_ph = engine.evaluate_farm(ctx_ph)
+    pom_ph = next(o for o in res_ph.crop_outcomes if o.crop_id == "pomegranate")
+    assert pom_ph.is_disqualified is False
+    assert any("outside the documented tolerance range" in w for w in pom_ph.uncertainty_notes)
+
+    # 3. Unverified MPKV thresholds cannot enforce hard constraints
+    ctx_mpkv = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["groundnut"],
+        target_season="kharif",
+        actual_recorded_rain_mm=20.0
+    )
+    res_mpkv = engine.evaluate_farm(ctx_mpkv)
+    gnd_mpkv = next(o for o in res_mpkv.crop_outcomes if o.crop_id == "groundnut")
+    assert gnd_mpkv.is_disqualified is False
+    assert any("DO NOT SOW UNTIL MONSOON ARRIVES" in f for f in (gnd_mpkv.limiting_factors + gnd_mpkv.uncertainty_notes))
+
+    # 4. Any positive rainfall forecast does not automatically suspend irrigation
+    ctx_rain = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["chickpea"],
+        forecast_rain_mm_48h=5.0, # Light rain forecast
+        drainage="Well-drained"
+    )
+    res_rain = engine.evaluate_farm(ctx_rain)
+    chk_rain = next(o for o in res_rain.crop_outcomes if o.crop_id == "chickpea")
+    assert chk_rain.is_disqualified is False
+    assert not any("SUSPEND planned irrigation immediately" in w for w in chk_rain.uncertainty_notes)
+    assert any("Do not automatically suspend" in w for w in chk_rain.uncertainty_notes)
+
+    # 5. Month-only sugarcane water assumptions cannot disqualify a farm
+    ctx_cane_month = FarmContextInput(
+        taluka="Indapur",
+        target_crops=["sugarcane"],
+        proposed_sowing_date="2026-02-15", # February mention
+        irrigation_capacity="seasonal"
+    )
+    res_cane_month = engine.evaluate_farm(ctx_cane_month)
+    cane_m = next(o for o in res_cane_month.crop_outcomes if o.crop_id == "sugarcane")
+    assert cane_m.is_disqualified is False
+    assert any("alternative summer irrigation" in w.lower() for w in cane_m.uncertainty_notes)
+
+    # 6. Unusual physical inputs trigger clarification rather than automatic invalidation
+    ctx_unusual = FarmContextInput(
+        taluka="Baramati",
+        soil_texture="Coarse sand",
+        standing_water_days=10,
+        target_crops=["bajra"]
+    )
+    res_unusual = engine.evaluate_farm(ctx_unusual)
+    assert len(res_unusual.crop_outcomes) > 0 # Evaluated, not rejected
+    assert len(res_unusual.contradictions_detected) > 0
+    assert any("Input Clarification Required" in c for c in res_unusual.contradictions_detected)

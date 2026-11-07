@@ -33,6 +33,18 @@ class EvidenceTier(str, Enum):
     UNSUPPORTED = "UNSUPPORTED"
 
 
+class EnforcementLevel(str, Enum):
+    """
+    Standardized rule enforcement levels for agricultural reasoning.
+    Only VERIFIED_HARD_CONSTRAINT can trigger categorical disqualification.
+    """
+    VERIFIED_HARD_CONSTRAINT = "VERIFIED_HARD_CONSTRAINT"
+    CONDITIONAL_CONSTRAINT = "CONDITIONAL_CONSTRAINT"
+    ADVISORY_ONLY = "ADVISORY_ONLY"
+    UNVERIFIED = "UNVERIFIED"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
 class SoilDataProvenance(str, Enum):
     """
     Provenance distinction for soil input data.
@@ -135,6 +147,16 @@ class AppliedRuleRecord(BaseModel):
     condition_met: bool
     evidence_tier: EvidenceTier
     citation: Optional[CitationMetadata] = None
+
+    # Phase 5.1.2 Granular Evidence Enforcement Architecture
+    claim_verification_status: str = "VERIFIED"
+    source_id: Optional[str] = None
+    document_title: Optional[str] = None
+    section_or_pages: Optional[str] = None
+    supporting_statement: Optional[str] = None
+    applicability_conditions: Optional[str] = None
+    enforcement_level: EnforcementLevel = EnforcementLevel.ADVISORY_ONLY
+    can_trigger_disqualification: bool = False
 
 
 class CropEvaluationOutcome(BaseModel):

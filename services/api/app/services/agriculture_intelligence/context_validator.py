@@ -1,8 +1,11 @@
 """
 CropNet AI — Farm Context Validator.
 
-Validates farm inputs, detects physical and chemical contradictions,
-distinguishes laboratory from spatial estimates, and flags missing diagnostic variables.
+Validates farm inputs, detects physical and chemical input anomalies,
+distinguishes laboratory from spatial estimates, and requests clarification
+for unusual conditions without automatically invalidating entire requests.
+Phase 5.1.2: Hardened rules; unusual physical combinations trigger clarification
+rather than automatic request rejection.
 """
 from typing import List, Dict, Any, Tuple
 from cropnet.services.api.app.schemas.agriculture_intelligence import FarmContextInput, SoilDataProvenance
@@ -15,6 +18,7 @@ class ValidationResult:
     def __init__(self):
         self.is_valid: bool = True
         self.is_empty_context: bool = False
+        self.needs_clarification: bool = False
         self.contradictions: List[str] = []
         self.missing_parameters: List[str] = []
         self.warnings: List[str] = []
@@ -55,8 +59,7 @@ class FarmContextValidator:
         else:
             res.missing_parameters.append("taluka")
 
-        # 3. Contradiction Detection: Soil Hydrology
-        # Coarse sand + standing water for > 7 days is physically contradictory
+        # 3. Anomaly Detection: Soil Hydrology (Phase 5.1.2: Clarification over Rejection)
         query_lower = (ctx.user_query or "").lower()
         if ctx.soil_texture:
             tex_lower = ctx.soil_texture.lower()
@@ -65,31 +68,33 @@ class FarmContextValidator:
                     "water stand" in query_lower or "standing water" in query_lower or "stands on the surface" in query_lower or "पाणी साचून" in query_lower
                 ):
                     res.contradictions.append(
-                        f"Physical contradiction: Coarse sandy soil reported with {ctx.standing_water_days or 'persistent'} days "
-                        "standing surface water. Sand macropores facilitate rapid percolation; standing water requires "
-                        "an impermeable subsoil hardpan or surface runoff depression."
+                        f"Input Clarification Required: Coarse sandy soil reported with {ctx.standing_water_days or 'persistent'} days "
+                        "standing surface water. While coarse sand macropores normally facilitate rapid infiltration, "
+                        "water accumulation can occur over an impermeable subsoil hardpan, clay lenses, high water table, "
+                        "or low-lying surface runoff depression. Clarification of subsoil compaction is advised."
                     )
-                    res.is_valid = False
+                    res.needs_clarification = True
 
         if ctx.soil_texture and ctx.drainage:
             tex_lower = ctx.soil_texture.lower()
             drain_lower = ctx.drainage.lower()
             if ("sand" in tex_lower or "coarse" in tex_lower) and ("waterlog" in drain_lower or "poor" in drain_lower):
                 res.contradictions.append(
-                    "Physical contradiction: Coarse sand texture combined with 'Poor / Waterlogged' drainage. "
-                    "Subsurface barrier or external catchment drainage inspection required."
+                    "Input Clarification Required: Coarse sand texture reported with 'Poor / Waterlogged' drainage. "
+                    "This combination suggests a restrictive subsurface layer or external runoff catchment. "
+                    "Subsurface barrier inspection recommended."
                 )
-                res.is_valid = False
+                res.needs_clarification = True
 
-        # 4. Contradiction Detection: pH Misclassification
-        # If user claims pH > 8.0 is acidic
+        # 4. Anomaly Detection: pH Misclassification & Hazardous Lime Application
         if ctx.user_query and ctx.soil_ph:
             query_lower = ctx.user_query.lower()
             if ctx.soil_ph >= 7.8 and ("acidic" in query_lower or "आम्ल" in query_lower or "lime" in query_lower or "चुना" in query_lower):
                 res.contradictions.append(
                     f"Chemical contradiction: Soil pH is {ctx.soil_ph} (alkaline/calcareous), but user describes "
-                    "it as acidic or plans to apply agricultural lime (CaCO3). Lime application on pH > 8.0 is strictly hazardous."
+                    "it as acidic or plans to apply agricultural lime (CaCO3). Lime application on pH > 7.8 is strictly hazardous and will aggravate alkalinity."
                 )
+                res.needs_clarification = True
 
         # 5. Total Nitrogen vs Available Nitrogen Guard
         if ctx.total_nitrogen_pct is not None and ctx.available_nitrogen_kg_ha is None:

@@ -324,7 +324,7 @@ class DeterministicDecisionEngine:
 
         # Compile Response
         validation_status = "VALID"
-        if not val_res.is_valid:
+        if not val_res.is_valid or val_res.contradictions:
             validation_status = "CONTRADICTORY_INPUTS_DETECTED"
         elif val_res.warnings:
             validation_status = "VALID_WITH_UNRESOLVED_CAVEATS"

@@ -2,7 +2,9 @@
 CropNet AI — Deterministic Regional Suitability Evaluator.
 
 Evaluates pilot taluka agroecological conditions, distinguishes regional
-screening from farm verification, and prevents inapplicable document extrapolation.
+screening from farm verification, and enforces strict governance boundaries.
+Phase 5.1.2: Separated governance classifications from scientific claims;
+removed unsupported numerical thresholds (>2000 mm, >50% RH).
 """
 from typing import List, Dict, Optional, Any
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
@@ -10,6 +12,7 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     DecisionState,
     AppliedRuleRecord,
     EvidenceTier,
+    EnforcementLevel,
     CitationMetadata
 )
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse
@@ -46,43 +49,51 @@ class RegionalSuitabilityEvaluator:
         # 1. Pilot Taluka Screening vs Validation Classification
         # -------------------------------------------------------------
         if taluka in ("maval", "mulshi"):
-            # High rainfall Western Ghats Transition Zone
+            # Western Ghats Transition Zone — Governance Policy
             res.regional_decision_state = DecisionState.REQUIRES_REGIONAL_VALIDATION
             
             if crop_id == "chickpea":
                 msg = (
-                    f"Maval/Mulshi Western Ghats transition zone has high atmospheric humidity and lateritic/acidic soils. "
-                    "Chickpea is vulnerable to Ascochyta blight, Botrytis grey mould, and excessive vegetative overgrowth. "
-                    "Classified as 'requires_regional_validation'; requires local field verification."
+                    "Maval/Mulshi Western Ghats transition zone features high atmospheric humidity and hilly lateritic soils. "
+                    "Chickpea is vulnerable to Ascochyta blight, Botrytis grey mould, and excessive vegetative growth. "
+                    "Classified as 'requires_regional_validation' under CropNet governance pending local field trials."
                 )
                 res.warnings.append(msg)
             elif crop_id == "soybean":
                 msg = (
-                    f"Mulshi receives excessive monsoon rainfall (>2000 mm) during Kharif. "
-                    "Continuous rain during flowering induces flower abortion, poor pod setting, and fungal collar rot. "
-                    "Classified as 'requires_regional_validation'."
+                    "Mulshi is located in the Western Ghats high-rainfall tract. "
+                    "Prolonged heavy monsoon rain during flowering induces flower drop, poor pod setting, and fungal collar rot. "
+                    "Classified as 'requires_regional_validation' under CropNet governance."
                 )
                 res.warnings.append(msg)
             elif crop_id == "pomegranate":
                 msg = (
-                    "High humidity (>50% RH) and persistent rain in Western Ghats drastically elevate Bacterial Blight "
-                    "(*Xanthomonas*) and Phytophthora root rot risks. Classified as 'requires_regional_validation'."
+                    "Persistent atmospheric humidity and monsoon rainfall in the Western Ghats drastically elevate Bacterial Blight "
+                    "(*Xanthomonas axonopodis pv. punicae*) and Phytophthora root rot risks. Classified as 'requires_regional_validation'."
                 )
                 res.warnings.append(msg)
             else:
                 res.warnings.append(
                     f"CropNet classifies {crop_id.capitalize()} in {taluka.capitalize()} as 'requires_regional_validation' "
-                    "due to lack of published MPKV university trial data for Ghat transition microclimates."
+                    "due to lack of published university agronomic trials for Western Ghats transition microclimates."
                 )
 
             res.applied_rules.append(AppliedRuleRecord(
                 rule_id=f"RULE_REGIONAL_VALIDATION_{taluka.upper()}",
                 domain="Crop Suitability",
                 parameter_checked="taluka",
-                rule_statement=f"Maval/Mulshi requires localized field validation (CropNet Regional Governance)",
+                rule_statement=f"{taluka.capitalize()} Western Ghats transition zone requires localized field validation (CropNet Regional Governance Policy)",
                 condition_met=True,
                 evidence_tier=EvidenceTier.VERIFIED,
-                citation=citation
+                citation=citation,
+                claim_verification_status="GOVERNANCE_POLICY",
+                source_id="cropnet_governance",
+                document_title="CropNet Regional Governance & Agroecological Zonation Policy",
+                section_or_pages="Pilot Taluka Protocol",
+                supporting_statement="Ghat transition zones require localized trial validation before commercial recommendation.",
+                applicability_conditions=f"taluka == '{taluka}'",
+                enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                can_trigger_disqualification=False
             ))
 
         elif taluka in ("baramati", "indapur"):
@@ -92,27 +103,35 @@ class RegionalSuitabilityEvaluator:
                 rule_id="RULE_REGIONAL_SCREENING_SCARCITY_ZONE",
                 domain="Crop Suitability",
                 parameter_checked="taluka",
-                rule_statement="Baramati/Indapur supported under regional screening for Plain Zone Vertisols",
+                rule_statement="Baramati/Indapur supported under regional screening for Plain Zone Vertisols (MPKV regional baseline)",
                 condition_met=True,
                 evidence_tier=EvidenceTier.VERIFIED,
-                citation=citation
+                citation=citation,
+                claim_verification_status="VERIFIED",
+                source_id="mpkv_research_2023",
+                document_title="MPKV Research Recommendations 2023",
+                section_or_pages="Zonal Recommendations",
+                supporting_statement="Macro agroecological recommendations apply to Plain Zone Vertisols.",
+                applicability_conditions="taluka in ('baramati', 'indapur')",
+                enforcement_level=EnforcementLevel.ADVISORY_ONLY,
+                can_trigger_disqualification=False
             ))
             res.warnings.append(
                 f"Regional screening for {taluka.capitalize()} represents a macro-zonal agroecological baseline for "
-                "Plain Zone Vertisols (MPKV 2023). It does NOT constitute individual farm verification. "
+                "Plain Zone Vertisols. It does NOT constitute individual farm verification. "
                 "Local soil depth, salinity, and water drainage must be tested."
             )
 
         # -------------------------------------------------------------
-        # 2. Contextual Inapplicability Guard (Adversarial 9)
+        # 2. Contextual Inapplicability Guard
         # -------------------------------------------------------------
         if taluka in ("maval", "mulshi") and ctx.soil_texture:
             tex_lower = ctx.soil_texture.lower()
             if ("gravel" in tex_lower or "shallow" in tex_lower or "laterite" in tex_lower) and crop_id == "chickpea":
                 res.limiting_factors.append(
-                    "Contextual inapplicability: MPKV 2023 high-yield gram recommendations apply strictly to "
-                    "medium-to-deep black Vertisols under canal irrigation in the Scarcity Zone (Rahuri). "
-                    "They cannot be extrapolated to shallow gravelly soils in Maval."
+                    "Contextual inapplicability: High-yield gram recommendations developed for "
+                    "medium-to-deep black Vertisols in the Plain Zone cannot be extrapolated "
+                    "to shallow gravelly or lateritic soils in Western Ghats transition tracts."
                 )
 
         return res

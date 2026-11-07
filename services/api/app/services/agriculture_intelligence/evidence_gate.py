@@ -6,7 +6,11 @@ or bibliographic sources do not trigger hard agronomic disqualifications,
 and strictly prevents silent evidence upgrading.
 """
 from typing import Optional, Dict, Any, Tuple
-from cropnet.services.api.app.schemas.agriculture_intelligence import EvidenceTier, CitationMetadata
+from cropnet.services.api.app.schemas.agriculture_intelligence import (
+    EvidenceTier,
+    CitationMetadata,
+    EnforcementLevel
+)
 
 
 # Canonical mapping of registered Supabase source IDs to evidence tiers
@@ -47,11 +51,13 @@ class EvidenceGate:
         return SOURCE_TIER_MAPPING.get(source_id, EvidenceTier.UNSUPPORTED)
 
     @staticmethod
-    def can_enforce_hard_disqualification(tier: EvidenceTier) -> bool:
+    def can_enforce_hard_disqualification(tier: EvidenceTier, enforcement_level: Optional[EnforcementLevel] = None) -> bool:
         """
-        Only VERIFIED and CONDITIONALLY_SUPPORTED (when qualified) evidence can enforce
-        hard agronomic disqualifications. UNVERIFIED_BIBLIOGRAPHIC and UNSUPPORTED cannot.
+        Only VERIFIED and CONDITIONALLY_SUPPORTED evidence under explicit
+        VERIFIED_HARD_CONSTRAINT enforcement level can enforce hard agronomic disqualifications.
         """
+        if enforcement_level is not None:
+            return enforcement_level == EnforcementLevel.VERIFIED_HARD_CONSTRAINT and tier in (EvidenceTier.VERIFIED, EvidenceTier.CONDITIONALLY_SUPPORTED)
         return tier in (EvidenceTier.VERIFIED, EvidenceTier.CONDITIONALLY_SUPPORTED)
 
     @staticmethod
