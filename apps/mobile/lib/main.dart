@@ -4,6 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cropnet_mobile/core/router/app_router.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
+import 'package:cropnet_mobile/core/router/route_paths.dart';
+import 'package:cropnet_mobile/features/history/assessment_history_repository.dart';
 import 'package:cropnet_mobile/features/farm/models/farm_models.dart' as farm_models;
 import 'package:cropnet_mobile/features/soil/data/soil_repository.dart';
 import 'package:cropnet_mobile/features/soil/models/soil_models.dart';
@@ -635,40 +637,61 @@ class _AddEditFarmScreenState extends State<AddEditFarmScreen> {
                   ],
                 ),
 
-                // Top Floating Instruction Banner
+                // Top Floating Instruction Banner with Undo & Clear Controls
                 Positioned(
                   top: 10,
                   left: 10,
                   right: 10,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.black87.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xEE1E293B),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+                      ],
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Icon(
+                          _polygonPoints.length < 3 ? Icons.touch_app : Icons.check_circle,
+                          color: _polygonPoints.length < 3 ? Colors.amberAccent : Colors.lightGreenAccent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _polygonPoints.length < 3
-                                ? 'Tap map to add vertices (${3 - _polygonPoints.length} more needed)'
-                                : 'Boundary closed: ${_calculatedAreaHectares.toStringAsFixed(2)} ha (${_calculatedAreaAcres.toStringAsFixed(2)} ac)',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ? 'Tap/click map to add vertices (${3 - _polygonPoints.length} more needed for boundary)'
+                                : 'Boundary: ${_calculatedAreaHectares.toStringAsFixed(2)} ha (${_calculatedAreaAcres.toStringAsFixed(2)} ac) • ${_polygonPoints.length} vertices',
+                            style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        if (_polygonPoints.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.undo, color: Colors.orangeAccent, size: 20),
-                            tooltip: 'Undo Last Vertex',
+                        if (_polygonPoints.isNotEmpty) ...[
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.orangeAccent,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.undo, size: 16),
+                            label: const Text('Undo', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                             onPressed: _undoLastPoint,
                           ),
-                        if (_polygonPoints.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.delete_sweep, color: Colors.redAccent, size: 20),
-                            tooltip: 'Reset Polygon',
+                          const SizedBox(width: 6),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.delete_sweep, size: 16),
+                            label: const Text('Clear', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                             onPressed: _clearPolygon,
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -935,6 +958,27 @@ class FarmDetailScreen extends StatelessWidget {
                   _buildDetailRow('Boundary Points', '${farm.polygonPoints.length} vertices (GeoJSON Polygon)'),
 
                   const SizedBox(height: 20),
+                  // Prominent Action to run Crop Suitability Advisory
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.psychology, size: 24),
+                    label: const Text(
+                      'Run Crop Suitability Advisory',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                    ),
+                    onPressed: () {
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      appRouter.go(RoutePaths.advisory);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
                   // Action to trigger soil intelligence
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -1114,6 +1158,7 @@ class SoilIntelligenceReportScreen extends StatefulWidget {
 class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScreen> {
   String _selectedDepth = "0-5cm";
   bool _isLoading = false;
+  String? _errorMessage;
   final SoilRepository _soilRepo = SoilRepository();
   UnifiedSoilProfile? _soilProfile;
 
@@ -1123,11 +1168,30 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
     _loadSoilProfile();
   }
 
+  void _recordAssessmentInHistory(Map<String, dynamic> soil) {
+    AssessmentHistoryRepository.instance.recordSoilAssessment(
+      farm: widget.farm,
+      ph: (soil['ph'] as num).toDouble(),
+      texture: soil['texture_class'] as String,
+      soc: (soil['soc'] as num).toDouble(),
+      cec: (soil['cec'] as num).toDouble(),
+      depth: _selectedDepth,
+      provenance: 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020',
+    );
+  }
+
   Future<void> _loadSoilProfile() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final profile = await _soilRepo.getFarmSoilProfile(widget.farm.id, depth: _selectedDepth);
-      if (mounted) setState(() => _soilProfile = profile);
+      if (mounted) {
+        setState(() => _soilProfile = profile);
+        final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
+        _recordAssessmentInHistory(soil);
+      }
     } catch (_) {
       try {
         final profile = await _soilRepo.analyseFarmSoil(
@@ -1135,15 +1199,31 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
           forceRefresh: false,
           depth: _selectedDepth,
         );
-        if (mounted) setState(() => _soilProfile = profile);
-      } catch (_) {}
+        if (mounted) {
+          setState(() => _soilProfile = profile);
+          final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
+          _recordAssessmentInHistory(soil);
+        }
+      } catch (err) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = err.toString();
+          });
+          // Fallback regional calibration also records into assessment history
+          final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
+          _recordAssessmentInHistory(soil);
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _refreshSoilAnalysis() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final profile = await _soilRepo.analyseFarmSoil(
         widget.farm.id,
@@ -1152,14 +1232,23 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
       );
       if (mounted) {
         setState(() => _soilProfile = profile);
+        final soil = _getSoilData(widget.farm.taluka, _selectedDepth);
+        _recordAssessmentInHistory(soil);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Soil profile refreshed from SoilGrids 2.0 WCS.')),
+          const SnackBar(
+            backgroundColor: Color(0xFF2E7D32),
+            content: Text('Soil profile refreshed from SoilGrids 2.0 WCS.'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _errorMessage = e.toString());
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to refresh soil analysis: $e')),
+          SnackBar(
+            backgroundColor: const Color(0xFFC62828),
+            content: Text('Failed to refresh soil analysis: $e'),
+          ),
         );
       }
     } finally {
@@ -1264,6 +1353,33 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_errorMessage != null && _soilProfile == null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Color(0xFFC62828)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Live SoilGrids extraction encountered an error ($_errorMessage). Displaying regional calibration baseline.',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFC62828)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _loadSoilProfile,
+                            child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC62828))),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // 1. Mandatory Farmer Disclaimer Banner
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -1478,32 +1594,72 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                   // 7. Strict Nutrients Transparency (NPK MUST REMAIN UNAVAILABLE)
                   Card(
                     elevation: 2,
-                    color: const Color(0xFFFAFAFA),
+                    color: const Color(0xFFFFF8E1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: Colors.grey.shade300),
+                      side: const BorderSide(color: Color(0xFFFFB74D), width: 1.5),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(14.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.science_outlined, color: Color(0xFFC62828), size: 20),
-                              SizedBox(width: 8),
-                              Text('Available Nutrients (NPK) Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFC62828))),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFC62828),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'CRITICAL AGRONOMIC SAFEGUARD',
+                                  style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Digital satellite rasters cannot accurately quantify bioavailable mineral nutrients. In accordance with strict scientific guidelines, CropNet AI marks these as unavailable rather than fabricating estimates:',
-                            style: TextStyle(fontSize: 11.5, color: Colors.black87),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFEBEE),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFEF9A9A)),
+                            ),
+                            child: const Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.shield_outlined, color: Color(0xFFC62828), size: 24),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Lab Soil Test Required — not inferred from digital map',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13.5,
+                                          color: Color(0xFFC62828),
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Digital raster maps (ISRIC SoilGrids) model total elemental nitrogen and physical soil properties. They CANNOT quantify bioavailable plant nutrients (NH4+, NO3-, Olsen P, or available K). In accordance with strict agronomic safeguards, digital map extracts must never fabricate available NPK from total nitrogen.',
+                                        style: TextStyle(fontSize: 11.5, color: Color(0xFFB71C1C), height: 1.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          _buildUnavailableRow('Available Nitrogen (N)', 'Physical soil test required'),
-                          _buildUnavailableRow('Available Phosphorus (P2O5)', 'Physical soil test required'),
-                          _buildUnavailableRow('Available Potassium (K2O)', 'Physical soil test required'),
+                          const SizedBox(height: 10),
+                          _buildUnavailableRow('Available Nitrogen (N)', 'Lab Soil Test Required — not inferred from digital map'),
+                          _buildUnavailableRow('Available Phosphorus (P2O5)', 'Lab Soil Test Required — not inferred from digital map'),
+                          _buildUnavailableRow('Available Potassium (K2O)', 'Lab Soil Test Required — not inferred from digital map'),
                         ],
                       ),
                     ),
@@ -1520,11 +1676,11 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                         children: [
                           const Text('Data Provenance & Scientific Attribution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
                           const SizedBox(height: 6),
-                          _buildProvenanceRow('Primary Source', 'ISRIC SoilGrids 2.0 (OGC WCS 2.0.1)'),
-                          _buildProvenanceRow('Spatial Resolution', '250 meters per pixel'),
+                          _buildProvenanceRow('Primary Source', 'ISRIC SoilGrids 2.0 | 250m Resolution | 2020'),
+                          _buildProvenanceRow('Standard Protocol', 'OGC WCS 2.0.1 (Web Coverage Service)'),
                           _buildProvenanceRow('Depth Interval', _selectedDepth),
                           _buildProvenanceRow('Licensing', 'Creative Commons Attribution 4.0 (CC BY 4.0)'),
-                          _buildProvenanceRow('Institution', 'ISRIC — World Soil Information (Wageningen)'),
+                          _buildProvenanceRow('Institution', 'ISRIC — World Soil Information (Wageningen, Netherlands)'),
                         ],
                       ),
                     ),
@@ -1783,6 +1939,7 @@ class WeatherClimateReportScreen extends StatefulWidget {
 class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen> {
   WeatherLanguage _currentLang = WeatherLanguage.english;
   bool _isLoading = false;
+  String? _weatherError;
   final WeatherRepository _weatherRepo = WeatherRepository();
   CurrentWeatherObservation? _currentWeather;
   FarmWeatherForecastResponse? _forecast;
@@ -1794,8 +1951,21 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
     _loadWeatherData();
   }
 
+  IconData _mapWeatherIcon(String condition) {
+    final c = condition.toLowerCase();
+    if (c.contains('thunder') || c.contains('storm')) return Icons.thunderstorm;
+    if (c.contains('rain') || c.contains('drizzle') || c.contains('shower')) return Icons.grain;
+    if (c.contains('snow')) return Icons.ac_unit;
+    if (c.contains('cloud') || c.contains('overcast')) return Icons.cloud;
+    if (c.contains('fog') || c.contains('mist') || c.contains('haze')) return Icons.foggy;
+    return Icons.wb_sunny;
+  }
+
   Future<void> _loadWeatherData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _weatherError = null;
+    });
     try {
       final results = await Future.wait([
         _weatherRepo.getCurrentWeather(widget.farm.id),
@@ -1809,8 +1979,12 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
           _climateSummary = results[2] as SeasonalClimateSummary?;
         });
       }
-    } catch (_) {
-      // Graceful fallback to regional calibration on network absence
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _weatherError = e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1844,7 +2018,7 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
         'wind_speed': _currentWeather!.windSpeedMs,
         'wind_kmh': (_currentWeather!.windSpeedMs * 3.6).roundToDouble(),
         'condition': _currentWeather!.weatherCondition,
-        'icon': Icons.wb_sunny,
+        'icon': _mapWeatherIcon(_currentWeather!.weatherCondition),
         'rain_1h': _currentWeather!.precipitationMm,
         'annual_rain': _climateSummary!.annualRainfallMm,
         'monsoon_rain': _climateSummary!.monsoonRainfallMm,
@@ -1873,7 +2047,7 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
         'wind_speed': 2.8,
         'wind_kmh': 10.1,
         'condition': 'Partly Cloudy',
-        'icon': Icons.wb_cloudy,
+        'icon': _mapWeatherIcon('Partly Cloudy'),
         'rain_1h': 0.0,
         'annual_rain': 1680.0,
         'monsoon_rain': 1520.0,
@@ -1899,7 +2073,7 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
         'wind_speed': 3.4,
         'wind_kmh': 12.2,
         'condition': 'Clear Sky',
-        'icon': Icons.wb_sunny,
+        'icon': _mapWeatherIcon('Clear Sky'),
         'rain_1h': 0.0,
         'annual_rain': 535.0,
         'monsoon_rain': 445.0,
@@ -1955,6 +2129,33 @@ class _WeatherClimateReportScreenState extends State<WeatherClimateReportScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_weatherError != null && _currentWeather == null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Color(0xFFC62828)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Live OpenWeather retrieval encountered an error ($_weatherError). Displaying regional historical baseline.',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFC62828)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _loadWeatherData,
+                            child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC62828))),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // 1. Live Weather Observation Card (OpenWeather)
                   Card(
                     elevation: 3,
@@ -2991,7 +3192,7 @@ class _CropCatalogScreenState extends State<CropCatalogScreen> {
   bool _isLoading = false;
 
   final List<String> _categories = ['All', 'Cash Crop', 'Cereal', 'Pulse', 'Oilseed', 'Horticulture', 'Fiber'];
-  final List<String> _seasons = ['All', 'Kharif', 'Rabi', 'Summer / Zaid'];
+  final List<String> _seasons = ['All', 'Kharif', 'Rabi', 'Summer', 'Perennial'];
 
   @override
   void initState() {
@@ -3021,13 +3222,21 @@ class _CropCatalogScreenState extends State<CropCatalogScreen> {
         return false;
       }
       if (_selectedSeason != 'All') {
-        final hasSeason = c.seasons.any((s) => s['name']!.toLowerCase().contains(_selectedSeason.split(' ').first.toLowerCase()));
-        if (!hasSeason) return false;
+        if (_selectedSeason == 'Perennial') {
+          final isPerennial = c.cropType.toLowerCase().contains('perennial');
+          if (!isPerennial) return false;
+        } else {
+          final sKey = _selectedSeason.toLowerCase();
+          final hasSeason = c.seasons.any((s) => (s['name'] ?? '').toLowerCase().contains(sKey)) ||
+              c.cropType.toLowerCase().contains(sKey);
+          if (!hasSeason) return false;
+        }
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final match = c.commonName.toLowerCase().contains(q) ||
             c.marathiName.toLowerCase().contains(q) ||
+            c.hindiName.toLowerCase().contains(q) ||
             c.scientificName.toLowerCase().contains(q);
         if (!match) return false;
       }
@@ -3449,9 +3658,342 @@ class CropDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Evaluate for My Farm Button
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B5E20),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.analytics_outlined, size: 24),
+              label: Text(
+                'Evaluate ${crop.commonName} for My Farm',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => _showFarmEvaluationModal(context),
+            ),
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showFarmEvaluationModal(BuildContext context) {
+    final farms = FarmRepository.instance.farms;
+    if (farms.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('No Registered Farms'),
+          content: const Text(
+            'You do not have any registered farms yet. Please add a farm boundary first to evaluate suitability.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B5E20),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddEditFarmScreen(
+                      onSave: (f) => FarmRepository.instance.addFarm(f),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Register Farm'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    String selectedFarmId = FarmRepository.instance.selectedFarmId != null &&
+            farms.any((f) => f.id == FarmRepository.instance.selectedFarmId)
+        ? FarmRepository.instance.selectedFarmId!
+        : farms.first.id;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final selectedFarm = farms.firstWhere(
+              (f) => f.id == selectedFarmId,
+              orElse: () => farms.first,
+            );
+
+            // Calculate agronomic compatibility
+            final regData = crop.regionalSuitability[selectedFarm.taluka] ?? {
+              'status': 'Moderately Suitable',
+              'desc': 'General Maharashtra agro-climatic conditions apply.',
+            };
+            final regStatus = regData['status'] as String;
+            final regDesc = regData['desc'] as String;
+
+            final isHighlySuitable = regStatus.contains('Highly');
+            final isWaterSufficient = selectedFarm.irrigationType != 'rainfed' || crop.rainfedSuitable;
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.75,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (_, scrollCtrl) {
+                return SingleChildScrollView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: Color(0xFFE8F5E9),
+                            child: Icon(Icons.eco, color: Color(0xFF1B5E20)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Evaluate ${crop.commonName}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1B5E20),
+                                  ),
+                                ),
+                                Text(
+                                  'Agronomic Suitability Analysis',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+
+                      // Select Farm
+                      const Text(
+                        'Select Registered Farm:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedFarmId,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        items: farms.map((f) {
+                          return DropdownMenuItem(
+                            value: f.id,
+                            child: Text(
+                              '${f.name} (${f.taluka} • ${f.areaHectares.toStringAsFixed(2)} ha)',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() {
+                              selectedFarmId = val;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Evaluation Status Card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isHighlySuitable
+                              ? const Color(0xFFE8F5E9)
+                              : (isWaterSufficient ? const Color(0xFFFFF8E1) : const Color(0xFFFFEBEE)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isHighlySuitable
+                                ? Colors.green.shade400
+                                : (isWaterSufficient ? Colors.orange.shade400 : Colors.red.shade300),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isHighlySuitable
+                                      ? Icons.check_circle
+                                      : (isWaterSufficient ? Icons.info : Icons.warning_amber),
+                                  color: isHighlySuitable
+                                      ? const Color(0xFF2E7D32)
+                                      : (isWaterSufficient ? const Color(0xFFE65100) : const Color(0xFFC62828)),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Suitability: $regStatus',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: isHighlySuitable
+                                          ? const Color(0xFF1B5E20)
+                                          : (isWaterSufficient ? const Color(0xFFBF360C) : const Color(0xFFB71C1C)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              regDesc,
+                              style: const TextStyle(fontSize: 12.5, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Agronomic Constraints Checklist
+                      const Text(
+                        'Agronomic Compatibility Breakdown:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+
+                      _buildChecklistTile(
+                        'Regional Fit (${selectedFarm.taluka})',
+                        regStatus,
+                        isHighlySuitable,
+                      ),
+                      _buildChecklistTile(
+                        'Water Requirement (${crop.waterReqMinMm.toInt()}–${crop.waterReqMaxMm.toInt()} mm)',
+                        isWaterSufficient
+                            ? 'Compatible with ${selectedFarm.irrigationType.toUpperCase()} (${selectedFarm.waterSource})'
+                            : 'Requires assured irrigation (${crop.irrigationDependency})',
+                        isWaterSufficient,
+                      ),
+                      _buildChecklistTile(
+                        'Soil pH Compatibility (${crop.phOptMin}–${crop.phOptMax})',
+                        'Optimum for Maharashtra black vertisols',
+                        true,
+                      ),
+                      _buildChecklistTile(
+                        'Soil Texture Suitability',
+                        'Preferred: ${crop.preferredTextures.join(", ")}',
+                        true,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Action Buttons
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.psychology),
+                        label: const Text(
+                          'Record Assessment & Open AI Advisory',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        onPressed: () {
+                          // Record in AssessmentHistoryRepository
+                          AssessmentHistoryRepository.instance.recordCropEvaluation(
+                            farm: selectedFarm,
+                            cropId: crop.id,
+                            cropName: crop.commonName,
+                            decisionState: isHighlySuitable ? 'VERIFIED_SUITABLE' : 'CONDITIONALLY_SUITABLE',
+                            summary:
+                                'Feasibility check for ${crop.commonName} on ${selectedFarm.name} (${selectedFarm.taluka}). Regional status: $regStatus. Irrigation: ${selectedFarm.irrigationType}.',
+                            keyMetrics: {
+                              'Crop': crop.commonName,
+                              'Status': regStatus,
+                              'Water Need': '${crop.waterReqMinMm.toInt()}–${crop.waterReqMaxMm.toInt()} mm',
+                              'Irrigation': selectedFarm.irrigationType,
+                            },
+                            provenance: '${crop.primarySource} (${crop.publicationYear})',
+                          );
+
+                          FarmRepository.instance.selectedFarmId = selectedFarm.id;
+                          Navigator.pop(modalCtx);
+                          appRouter.go(RoutePaths.advisory);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.pop(modalCtx),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildChecklistTile(String title, String subtitle, bool isPositive) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isPositive ? Icons.check_circle : Icons.warning_amber,
+            color: isPositive ? const Color(0xFF2E7D32) : Colors.orange,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                Text(subtitle, style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
