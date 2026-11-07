@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:cropnet_mobile/core/router/app_router.dart';
 
 void main() {
   runApp(const CropNetApp());
@@ -81,11 +82,13 @@ LatLng calculateCentroid(List<LatLng> points) {
 }
 
 class CropNetApp extends StatelessWidget {
-  const CropNetApp({super.key});
+  final RouterConfig<Object>? routerConfig;
+
+  const CropNetApp({super.key, this.routerConfig});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'CropNet AI',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -102,7 +105,7 @@ class CropNetApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const MainNavigationShell(),
+      routerConfig: routerConfig ?? appRouter,
     );
   }
 }
@@ -227,15 +230,15 @@ class MyFarmsDashboard extends StatelessWidget {
         },
       ),
       body: farms.isEmpty
-          ? Center(
+          ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.agriculture, size: 72, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('No farms registered yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const Text('Tap "Register New Farm" to draw your plot on the map.', style: TextStyle(color: Colors.black54)),
+                  Icon(Icons.agriculture, size: 72, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No farms registered yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Tap "Register New Farm" to draw your plot on the map.', style: TextStyle(color: Colors.black54)),
                 ],
               ),
             )
@@ -250,11 +253,11 @@ class MyFarmsDashboard extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(14),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFE8F5E9),
-                      foregroundColor: const Color(0xFF1B5E20),
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFE8F5E9),
+                      foregroundColor: Color(0xFF1B5E20),
                       radius: 26,
-                      child: const Icon(Icons.fence, size: 28),
+                      child: Icon(Icons.fence, size: 28),
                     ),
                     title: Text(
                       farm.name,
