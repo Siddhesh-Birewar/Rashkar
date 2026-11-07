@@ -125,7 +125,7 @@ class SoilOCRExtractor:
 
         if len(full_text) >= 100 and has_soil_keywords:
             logger.info(f"Processing '{filename}' as text-based PDF ({len(full_text)} chars).")
-            metadata, measurements = self.parser.parse(full_text)
+            metadata, measurements = self.parser.parse(full_text, pages=extracted_pages)
             result = SoilReportExtractionResult(
                 document_type="text_pdf",
                 extraction_status=ReportExtractionStatus.EXTRACTION_COMPLETED.value,
@@ -156,7 +156,7 @@ class SoilOCRExtractor:
         if not page_images:
             # Fall back to whatever text was available
             if full_text:
-                metadata, measurements = self.parser.parse(full_text)
+                metadata, measurements = self.parser.parse(full_text, pages=extracted_pages)
                 result = SoilReportExtractionResult(
                     document_type="text_pdf",
                     extraction_status=ReportExtractionStatus.EXTRACTION_COMPLETED.value,
@@ -182,7 +182,7 @@ class SoilOCRExtractor:
             ocr_texts.append(ocr_content)
 
         composite_ocr_text = "\n\n".join(ocr_texts)
-        metadata, measurements = self.parser.parse(composite_ocr_text)
+        metadata, measurements = self.parser.parse(composite_ocr_text, pages=ocr_texts)
 
         result = SoilReportExtractionResult(
             document_type="scanned_pdf",

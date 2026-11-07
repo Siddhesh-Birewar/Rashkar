@@ -143,6 +143,9 @@ class ExtractedSoilMeasurement(BaseModel):
     laboratory_rating: Optional[str] = Field(None, description="Reported category, e.g. 'Low', 'Medium', 'High', 'Deficient'")
     reference_range: Optional[str] = Field(None, description="Laboratory reference or critical limit range")
     sample_depth: Optional[str] = Field(None, description="Sample depth interval, e.g. '0-15 cm'. None if unstated.")
+    sample_id: Optional[str] = Field(None, description="Sample identifier or number within report, e.g. '1', '2'")
+    sample_designation: Optional[str] = Field(None, description="Sample designation or field name, e.g. 'Lawn', 'Garden'")
+    area_type: Optional[str] = Field(None, description="Area type or crop context, e.g. 'Lawn/Established', 'Garden/Vegetable'")
     page_number: int = Field(default=1, description="Source page number in document")
     
     # Optical and quality confidence

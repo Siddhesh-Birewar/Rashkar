@@ -151,6 +151,9 @@ class SoilMeasurementItem(BaseModel):
     detection_limit: Optional[float] = None
 
     page_number: Optional[int] = 1
+    sample_id: Optional[str] = None
+    sample_designation: Optional[str] = None
+    area_type: Optional[str] = None
     bounding_box: Optional[List[float]] = None
     extraction_confidence: Optional[float] = 1.0
     is_ambiguous: Optional[bool] = False

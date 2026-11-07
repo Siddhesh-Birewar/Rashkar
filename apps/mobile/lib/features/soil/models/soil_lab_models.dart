@@ -557,7 +557,7 @@ class SoilReportSummary {
           : (json['created_at'] != null
               ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
               : DateTime.now()),
-      laboratoryName: json['lab_name'] as String? ?? json['laboratoryName'] as String?,
+      laboratoryName: json['laboratory_name'] as String? ?? json['lab_name'] as String? ?? json['laboratoryName'] as String?,
       reportDate: json['report_date'] != null
           ? DateTime.tryParse(json['report_date'].toString())
           : (json['reportDate'] != null
@@ -782,7 +782,7 @@ class SoilReportDetail {
       reviewStatus: json['review_status'] as String? ??
           json['reviewStatus'] as String? ??
           'PENDING_REVIEW',
-      laboratoryName: json['lab_name'] as String? ?? json['laboratoryName'] as String?,
+      laboratoryName: json['laboratory_name'] as String? ?? json['lab_name'] as String? ?? json['laboratoryName'] as String?,
       labAddress: json['lab_address'] as String? ?? json['labAddress'] as String?,
       labAccreditation: json['lab_accreditation'] as String? ??
           json['labAccreditation'] as String?,

@@ -39,10 +39,10 @@ PARAMETER_PATTERNS = [
     ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता)", re.IGNORECASE)),
     
     # Available Phosphorus (P2O5 / P) - note P206 is OCR confusion
-    ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद)", re.IGNORECASE)),
+    ("available_phosphorus", re.compile(r"\b((?:available\s*)?phosphorus(?:\s*\[P\]|\s*\(P\))?|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद)", re.IGNORECASE)),
     
     # Available Potassium (K2O / K) - note K20 is OCR confusion
-    ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)", re.IGNORECASE)),
+    ("available_potassium", re.compile(r"\b((?:available\s*)?potassium(?:\s*\[K\]|\s*\(K\))?|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)", re.IGNORECASE)),
     
     # Sulphur / Sulfur
     ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|available\s*sulphur|available\s*sulfur|\bs\b\s*\(available\)|\bso4\b|गंधक)", re.IGNORECASE)),
@@ -63,21 +63,55 @@ PARAMETER_PATTERNS = [
     ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|available\s*boron|\bb\b(?!\s*arcode)|बोरॉन)", re.IGNORECASE)),
 ]
 
+# Column definitions for horizontal/columnar multi-parameter tables
+PARAMETER_COL_DEFS = [
+    ("sample_col", re.compile(r"\b(sample(?:\s*no|\s*id|\s*#)?)\b", re.IGNORECASE)),
+    ("soil_ph", re.compile(r"\b(p[hH](?:\s*\(1:2\.?5?\))?)\b(?!\s*os|\s*hate)", re.IGNORECASE)),
+    ("available_phosphorus", re.compile(r"\b((?:available\s*)?phosphorus(?:\s*\[P\]|\s*\(P\))?|avail(?:able|\.)?\s*p\b|p2o5|p205|उपलब्ध\s*स्फुरद)", re.IGNORECASE)),
+    ("available_potassium", re.compile(r"\b((?:available\s*)?potassium(?:\s*\[K\]|\s*\(K\))?|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)", re.IGNORECASE)),
+    ("organic_matter", re.compile(r"\b(organic\s*matter|soil\s*organic\s*matter|s\.?o\.?m\.?\b|सेंद्रिय\s*पदार्थ)", re.IGNORECASE)),
+    ("organic_carbon", re.compile(r"\b(organic\s*carbon|s\.?o\.?c\.?\b|o\.?c\.?\b|सेंद्रिय\s*कर्ब)", re.IGNORECASE)),
+    ("available_nitrogen", re.compile(r"\b(available\s*nitrogen|avail(?:able|\.)?\s*n\b|उपलब्ध\s*नत्र)", re.IGNORECASE)),
+    ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता)", re.IGNORECASE)),
+    ("total_nitrogen", re.compile(r"\b(total\s*nitrogen|total\s*n\b|एकूण\s*नत्र)", re.IGNORECASE)),
+    ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|गंधक)", re.IGNORECASE)),
+    ("zinc", re.compile(r"\b(zinc|avail(?:able|\.)?\s*zn\b|जस्त)", re.IGNORECASE)),
+    ("iron", re.compile(r"\b(iron|avail(?:able|\.)?\s*fe\b|लोह)", re.IGNORECASE)),
+    ("manganese", re.compile(r"\b(manganese|avail(?:able|\.)?\s*mn\b|मॅंगनीज)", re.IGNORECASE)),
+    ("copper", re.compile(r"\b(copper|avail(?:able|\.)?\s*cu\b|तांबे)", re.IGNORECASE)),
+    ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|बोरॉन)", re.IGNORECASE)),
+]
+
 
 class SoilReportParser:
     """
     Deterministic parser for structured text and Markdown tables extracted from soil reports.
     """
 
-    def parse(self, text: str) -> Tuple[SoilReportMetadata, List[ExtractedSoilMeasurement]]:
+    def parse(
+        self, text: str, pages: Optional[List[str]] = None
+    ) -> Tuple[SoilReportMetadata, List[ExtractedSoilMeasurement]]:
         """
         Parses full report text stream into metadata and structured measurements.
+        Supports multi-page documents and multi-sample reports.
         """
         if not text:
             return SoilReportMetadata(), []
 
         metadata = self._parse_metadata(text)
-        measurements = self._parse_measurements(text, default_depth=metadata.sample_depth)
+
+        if pages and len(pages) > 1:
+            all_measurements = []
+            for p_idx, page_text in enumerate(pages):
+                page_measurements = self._parse_measurements(
+                    page_text, page_num=p_idx + 1, default_depth=metadata.sample_depth
+                )
+                all_measurements.extend(page_measurements)
+            measurements = self._deduplicate_measurements(all_measurements)
+        else:
+            measurements = self._parse_measurements(
+                text, page_num=1, default_depth=metadata.sample_depth
+            )
 
         return metadata, measurements
 
@@ -90,67 +124,79 @@ class SoilReportParser:
 
         # 1. Laboratory Name
         lab_match = re.search(
-            r"(?:Laboratory|Lab Name|Testing Lab|Testing Laboratory)\s*[:=\-]\s*([^\n\r]+)",
+            r"(?:Laboratory|Lab\s*Name|Testing\s*Laboratory|Testing\s*Lab|Samples\s*Analyzed\s*By|Analyzed\s*By)\b\s*[:=\-]\s*([^\n\r]+)",
             text,
             re.IGNORECASE,
         )
-        if lab_match:
+        if lab_match and lab_match.group(1).strip():
             meta.laboratory_name = lab_match.group(1).strip()
         else:
-            # Check for header banner lab name in the first 8 lines
-            for line in lines[:8]:
-                cleaned = line.lstrip("#* \t")
-                if any(
-                    kw in cleaned.upper()
-                    for kw in [
-                        "SOIL TESTING LAB",
-                        "KRISHI VIGYAN KENDRA",
-                        "KVK",
-                        "SOIL HEALTH CARD",
-                        "AGRICULTURAL RESEARCH",
-                        "AGRICULTURE DEPARTMENT",
-                        "MPKV",
-                        "ICAR",
-                    ]
-                ):
-                    meta.laboratory_name = cleaned.split("|")[0].strip()
-                    break
+            # Check for header banner or line right after "Samples Analyzed By"
+            found_banner = False
+            for idx, line in enumerate(lines[:15]):
+                if re.search(r"Samples\s*Analyzed\s*By|Analyzed\s*By", line, re.IGNORECASE):
+                    if idx + 1 < len(lines):
+                        meta.laboratory_name = lines[idx + 1].strip()
+                        found_banner = True
+                        break
+            if not found_banner:
+                for line in lines[:8]:
+                    cleaned = line.lstrip("#* \t")
+                    if any(
+                        kw in cleaned.upper()
+                        for kw in [
+                            "SOIL TESTING LAB",
+                            "KRISHI VIGYAN KENDRA",
+                            "KVK",
+                            "SOIL HEALTH CARD",
+                            "AGRICULTURAL RESEARCH",
+                            "AGRICULTURE DEPARTMENT",
+                            "MPKV",
+                            "ICAR",
+                            "SOIL & PLANT ANALYSIS LAB",
+                        ]
+                    ):
+                        meta.laboratory_name = cleaned.split("|")[0].strip()
+                        break
 
-        # 2. Sample ID
+        # 2. Sample ID / Lab Number
         sample_id_match = re.search(
-            r"(?:Sample\s*(?:ID|No|Number|Code|Ref)|Lab\s*Sample\s*No)\s*[:=\-]\s*([A-Za-z0-9\-_/]+)",
+            r"(?:Sample\s*(?:ID|No|Number|Code|Ref)|Lab\s*(?:Number|No|Sample\s*No))\s*[:=\-]?\s*([A-Za-z0-9\-_/]+)",
             text,
             re.IGNORECASE,
         )
         if sample_id_match:
             meta.sample_id = sample_id_match.group(1).strip()
 
-        # 3. Farmer Name
+        # 3. Farmer / Client Name
         farmer_match = re.search(
-            r"(?:Farmer(?:'s)?\s*Name|Customer\s*Name)\s*[:=\-]\s*([^\n\r,;|]+)",
+            r"(?:Farmer(?:'s)?\s*Name|Customer\s*Name|Client\s*(?:Name)?|Grower\s*(?:Name)?)\s*[:=\-]?\s*([^\n\r,;|]+?)(?:,|\n|Date|Account|County|Send|$)",
             text,
             re.IGNORECASE,
         )
         if farmer_match:
             meta.farmer_name = farmer_match.group(1).strip()
 
-        # 4. Report Date
+        # Detect regional conventions (e.g. US date convention MM/DD/YYYY)
+        is_us_doc = bool(re.search(r"\b(?:WI|Wisconsin|USA|County|lbs?|Extension)\b", text, re.IGNORECASE))
+
+        # 4. Report Date / Date Processed
         report_date_match = re.search(
-            r"(?:Report\s*Date|Date\s*of\s*Report|Issue\s*Date|Date\s*of\s*Issue)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+            r"(?:Report\s*Date|Date\s*of\s*Report|Issue\s*Date|Date\s*of\s*Issue|Date\s*processed|Processed\s*Date)\s*[:=\-]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
             text,
             re.IGNORECASE,
         )
         if report_date_match:
-            meta.report_date = self._normalize_date(report_date_match.group(1).strip())
+            meta.report_date = self._normalize_date(report_date_match.group(1).strip(), is_us=is_us_doc)
 
-        # 5. Collection Date
+        # 5. Collection Date / Date Received
         coll_date_match = re.search(
-            r"(?:Collection\s*Date|Date\s*of\s*Collection|Sampling\s*Date|Date\s*of\s*Sampling)\s*[:=\-]\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
+            r"(?:Collection\s*Date|Date\s*of\s*Collection|Sampling\s*Date|Date\s*of\s*Sampling|Date\s*received|Received\s*Date)\s*[:=\-]?\s*([0-9]{1,4}[/\-\.][0-9]{1,2}[/\-\.][0-9]{1,4})",
             text,
             re.IGNORECASE,
         )
         if coll_date_match:
-            meta.collection_date = self._normalize_date(coll_date_match.group(1).strip())
+            meta.collection_date = self._normalize_date(coll_date_match.group(1).strip(), is_us=is_us_doc)
 
         # 6. Sample Depth (Safeguard 6: preserve exact reported, do not guess)
         depth_match = re.search(
@@ -179,7 +225,11 @@ class SoilReportParser:
         if taluka_match:
             meta.taluka = taluka_match.group(1).strip()
 
-        district_match = re.search(r"\bDistrict\s*[:=\-]\s*([A-Za-z\s]+?)(?:,|\n|$)", text, re.IGNORECASE)
+        district_match = re.search(
+            r"(?<![A-Za-z])(?:District|County)\b\s*[:=\-]\s*([A-Za-z\s]+?)(?:,|\n|Send|$)",
+            text,
+            re.IGNORECASE,
+        )
         if district_match:
             meta.district = district_match.group(1).strip()
 
@@ -189,66 +239,244 @@ class SoilReportParser:
 
         return meta
 
-    def _normalize_date(self, raw_date: str) -> str:
+    def _normalize_date(self, raw_date: str, is_us: bool = False) -> str:
         """
         Attempts to normalize date to YYYY-MM-DD format, or returns raw string.
+        Supports international (%d/%m/%Y, %Y-%m-%d) and US (%m/%d/%Y) date formats.
         """
-        formats = [
-            "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y",
+        formats_intl = [
             "%Y-%m-%d", "%Y/%m/%d",
+            "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y",
+            "%m/%d/%Y", "%m-%d-%Y", "%m.%d.%Y",
+            "%d/%m/%y", "%d-%m-%y",
+            "%m/%d/%y", "%m-%d-%y",
+        ]
+        formats_us = [
+            "%Y-%m-%d", "%Y/%m/%d",
+            "%m/%d/%Y", "%m-%d-%Y", "%m.%d.%Y",
+            "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y",
+            "%m/%d/%y", "%m-%d-%y",
             "%d/%m/%y", "%d-%m-%y",
         ]
-        for fmt in formats:
+        clean_date = raw_date.strip()
+        parts = re.split(r"[/\-\.]", clean_date)
+        if len(parts) == 3:
             try:
-                dt = datetime.strptime(raw_date, fmt)
+                p1, p2 = int(parts[0]), int(parts[1])
+                if p1 > 12:
+                    try_order = ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%d-%m-%y"]
+                elif p2 > 12:
+                    try_order = ["%m/%d/%Y", "%m-%d-%Y", "%m.%d.%Y", "%m/%d/%y", "%m-%d-%y"]
+                else:
+                    try_order = formats_us if is_us else formats_intl
+            except ValueError:
+                try_order = formats_us if is_us else formats_intl
+        else:
+            try_order = formats_us if is_us else formats_intl
+
+        for fmt in try_order:
+            try:
+                dt = datetime.strptime(clean_date, fmt)
                 return dt.strftime("%Y-%m-%d")
             except ValueError:
                 continue
         return raw_date
 
     def _parse_measurements(
-        self, text: str, default_depth: Optional[str] = None
+        self, text: str, page_num: int = 1, default_depth: Optional[str] = None
     ) -> List[ExtractedSoilMeasurement]:
         """
         Extracts tabular or key-value parameter rows from text.
-        Supports HTML tables (glm-ocr), Markdown tables, and whitespace tables (pypdf).
+        Supports HTML tables (glm-ocr), Markdown tables, horizontal/columnar tables,
+        whitespace vertical tables (pypdf), and key-value lines.
         """
         raw_measurements: List[ExtractedSoilMeasurement] = []
 
         # 1. HTML tables (from glm-ocr vision output)
         if "<table" in text.lower():
-            html_m = self._parse_html_tables(text, default_depth=default_depth)
+            html_m = self._parse_html_tables(text, page_num=page_num, default_depth=default_depth)
             raw_measurements.extend(html_m)
 
         # 2. Markdown pipe tables
         if "|" in text:
-            table_measurements = self._parse_markdown_tables(text, default_depth=default_depth)
+            table_measurements = self._parse_markdown_tables(text, page_num=page_num, default_depth=default_depth)
             raw_measurements.extend(table_measurements)
 
-        # 3. Space / tab-separated tabular rows (pypdf text streams)
-        ws_measurements = self._parse_whitespace_tables(text, default_depth=default_depth)
+        # 3. Horizontal / Columnar whitespace tables (multi-sample tables e.g. lag_sample.pdf)
+        col_measurements = self._parse_horizontal_columnar_tables(text, page_num=page_num, default_depth=default_depth)
+        raw_measurements.extend(col_measurements)
+
+        # 4. Space / tab-separated tabular rows (pypdf text streams, vertical format)
+        ws_measurements = self._parse_whitespace_tables(text, page_num=page_num, default_depth=default_depth)
         raw_measurements.extend(ws_measurements)
 
-        # 4. Key-value lines
+        # 5. Key-value lines
         existing_keys = {m.parameter_key for m in raw_measurements}
         kv_measurements = self._parse_key_value_lines(
-            text, exclude_keys=existing_keys, default_depth=default_depth
+            text, exclude_keys=existing_keys, page_num=page_num, default_depth=default_depth
         )
         raw_measurements.extend(kv_measurements)
 
-        # De-duplicate while preserving multi-depth variations
+        return self._deduplicate_measurements(raw_measurements)
+
+    def _deduplicate_measurements(
+        self, measurements: List[ExtractedSoilMeasurement]
+    ) -> List[ExtractedSoilMeasurement]:
+        """
+        Deduplicates measurements while strictly preserving multi-sample, multi-depth,
+        and multi-page observations.
+        """
         deduped: List[ExtractedSoilMeasurement] = []
         seen = set()
-        for m in raw_measurements:
-            pair = (m.parameter_key, m.sample_depth)
-            if pair not in seen:
-                seen.add(pair)
+        for m in measurements:
+            key = (m.parameter_key, m.sample_depth, m.sample_id, m.page_number)
+            if key not in seen:
+                seen.add(key)
                 deduped.append(m)
-
         return deduped
 
+    def _parse_horizontal_columnar_tables(
+        self, text: str, page_num: int = 1, default_depth: Optional[str] = None
+    ) -> List[ExtractedSoilMeasurement]:
+        """
+        Parses horizontal/columnar tables where column headers contain parameter names
+        and rows contain sample observations (e.g. Sample pH Phosphorus Potassium Organic Matter).
+        Excludes fertilizer recommendation sections and dosage tables.
+        """
+        measurements: List[ExtractedSoilMeasurement] = []
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+        # Contextual area designation and area type
+        area_desig = None
+        area_type = None
+        for i, line in enumerate(lines):
+            if re.search(r"Area\s*Designation", line, re.IGNORECASE):
+                val = re.sub(r"^(?:Area\s*Designation\s*[:=\-]?\s*)+", "", line, flags=re.IGNORECASE).strip()
+                if not val and i + 1 < len(lines):
+                    val = lines[i + 1].strip()
+                if val:
+                    area_desig = val
+            if re.search(r"Area\s*Type", line, re.IGNORECASE):
+                val = re.sub(r"^(?:Area\s*Type\s*[:=\-]?\s*)+", "", line, flags=re.IGNORECASE).strip()
+                if not val and i + 1 < len(lines):
+                    val = lines[i + 1].strip()
+                if val:
+                    area_type = val
+
+        in_recommendations = False
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Detect recommendation or dosage sections (e.g. "RECOMMENDATIONS", "Fertilizer to Apply")
+            if re.search(r"\b(?:RECOMMENDATIONS|Fertilizer to Apply|Actual Nutrient Need|Lime to Apply)\b", line, re.IGNORECASE):
+                in_recommendations = True
+            elif re.search(r"\b(?:LABORATORY ANALYSIS|SOIL TEST RESULTS|TEST RESULTS|ANALYTICAL REPORT)\b", line, re.IGNORECASE):
+                in_recommendations = False
+
+            # Explicit guardrail: Skip recommendation sections and dosage headers
+            if in_recommendations:
+                i += 1
+                continue
+
+            # Skip lines containing fertilizer dosage rate units (e.g. lbs/100 ft², lbs/1000 ft², lbs/acre)
+            if re.search(r"\b(?:lbs?/(?:100|1,?000)?\s*ft|lbs?/acre|kg/ha\s*recommended)\b", line, re.IGNORECASE):
+                i += 1
+                continue
+
+            if re.match(r"^\s*\d+\s+", line):
+                i += 1
+                continue
+
+            # Check if line looks like a columnar table header with 2 or more parameter columns
+            col_matches = []
+            for key, pat in PARAMETER_COL_DEFS:
+                for m in pat.finditer(line):
+                    col_matches.append((m.start(), m.end(), key, m.group(0)))
+
+            distinct_params = {key for _, _, key, _ in col_matches if key != "sample_col"}
+            if len(distinct_params) >= 2 and len(line) < 120 and not re.search(r"\b(?:will|should|apply|increase|decrease|because|between|during)\b", line, re.IGNORECASE):
+                col_matches.sort(key=lambda x: x[0])
+                # Deduplicate overlapping matches
+                filtered_matches = []
+                last_end = -1
+                for m_start, m_end, m_key, m_text in col_matches:
+                    if m_start >= last_end:
+                        filtered_matches.append((m_start, m_end, m_key, m_text))
+                        last_end = m_end
+
+                columns = []
+                for c_idx, (start, end, key, text_match) in enumerate(filtered_matches):
+                    next_start = filtered_matches[c_idx + 1][0] if c_idx + 1 < len(filtered_matches) else len(line)
+                    col_header = line[start:next_start].strip()
+
+                    # Extract unit from header
+                    unit = None
+                    unit_m = re.search(r"\(([^)]+)\)|(\b(?:ppm|mg/kg|kg/ha|g/kg|dS/m)\b)|(%)", col_header, re.IGNORECASE)
+                    if unit_m:
+                        unit = unit_m.group(1) or unit_m.group(2) or unit_m.group(3)
+                    elif key == "soil_ph":
+                        unit = "pH"
+
+                    columns.append({
+                        "key": key,
+                        "header": col_header,
+                        "unit": unit,
+                    })
+
+                # Scan subsequent lines for data row(s)
+                r_idx = i + 1
+                while r_idx < len(lines):
+                    row_line = lines[r_idx]
+                    # Terminate table scanning if new section or document footer
+                    if re.search(r"\b(?:RECOMMENDATIONS|WEB COPY|Page \d+|LABORATORY ANALYSIS)\b", row_line, re.IGNORECASE):
+                        break
+
+                    tokens = row_line.split()
+                    num_tokens = [t for t in tokens if re.match(r"^[<>]?\s*[-+]?\d+(?:\.\d+)?$", t)]
+
+                    # If row has numbers corresponding to the parameter columns
+                    if len(num_tokens) >= len(columns) - 1:
+                        sample_id = None
+                        val_idx = 0
+                        for col in columns:
+                            if col["key"] == "sample_col":
+                                if val_idx < len(tokens):
+                                    sample_id = tokens[val_idx]
+                                    val_idx += 1
+                                continue
+                            if val_idx < len(tokens):
+                                val_str = tokens[val_idx]
+                                parsed_val, is_reported, is_amb, amb_reason = self._parse_numeric_value(val_str)
+                                if is_reported and parsed_val is not None:
+                                    meas = ExtractedSoilMeasurement(
+                                        parameter_key=col["key"],
+                                        original_parameter_name=col["header"],
+                                        original_value=parsed_val,
+                                        original_unit=col["unit"],
+                                        sample_id=sample_id,
+                                        sample_designation=area_desig,
+                                        area_type=area_type,
+                                        page_number=page_num,
+                                        sample_depth=default_depth,
+                                        ocr_confidence=0.85 if is_amb else 1.0,
+                                        is_ambiguous=is_amb,
+                                        ambiguity_reason=amb_reason,
+                                        extraction_status=ParameterExtractionStatus.EXTRACTED.value,
+                                        verification_status=MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value,
+                                    )
+                                    measurements.append(meas)
+                                val_idx += 1
+                        r_idx += 1
+                    else:
+                        break
+            i += 1
+
+        return measurements
+
     def _parse_html_tables(
-        self, text: str, default_depth: Optional[str] = None
+        self, text: str, page_num: int = 1, default_depth: Optional[str] = None
     ) -> List[ExtractedSoilMeasurement]:
         """
         Parses HTML formatted tables (as produced by glm-ocr vision models).
@@ -281,13 +509,13 @@ class SoilReportParser:
                     for c in re.findall(r"<(?:td|th)[^>]*>(.*?)<\/(?:td|th)>", r_html, re.IGNORECASE | re.DOTALL)
                 ]
                 if td_cells:
-                    row_m = self._parse_table_row(td_cells, col_map, header_cells, default_depth=default_depth)
+                    row_m = self._parse_table_row(td_cells, col_map, header_cells, page_num=page_num, default_depth=default_depth)
                     measurements.extend(row_m)
 
         return measurements
 
     def _parse_whitespace_tables(
-        self, text: str, default_depth: Optional[str] = None
+        self, text: str, page_num: int = 1, default_depth: Optional[str] = None
     ) -> List[ExtractedSoilMeasurement]:
         """
         Parses space/tab-separated tabular rows (as produced by pypdf digital text extraction).
@@ -329,6 +557,7 @@ class SoilReportParser:
                     original_value=None,
                     original_unit=None,
                     sample_depth=default_depth,
+                    page_number=page_num,
                     extraction_status=ParameterExtractionStatus.NOT_REPORTED.value,
                     verification_status=MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value,
                 )
@@ -370,6 +599,7 @@ class SoilReportParser:
                         original_value=parsed_val,
                         original_unit=raw_unit,
                         sample_depth=depth_str,
+                        page_number=page_num,
                         ocr_confidence=0.80 if is_ambiguous else 1.0,
                         is_ambiguous=is_ambiguous,
                         ambiguity_reason="; ".join(reasons) if reasons else None,
@@ -388,6 +618,7 @@ class SoilReportParser:
                     original_value=parsed_val,
                     original_unit=raw_unit,
                     sample_depth=default_depth,
+                    page_number=page_num,
                     ocr_confidence=0.80 if is_ambiguous else 1.0,
                     is_ambiguous=is_ambiguous,
                     ambiguity_reason="; ".join(reasons) if reasons else None,
@@ -399,7 +630,7 @@ class SoilReportParser:
         return measurements
 
     def _parse_markdown_tables(
-        self, text: str, default_depth: Optional[str] = None
+        self, text: str, page_num: int = 1, default_depth: Optional[str] = None
     ) -> List[ExtractedSoilMeasurement]:
         """
         Parses Markdown formatted tables with header classification.
@@ -421,7 +652,7 @@ class SoilReportParser:
                         row_line = lines[i].strip()
                         cells = [c.strip() for c in row_line.split("|")[1:-1]]
                         row_measurements = self._parse_table_row(
-                            cells, col_map, headers, default_depth=default_depth
+                            cells, col_map, headers, page_num=page_num, default_depth=default_depth
                         )
                         measurements.extend(row_measurements)
                         i += 1
@@ -480,6 +711,7 @@ class SoilReportParser:
         cells: List[str],
         col_map: Dict[str, Any],
         headers: List[str],
+        page_num: int = 1,
         default_depth: Optional[str] = None,
     ) -> List[ExtractedSoilMeasurement]:
         """
@@ -540,6 +772,7 @@ class SoilReportParser:
                 analytical_method=method,
                 laboratory_rating=rating,
                 reference_range=ref_range,
+                page_number=page_num,
                 ocr_confidence=0.80 if is_ambiguous else 1.0,
                 is_ambiguous=is_ambiguous,
                 ambiguity_reason="; ".join(ambiguity_reasons) if ambiguity_reasons else None,
@@ -558,6 +791,7 @@ class SoilReportParser:
         self,
         text: str,
         exclude_keys: set,
+        page_num: int = 1,
         default_depth: Optional[str] = None,
     ) -> List[ExtractedSoilMeasurement]:
         """
@@ -612,6 +846,7 @@ class SoilReportParser:
                 original_value=parsed_val,
                 original_unit=raw_unit,
                 sample_depth=default_depth,
+                page_number=page_num,
                 ocr_confidence=0.80 if is_ambiguous else 1.0,
                 is_ambiguous=is_ambiguous,
                 ambiguity_reason="; ".join(ambiguity_reasons) if ambiguity_reasons else None,

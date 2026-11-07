@@ -313,12 +313,40 @@ In Phase 5.6.1, the prototype was upgraded to eliminate all simulated document s
 
 ---
 
+## 9.2 Phase 5.6.3: Web Native File Picker & Multi-Sample Columnar Soil Parser (`lag_sample.pdf`)
+
+### 1. Root Cause & Solution: `UnimplementedError: pickFile() has not been implemented`
+- **Root Cause**: On Flutter Web, `FilePicker.pickFile` / `FilePicker.pickFiles` in certain bundler contexts delegates to `MethodChannelFilePicker` when web plugin registration is uninitialized or asynchronous, raising `UnimplementedError: pickFile() has not been implemented`.
+- **Solution**: Implemented a resilient, platform-conditional HTML5 native web file picker ([`lib/core/utils/native_file_picker_web.dart`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/apps/mobile/lib/core/utils/native_file_picker_web.dart)) that directly creates an HTML `<input type="file">` via `package:web`, listens for DOM `change` and `cancel` events, reads the selected binary buffer via `FileReader.readAsArrayBuffer`, and wraps the result in `WebSimplePlatformFile` extending `PlatformFile`. Integrated via conditional imports (`native_file_picker.dart` / `native_file_picker_stub.dart`), providing seamless zero-dependency file selection on Flutter Web.
+
+### 2. Root Cause & Solution: Zero Parameters From Readable Laboratory PDF (`lag_sample.pdf`)
+- **Root Cause**:
+  1. The legacy parser supported vertical tables (one row per parameter) and Markdown pipe tables. Extension laboratory reports like the University of Wisconsin Soil & Plant Analysis Lab (`lag_sample.pdf`) use horizontal columnar tables where nutrient names form column headers (`Sample pH Phosphorus [P] (ppm) Potassium [K] (ppm) Organic Matter %`) and numeric observations appear on subsequent rows.
+  2. Legacy parameter regex patterns required `available\s*phosphorus` / `available\s*potassium`, failing on standard headers like `Phosphorus [P]` and `Potassium [K]`.
+  3. Deduplication keyed solely by `(parameter_key, sample_depth)`, causing Sample 2 (Garden) to be dropped as a duplicate of Sample 1 (Lawn) when depth was unstated.
+- **Solution**:
+  1. **Horizontal Columnar Table Parser (`_parse_horizontal_columnar_tables`)**: Scans lines for multiple distinct canonical parameter headers (`soil_ph`, `available_phosphorus`, `available_potassium`, `organic_matter`), parses column boundaries, extracts units, and extracts multi-sample observation rows.
+  2. **Multi-Sample Provenance**: Captures `sample_id` ("1", "2"), `sample_designation` ("Lawn", "Garden"), `area_type` ("Lawn/Established", "Garden/Vegetable"), and `page_number`. Deduplication now keys on `(parameter_key, sample_depth, sample_id, page_number)`.
+  3. **Strict Agronomic Guardrails**:
+     - Explicit exclusion of fertilizer application recommendations (e.g., `0.30 lbs N/100 ft²`, `1.0 lbs P2O5`, `1.5 lbs K2O`) from soil chemistry measurements.
+     - Strict preservation of Organic Matter (SOM) without unapproved conversion to Organic Carbon (SOC).
+     - Safeguard 1 & 6: Zero unmeasured parameter hallucinations (EC, Available N, and sample depth remain strictly unmeasured / null).
+     - Decoupled verification status: All 8 measurements initialized as `EXTRACTED_UNVERIFIED` awaiting farmer review.
+
+### 3. Automated Test Verification
+- Added `test_uw_extension_lag_sample_multi_sample_extraction` to [`cropnet/services/api/tests/test_soil_ocr_pipeline.py`](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/services/api/tests/test_soil_ocr_pipeline.py).
+- Full 23-test suite in `test_soil_ocr_pipeline.py` passes with **23 / 23 (100%)**.
+
+---
+
 ## 10. Screenshot Artifacts
 
-All responsive viewports have been captured and verified:
+All responsive viewports and live workflows have been captured and verified:
 
-| Viewport | Screen Description | Screenshot Link |
+| Viewport / Stage | Screen Description | Screenshot Link |
 |---|---|---|
+| Desktop (1280px) | Real Document Selected via Native Picker (`lag_sample.pdf`) | [lag_sample_file_selected.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/lag_sample_file_selected.png) |
+| Desktop (1280px) | Multi-Sample Review Screen (Lawn & Garden, 8 Parameters) | [lag_sample_review_screen_verified.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/lag_sample_review_screen_verified.png) |
 | Desktop (1280px) | Soil Laboratory Upload Workspace | [soil_lab_upload_desktop.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_upload_desktop.png) |
 | Mobile (375px) | Soil Laboratory Upload Screen | [soil_lab_upload_mobile.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_upload_mobile.png) |
 | Desktop (1280px) | Soil Laboratory History & Report Archive | [soil_lab_history_desktop.png](file:///Users/siddheshbirewar/Downloads/Cropnet%20Feature/cropnet/docs/screenshots/soil_lab_history_desktop.png) |

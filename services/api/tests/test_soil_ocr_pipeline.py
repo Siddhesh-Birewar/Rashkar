@@ -459,3 +459,88 @@ def test_full_corpus_evaluation_benchmark():
     assert metrics["sma"] >= 85.0
     assert metrics["tea"] >= 90.0
     assert metrics["adr"] >= 90.0
+
+
+# ============================================================================
+# 6. Real-World Multi-Sample Soil Laboratory PDF Regression Test
+# ============================================================================
+
+def test_uw_extension_lag_sample_multi_sample_extraction():
+    """
+    Regression test fixture: lag_sample.pdf (UW Soil & Plant Analysis Lab).
+    Verifies:
+    1. Multi-page horizontal/columnar table parsing without zero-parameter failure.
+    2. Distinction between Sample 1 (Lawn, Page 1) and Sample 2 (Garden, Page 2).
+    3. Strict agronomic guardrails:
+       - No fertilizer dosage recommendations extracted into soil chemistry.
+       - SOM is strictly organic_matter (not silently converted to organic_carbon).
+       - No fabricated EC, depth, or Available Nitrogen.
+       - Decoupled verification status (EXTRACTED_UNVERIFIED).
+    """
+    pdf_path = os.path.join(CORPUS_DIR, "lag_sample.pdf")
+    if not os.path.exists(pdf_path):
+        pdf_path = "/Users/siddheshbirewar/Downloads/lag_sample.pdf"
+    assert os.path.exists(pdf_path), f"Fixture not found at {pdf_path}"
+
+    with open(pdf_path, "rb") as f:
+        file_bytes = f.read()
+
+    extractor = SoilOCRExtractor()
+    result = extractor.extract(file_bytes=file_bytes, filename="lag_sample.pdf")
+
+    assert result.extraction_status == ReportExtractionStatus.EXTRACTION_COMPLETED.value
+    assert len(result.measurements) == 8, f"Expected 8 measurements, found {len(result.measurements)}"
+
+    # Metadata extraction
+    assert result.metadata.laboratory_name == "UW Soil & Plant Analysis Lab"
+    assert result.metadata.sample_id == "54321"
+    assert result.metadata.farmer_name == "Bucky Badger"
+    assert result.metadata.district == "Dane"
+    assert result.metadata.collection_date == "2007-08-01"
+    assert result.metadata.report_date == "2007-08-10"
+
+    # Separate Sample 1 (Lawn, Page 1) and Sample 2 (Garden, Page 2)
+    s1_meas = {m.parameter_key: m for m in result.measurements if m.sample_id == "1" or m.page_number == 1}
+    s2_meas = {m.parameter_key: m for m in result.measurements if m.sample_id == "2" or m.page_number == 2}
+
+    assert len(s1_meas) == 4
+    assert len(s2_meas) == 4
+
+    # Sample 1 (Lawn) Assertions
+    assert s1_meas["soil_ph"].original_value == 5.9
+    assert s1_meas["available_phosphorus"].original_value == 10.0
+    assert s1_meas["available_phosphorus"].original_unit == "ppm"
+    assert s1_meas["available_potassium"].original_value == 34.0
+    assert s1_meas["available_potassium"].original_unit == "ppm"
+    assert s1_meas["organic_matter"].original_value == 1.9
+    assert s1_meas["organic_matter"].original_unit == "%"
+    assert s1_meas["soil_ph"].sample_designation == "Lawn"
+
+    # Sample 2 (Garden) Assertions
+    assert s2_meas["soil_ph"].original_value == 6.2
+    assert s2_meas["available_phosphorus"].original_value == 25.0
+    assert s2_meas["available_phosphorus"].original_unit == "ppm"
+    assert s2_meas["available_potassium"].original_value == 45.0
+    assert s2_meas["available_potassium"].original_unit == "ppm"
+    assert s2_meas["organic_matter"].original_value == 3.1
+    assert s2_meas["organic_matter"].original_unit == "%"
+    assert s2_meas["soil_ph"].sample_designation == "Garden"
+
+    # Agronomic Invariant Checks:
+    all_keys = [m.parameter_key for m in result.measurements]
+    all_values = [m.original_value for m in result.measurements]
+
+    # 1. No fertilizer application dosage (0.30 lbs N, 1.0 lbs P2O5, 1.5 lbs K2O) leaked into measurements
+    assert 0.3 not in all_values and 0.30 not in all_values
+    assert 1.5 not in all_values
+
+    # 2. No unverified organic_carbon conversion
+    assert "organic_carbon" not in all_keys
+
+    # 3. No hallucinated unmeasured parameters
+    assert "available_nitrogen" not in all_keys
+    assert "electrical_conductivity" not in all_keys
+
+    # 4. Decoupled verification status
+    for m in result.measurements:
+        assert m.verification_status == MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value

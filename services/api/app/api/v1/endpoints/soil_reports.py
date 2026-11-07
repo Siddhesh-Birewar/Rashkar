@@ -86,6 +86,11 @@ def _parse_optional_date(val: Optional[str]) -> Optional[datetime]:
 
 
 def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
+    ref = m.lab_reference_range or {}
+    sample_id = ref.get("sample_id") if isinstance(ref, dict) else None
+    sample_designation = ref.get("sample_designation") if isinstance(ref, dict) else None
+    area_type = ref.get("area_type") if isinstance(ref, dict) else None
+
     return SoilMeasurementItem(
         id=uuid.UUID(m.id),
         report_id=uuid.UUID(m.report_id),
@@ -103,6 +108,9 @@ def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
         lab_rating=m.lab_rating,
         detection_limit=m.detection_limit,
         page_number=m.page_number,
+        sample_id=sample_id,
+        sample_designation=sample_designation,
+        area_type=area_type,
         bounding_box=m.bounding_box,
         extraction_confidence=m.extraction_confidence,
         is_ambiguous=m.is_ambiguous,
@@ -203,6 +211,20 @@ def _execute_report_extraction(
             for m in result.measurements:
                 param_meta = CANONICAL_SOIL_PARAMETERS.get(m.parameter_key, {})
                 cat = param_meta.get("category", "macronutrient")
+                ref_dict = {}
+                if m.reference_range:
+                    ref_dict["range"] = m.reference_range
+                if m.sample_id:
+                    ref_dict["sample_id"] = m.sample_id
+                if m.sample_designation:
+                    ref_dict["sample_designation"] = m.sample_designation
+                if m.area_type:
+                    ref_dict["area_type"] = m.area_type
+
+                lab_rating_val = m.laboratory_rating
+                if not lab_rating_val and m.sample_designation:
+                    lab_rating_val = f"{m.sample_designation} (Sample {m.sample_id or ''})".strip()
+
                 meas = SoilMeasurementModel(
                     id=str(uuid.uuid4()),
                     report_id=report.id,
@@ -216,8 +238,8 @@ def _execute_report_extraction(
                     normalized_value=m.normalized_value,
                     normalized_unit=m.normalized_unit,
                     analytical_method=m.analytical_method,
-                    lab_reference_range={"range": m.reference_range} if m.reference_range else None,
-                    lab_rating=m.laboratory_rating,
+                    lab_reference_range=ref_dict if ref_dict else None,
+                    lab_rating=lab_rating_val,
                     detection_limit=None,
                     page_number=m.page_number or 1,
                     bounding_box=None,

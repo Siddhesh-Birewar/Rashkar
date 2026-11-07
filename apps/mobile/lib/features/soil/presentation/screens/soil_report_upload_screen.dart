@@ -1,8 +1,10 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_paths.dart';
+import '../../../../core/utils/native_file_picker.dart';
 import '../../../../shared/widgets/centered_page_container.dart';
 import '../state/soil_lab_notifier.dart';
 
@@ -263,20 +265,32 @@ class _SoilReportUploadScreenState extends State<SoilReportUploadScreen> {
         return;
       }
 
-      // Native browser/device file picker with dual fallback
+      // Native browser/device file picker with multi-tier fallback
       PlatformFile? picked;
-      try {
-        picked = await FilePicker.pickFile(
-          type: FileType.custom,
-          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-        );
-      } catch (_) {
-        final files = await FilePicker.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-        );
-        if (files.isNotEmpty) {
-          picked = files.first;
+      if (kIsWeb) {
+        try {
+          picked = await pickDocumentNative(
+            allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+          );
+        } catch (_) {}
+      }
+
+      if (picked == null) {
+        try {
+          picked = await FilePicker.pickFile(
+            type: FileType.custom,
+            allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+          );
+        } catch (_) {
+          try {
+            final files = await FilePicker.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+            );
+            if (files.isNotEmpty) {
+              picked = files.first;
+            }
+          } catch (_) {}
         }
       }
 
