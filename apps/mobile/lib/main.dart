@@ -1017,12 +1017,8 @@ class FarmDetailScreen extends StatelessWidget {
                     icon: const Icon(Icons.science),
                     label: const Text('Analyse Soil Profile for this Boundary', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (ctx) => SoilIntelligenceReportScreen(farm: farm),
-                        ),
-                      );
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      context.push(RoutePaths.soilDetailPath(farm.id));
                     },
                   ),
                   const SizedBox(height: 10),
@@ -1038,12 +1034,8 @@ class FarmDetailScreen extends StatelessWidget {
                     icon: const Icon(Icons.cloud_sync),
                     label: const Text('Weather & Climate Intelligence', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (ctx) => WeatherClimateReportScreen(farm: farm),
-                        ),
-                      );
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      context.push(RoutePaths.weatherDetailPath(farm.id));
                     },
                   ),
                 ],
@@ -1181,12 +1173,8 @@ class SoilIntelligenceScreen extends StatelessWidget {
                       subtitle: Text('${f.taluka} • ${f.areaHectares.toStringAsFixed(2)} ha (${f.areaAcres.toStringAsFixed(2)} ac)'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) => SoilIntelligenceReportScreen(farm: f),
-                          ),
-                        );
+                        FarmRepository.instance.selectedFarmId = f.id;
+                        context.push(RoutePaths.soilDetailPath(f.id));
                       },
                     ),
                   )),
@@ -1959,12 +1947,8 @@ class WeatherIntelligenceScreen extends StatelessWidget {
                       subtitle: Text('${f.taluka} • Centroid: ${f.centroid.latitude.toStringAsFixed(3)}, ${f.centroid.longitude.toStringAsFixed(3)}'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) => WeatherClimateReportScreen(farm: f),
-                          ),
-                        );
+                        FarmRepository.instance.selectedFarmId = f.id;
+                        context.push(RoutePaths.weatherDetailPath(f.id));
                       },
                     ),
                   )),

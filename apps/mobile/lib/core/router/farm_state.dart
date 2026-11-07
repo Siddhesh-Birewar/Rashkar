@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:cropnet_mobile/core/network/api_exception.dart';
+import 'package:cropnet_mobile/core/router/farm_resolution.dart';
 import 'package:cropnet_mobile/main.dart';
 import 'package:cropnet_mobile/features/farm/data/farm_repository.dart' as data;
 import 'package:cropnet_mobile/features/farm/models/farm_models.dart';
@@ -14,7 +16,7 @@ class FarmRepository extends ChangeNotifier {
 
   factory FarmRepository() => _instance;
 
-  final data.FarmRepository _dataRepo;
+  data.FarmRepository _dataRepo;
 
   FarmRepository._internal({data.FarmRepository? dataRepo})
       : _dataRepo = dataRepo ?? data.FarmRepository();
@@ -48,6 +50,53 @@ class FarmRepository extends ChangeNotifier {
       return _farms.firstWhere((f) => f.id == id);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Asynchronously resolve a farm by ID.
+  /// First checks local in-memory farms; if missing, queries FastAPI directly.
+  Future<FarmResolutionResult> resolveFarm(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) {
+      return const FarmResolutionResult.invalidId('Invalid farm identifier.');
+    }
+
+    // 1. Check in-memory list first
+    final existing = getFarmById(cleanId);
+    if (existing != null) {
+      _selectedFarmId = cleanId;
+      return FarmResolutionResult.success(existing);
+    }
+
+    // 2. Query backend by ID directly
+    try {
+      final backendFarm = await _dataRepo.getFarm(cleanId);
+      final item = FarmItem.fromFarm(backendFarm);
+
+      final idx = _farms.indexWhere((f) => f.id == item.id);
+      if (idx == -1) {
+        _farms.add(item);
+      } else {
+        _farms[idx] = item;
+      }
+      _selectedFarmId = cleanId;
+      notifyListeners();
+      return FarmResolutionResult.success(item);
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+        return FarmResolutionResult.notFound('Farm with ID "$cleanId" was not found or has been removed.');
+      } else if (e.statusCode == 401 || e.statusCode == 403) {
+        return const FarmResolutionResult.unauthorized('You do not have permission to access this farm.');
+      }
+      return FarmResolutionResult.networkError('Failed to load farm details: ${e.message}');
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('404') || errStr.contains('not found')) {
+        return FarmResolutionResult.notFound('Farm with ID "$cleanId" was not found or has been removed.');
+      } else if (errStr.contains('401') || errStr.contains('403') || errStr.contains('permission')) {
+        return const FarmResolutionResult.unauthorized('You do not have permission to access this farm.');
+      }
+      return FarmResolutionResult.networkError('Network error connecting to CropNet: $e');
     }
   }
 
@@ -172,8 +221,11 @@ class FarmRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Resets repository back to empty baseline.
-  void resetToDefault() {
+  /// Resets repository back to empty baseline with optional custom data repository.
+  void resetToDefault({data.FarmRepository? dataRepo}) {
+    if (dataRepo != null) {
+      _dataRepo = dataRepo;
+    }
     clear();
   }
 }

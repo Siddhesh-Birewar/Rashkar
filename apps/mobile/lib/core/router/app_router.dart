@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cropnet_mobile/core/router/advisory_screen.dart';
 import 'package:cropnet_mobile/core/router/app_shell.dart';
+import 'package:cropnet_mobile/core/router/farm_resolution.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
 import 'package:cropnet_mobile/core/router/history_screen.dart';
 import 'package:cropnet_mobile/core/router/route_error_screen.dart';
@@ -113,20 +114,17 @@ GoRouter createCropNetRouter({
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (context, state) {
                       final farmId = state.pathParameters['farmId'] ?? '';
-                      final farm = FarmRepository.instance.getFarmById(farmId);
-                      if (farm == null) {
-                        return AppRouteErrorScreen(
-                          uri: state.uri.toString(),
-                          error: Exception('Farm with ID "$farmId" not found.'),
-                        );
-                      }
-                      return FarmDetailScreen(
-                        farm: farm,
-                        onUpdate: (updated) => FarmRepository.instance.updateFarm(updated),
-                        onDelete: (id) {
-                          FarmRepository.instance.deleteFarm(id);
-                          context.pop();
-                        },
+                      return FarmRouteResolver(
+                        farmId: farmId,
+                        featureName: 'Farm Details',
+                        builder: (context, farm) => FarmDetailScreen(
+                          farm: farm,
+                          onUpdate: (updated) => FarmRepository.instance.updateFarm(updated),
+                          onDelete: (id) {
+                            FarmRepository.instance.deleteFarm(id);
+                            context.pop();
+                          },
+                        ),
                       );
                     },
                   ),
@@ -157,14 +155,11 @@ GoRouter createCropNetRouter({
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (context, state) {
                       final farmId = state.pathParameters['farmId'] ?? '';
-                      final farm = FarmRepository.instance.getFarmById(farmId);
-                      if (farm == null) {
-                        return AppRouteErrorScreen(
-                          uri: state.uri.toString(),
-                          error: Exception('Farm with ID "$farmId" not found for soil profiling.'),
-                        );
-                      }
-                      return SoilIntelligenceReportScreen(farm: farm);
+                      return FarmRouteResolver(
+                        farmId: farmId,
+                        featureName: 'Soil Intelligence',
+                        builder: (context, farm) => SoilIntelligenceReportScreen(farm: farm),
+                      );
                     },
                     routes: [
                       GoRoute(
@@ -269,14 +264,11 @@ GoRouter createCropNetRouter({
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (context, state) {
                       final farmId = state.pathParameters['farmId'] ?? '';
-                      final farm = FarmRepository.instance.getFarmById(farmId);
-                      if (farm == null) {
-                        return AppRouteErrorScreen(
-                          uri: state.uri.toString(),
-                          error: Exception('Farm with ID "$farmId" not found for weather intelligence.'),
-                        );
-                      }
-                      return WeatherClimateReportScreen(farm: farm);
+                      return FarmRouteResolver(
+                        farmId: farmId,
+                        featureName: 'Weather Intelligence',
+                        builder: (context, farm) => WeatherClimateReportScreen(farm: farm),
+                      );
                     },
                   ),
                 ],
