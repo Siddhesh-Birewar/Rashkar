@@ -29,7 +29,7 @@ This document provides a transparent, rigorous inventory of functionality within
 | **Farms** | Farm Cascade Deletion | **COMPLETE** | Ready | Cascades deletion of dependent weather snapshots and climate records before deleting farm. |
 | **Soil** | ISRIC SoilGrids 2.0 Digital Extraction (250m) | **COMPLETE** | Ready | Extracts pH (H2O), CEC, clay %, sand %, SOC, and texture class. |
 | **Soil** | **Agronomic Safeguard: Zero NPK Fabrication** | **COMPLETE** | Enforced | Available NPK remains strictly `null`. UI informs farmer that laboratory soil testing is required. |
-| **Soil** | Laboratory Soil Test Card Upload & OCR | **ROADMAP** | Future | Document parser for physical Krishi Vigyan Kendra (KVK) lab cards. |
+| **Soil** | **Laboratory Soil Test Card Upload & OCR (Phase 5.6)** | **COMPLETE** | Ready | End-to-end multi-modal vision & text extraction (PDF/JPEG/PNG), columnar multi-sample table parsing, dual-source intelligence fusion with strict provenance separation and farmer confirmation. |
 | **Weather** | Real-Time OpenWeather Conditions & Forecasts | **COMPLETE** | Ready | Fetches, caches in PostgreSQL, and serves meteorological metrics. |
 | **Weather** | NASA POWER 30-Year Climatology Summary | **COMPLETE** | Ready | Mean rainfall, monsoon share %, temperature limits, drought risk. |
 | **Crops** | 10 Maharashtra Pilot Crop Knowledge Profiles | **COMPLETE** | Ready | ICAR / MPKV Rahuri agronomic thresholds in PostgreSQL. |
