@@ -26,13 +26,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
+# Safe CORS Middleware Setup
+# allow_credentials=True must only be paired with explicit permitted origins (never wildcard '*')
+has_wildcard_cors = any(origin == "*" for origin in settings.CORS_ORIGINS)
+if has_wildcard_cors and settings.ENVIRONMENT.lower() in ("production", "prod"):
+    raise RuntimeError(
+        "CRITICAL SECURITY CONFIGURATION ERROR: Wildcard CORS origins '*' are forbidden in production with credentials."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=not has_wildcard_cors,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Dev-User-Id", "X-Request-ID"],
 )
 
 
