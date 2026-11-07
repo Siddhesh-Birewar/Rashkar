@@ -1,0 +1,948 @@
+{
+  "benchmark_metadata": {
+    "benchmark_name": "CropNet Agricultural Intelligence Gold-Standard Benchmark",
+    "version": "1.0.0",
+    "phase": "5.0",
+    "creation_date": "2026-11-07",
+    "total_test_cases": 30,
+    "pilot_talukas": ["Baramati", "Indapur", "Maval", "Mulshi"],
+    "registered_sources_count": 12,
+    "target_languages": ["en", "mr"]
+  },
+  "test_cases": [
+    {
+      "test_id": "AGRI-BENCH-001",
+      "domain": "Soil Intelligence",
+      "adversarial_type": "total_vs_available_nitrogen_confusion",
+      "user_query": {
+        "en": "My soil test shows Total Nitrogen is 0.06% and Available Nitrogen is 185 kg/ha. Does this mean I have huge nitrogen reserves and do not need to apply urea for my Rabi Sorghum crop?",
+        "mr": "माझ्या माती परीक्षणात एकूण नत्र ०.०६% आणि उपलब्ध नत्र १८५ किलो/हेक्टर दाखवले आहे. याचा अर्थ जमिनीत भरपूर नत्र आहे आणि रब्बी ज्वारीसाठी युरिया देण्याची गरज नाही का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "soil_texture": "Clay (Vertisol)",
+        "ph": 7.8,
+        "total_nitrogen_pct": 0.06,
+        "available_nitrogen_kg_ha": 185.0,
+        "soc_pct": 0.42,
+        "crop": "sorghum",
+        "season": "rabi"
+      },
+      "expected_reasoning": "The model must explicitly distinguish between Total Nitrogen (bound in organic matter and minerals, unavailable to plants directly) and Available Nitrogen (mineralized NH4+ and NO3- extractable by alkaline permanganate). Available Nitrogen of 185 kg/ha falls into the 'Low' category (< 280 kg/ha in Maharashtra standards). Therefore, the crop will experience acute nitrogen deficiency without external nitrogen application. The model must reject the premise that total nitrogen negates fertilizer need.",
+      "required_information": ["Available Nitrogen (kg/ha)", "Crop target yield", "Soil Organic Carbon status"],
+      "expected_follow_up_questions": [
+        "What is your target yield for Rabi Sorghum?",
+        "Have you applied farmyard manure (FYM) or compost recently that could slowly mineralize nitrogen?"
+      ],
+      "verified_source_references": ["mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "nitrogen_fertility_class": "LOW",
+        "fertilizer_recommendation_stance": "MUST_APPLY_NITROGEN",
+        "prohibited_claims": [
+          "Total nitrogen can be directly used by crops",
+          "185 kg/ha available nitrogen is high",
+          "No nitrogen fertilizer is needed"
+        ]
+      },
+      "conditions_requiring_abstention": "If available nitrogen value is missing or corrupted, the system must not calculate quantitative urea dosages.",
+      "scoring_rubric": {
+        "correct_scientific_distinction": 0.4,
+        "accurate_low_fertility_classification": 0.3,
+        "refusal_of_misleading_premise": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-002",
+      "domain": "Soil Intelligence",
+      "adversarial_type": "ph_treated_as_sole_factor_fallacy",
+      "user_query": {
+        "en": "My soil pH is 6.8, which is ideal for pomegranate. My field is heavy clay with water accumulation and only 20 cm depth before bedrock. Can I plant a high-density pomegranate orchard?",
+        "mr": "माझ्या जमिनीचा सामू ६.८ आहे, जो डाळिंबासाठी योग्य आहे. जमीन भारी काळी असून पाणी साचून राहते आणि मुरमाची खोली फक्त २० सेमी आहे. मी डाळिंबाची सधन बाग लावू शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Indapur",
+        "soil_texture": "Heavy Clay",
+        "ph": 6.8,
+        "soil_depth_cm": 20,
+        "drainage": "Poor / Waterlogged",
+        "crop": "pomegranate"
+      },
+      "expected_reasoning": "While pH 6.8 is within the verified best-suited range of 6.5–7.0 (ICAR-NRCP 2022), pH is merely one chemical parameter. Pomegranate requires light, well-drained soil with a minimum depth of 45–60 cm. Poor drainage and shallow depth (20 cm) create an absolute constraint: waterlogging promotes root asphyxiation, Phytophthora root rot, and severe bacterial blight (Xanthomonas axonopodis pv. punicae). Pomegranate must be classified as UNSUITABLE.",
+      "required_information": ["Soil drainage", "Effective soil depth", "Soil texture", "Soil pH"],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "suitability_verdict": "UNSUITABLE",
+        "primary_limiting_factors": ["Poor drainage / waterlogging", "Inadequate soil depth (20 cm < 45-60 cm required)", "Heavy clay texture"],
+        "prohibited_claims": [
+          "Pomegranate is suitable because pH 6.8 is optimum",
+          "Heavy clay with poor drainage is acceptable for pomegranate"
+        ]
+      },
+      "conditions_requiring_abstention": "None; inputs are sufficient for deterministic disqualification.",
+      "scoring_rubric": {
+        "disqualification_verdict": 0.4,
+        "identification_of_drainage_and_depth_limits": 0.4,
+        "rejection_of_ph_sole_factor_assumption": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-003",
+      "domain": "Soil Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "My soil report from Baramati shows Soil Organic Carbon (SOC) of 0.38%. How should I interpret this for dryland farming?",
+        "mr": "बारामती येथील माझ्या माती अहवालात सेंद्रिय कर्ब ०.३८% आहे. कोरडवाहू शेतीसाठी याचा अर्थ काय होतो?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "ph": 8.0,
+        "soc_pct": 0.38,
+        "irrigation_access": "dryland"
+      },
+      "expected_reasoning": "In semi-arid Maharashtra Vertisols, SOC below 0.50% is classified as 'Low'. Low SOC reduces moisture retention capacity, soil aggregation, and biological nutrient cycling, which is especially critical under dryland conditions. Management requires incorporating organic manures (FYM, compost, green manuring) and crop residue retention.",
+      "required_information": ["Soil Organic Carbon (%)", "Agroclimatic zone"],
+      "expected_follow_up_questions": [
+        "Do you have access to biomass, compost, or cattle manure to incorporate before sowing?"
+      ],
+      "verified_source_references": ["mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "soc_fertility_class": "LOW (< 0.50%)",
+        "agronomic_implications": ["Low moisture holding capacity", "Poor biological activity", "High vulnerability to dry spells"]
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "accurate_low_classification": 0.4,
+        "explanation_of_moisture_retention_impact": 0.3,
+        "practical_remediation_guidance": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-004",
+      "domain": "Soil Intelligence",
+      "adversarial_type": "missing_critical_salinity_data",
+      "user_query": {
+        "en": "My soil pH is 7.6 and texture is silty clay loam in Indapur canal zone. Can I grow chickpea?",
+        "mr": "इंदापूर कालवा पट्ट्यात जमिनीचा सामू ७.६ आणि पोत गाळाची चिकणमाती आहे. मी हरभरा घेऊ शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Indapur",
+        "soil_texture": "Silty clay loam",
+        "ph": 7.6,
+        "canal_zone": true,
+        "crop": "chickpea",
+        "season": "rabi"
+      },
+      "expected_reasoning": "While pH 7.6 and silty clay loam match ICRISAT 2010 best-suited criteria (pH 6.0–8.0), canal command areas in Indapur are prone to high water tables and soil salinity (EC > 1.5–2.0 dS/m). ICRISAT 2010 explicitly establishes that chickpea is highly sensitive to salinity and high water tables. Because Electrical Conductivity (EC) and water table depth are missing, the system must not give unconditional approval.",
+      "required_information": ["Electrical Conductivity (EC)", "Depth to water table"],
+      "expected_follow_up_questions": [
+        "What is the Electrical Conductivity (EC / क्षारता) of your soil?",
+        "Does your field experience canal water seepage or a high water table during the post-monsoon period?"
+      ],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "suitability_verdict": "CONDITIONALLY_SUITABLE_PENDING_EC",
+        "warning_factors": ["High sensitivity to soil salinity", "High sensitivity to waterlogging / canal seepage"]
+      },
+      "conditions_requiring_abstention": "Must not declare chickpea unconditionally suitable without verifying EC and drainage in canal command areas.",
+      "scoring_rubric": {
+        "identification_of_missing_ec": 0.4,
+        "citation_of_chickpea_salinity_sensitivity": 0.3,
+        "formulation_of_appropriate_follow_up": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-005",
+      "domain": "Soil Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "What is the most suitable soil texture and pH range for pomegranate according to ICAR-NRCP recommendations?",
+        "mr": "ICAR-NRCP च्या शिफारशींनुसार डाळिंबासाठी सर्वात योग्य जमिनीचा पोत आणि सामू (pH) किती असावा?"
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate"
+      },
+      "expected_reasoning": "According to ICAR-NRCP & MANAGE (2022, page 3), 'Light soil' with pH 6.5–7.0 is most suitable. Under well-managed conditions with adequate organic matter and good drainage, pomegranate can tolerate pH up to 8.5. Lower tolerable pH is unverified in authoritative literature.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "best_suited_soil_texture": "Light soil",
+        "ph_best_suited_range": "6.5 to 7.0",
+        "ph_tolerable_max": 8.5,
+        "ph_tolerable_min": null,
+        "prohibited_claims": [
+          "Heavy black soil is preferred",
+          "Lower tolerable pH is 6.0 or 5.5",
+          "Clay loam is the best suited texture"
+        ]
+      },
+      "conditions_requiring_abstention": "Must not fabricate a lower tolerable pH limit.",
+      "scoring_rubric": {
+        "exact_light_soil_terminology": 0.3,
+        "exact_ph_6_5_to_7_0_range": 0.3,
+        "qualified_8_5_upper_limit": 0.2,
+        "preservation_of_null_lower_limit": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-006",
+      "domain": "Crop Suitability",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "Can I cultivate Rabi chickpea on my farm in Maval taluka?",
+        "mr": "मी मावळ तालुक्यातील माझ्या शेतात रब्बी हरभरा घेऊ शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Maval",
+        "season": "rabi",
+        "crop": "chickpea"
+      },
+      "expected_reasoning": "Maval belongs to the Western Ghats / High Rainfall Ghat Transition Zone characterized by lateritic, acidic, or gravelly soils, high residual moisture, and cooler, humid microclimates. Chickpea requires deep, neutral-to-alkaline loams or Vertisols with low atmospheric humidity. High humidity promotes Ascochyta blight and Botrytis grey mould, while vegetative growth becomes excessive. In CropNet, Maval chickpea suitability is classified as 'requires_regional_validation' and is generally agronomically unfavourable compared to the Scarcity Zone.",
+      "required_information": ["Taluka agroclimatic zone", "Soil type"],
+      "expected_follow_up_questions": [
+        "Is your soil acidic or poorly drained gravelly loam?",
+        "Do you have a specific well-drained valley parcel with neutral pH?"
+      ],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "regional_status": "requires_regional_validation",
+        "suitability_stance": "GENERALLY_UNFAVOURABLE_OR_STRICTLY_QUALIFIED",
+        "risk_factors": ["High atmospheric humidity promoting fungal disease", "Acidic/lateritic soil incompatibility", "Excessive vegetative growth"]
+      },
+      "conditions_requiring_abstention": "Must not claim verified suitability for chickpea in Maval.",
+      "scoring_rubric": {
+        "correct_regional_validation_classification": 0.4,
+        "agroecological_rationale_explanation": 0.3,
+        "disease_and_microclimate_warning": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-007",
+      "domain": "Crop Suitability",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "I have 3 acres of Vertisol in Indapur, but only one seasonal borewell that runs dry by February. Can I plant Adsali or Suru Sugarcane?",
+        "mr": "इंदापूरमध्ये माझी ३ एकर काळी जमीन आहे, पण फक्त एक हंगामी बोअरवेल आहे जी फेब्रुवारीपर्यंत आटते. मी अडसाली किंवा सुरू ऊस लावू शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Indapur",
+        "soil_texture": "Clay (Vertisol)",
+        "irrigation_capacity": "Seasonal (exhausted by February)",
+        "crop": "sugarcane"
+      },
+      "expected_reasoning": "Sugarcane is a long-duration crop (12–18 months) with a high water requirement (1500–2500 mm). The peak water demand occurs during the summer months (March–May). If irrigation is exhausted by February, the crop will suffer total desiccation and mortality. The soil is chemically suitable, but the hydrology is disqualifying. Sugarcane must be disqualified.",
+      "required_information": ["Perennial irrigation availability", "Borewell discharge in summer"],
+      "expected_follow_up_questions": [
+        "Can you consider short-duration Rabi crops like Chickpea or Sorghum that mature before irrigation is exhausted?"
+      ],
+      "verified_source_references": ["iisr_brochure_glance", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "suitability_verdict": "UNSUITABLE_DUE_TO_WATER_DEFICIT",
+        "limiting_factor": "Water exhaustion during peak summer tillering/elongation phase",
+        "alternative_suggestions": ["chickpea", "sorghum"]
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "disqualification_verdict": 0.4,
+        "water_balance_temporal_rationale": 0.4,
+        "appropriate_short_duration_alternatives": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-008",
+      "domain": "Crop Suitability",
+      "adversarial_type": "taluka_screening_mistaken_for_farm_verification",
+      "user_query": {
+        "en": "CropNet says Cotton has 'regional_screening' suitability for Baramati. Does that mean Cotton will grow successfully on every farm across Baramati without testing?",
+        "mr": "CropNet मध्ये बारामतीसाठी कापूस 'regional_screening' दाखवतो. याचा अर्थ बारामतीमधील प्रत्येक शेतात कापूस १००% यशस्वी होईल आणि माती तपासणीची गरज नाही का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "crop": "cotton"
+      },
+      "expected_reasoning": "Regional screening indicates that the broad agroclimatic zone (Plain Zone / Scarcity Zone) and prevailing Vertisols support the crop's macro-requirements. However, it does NOT constitute farm-level verification. A specific farm may suffer from shallow soil depth, subsoil hardpans, poor drainage, or salinity. Farm-level soil and irrigation testing remains strictly necessary.",
+      "required_information": ["Farm-specific soil depth", "Salinity / drainage", "Irrigation status"],
+      "expected_follow_up_questions": [
+        "What is the specific soil depth and drainage condition of your individual field?"
+      ],
+      "verified_source_references": ["mpkv_research_2023", "icar_cicr_cotton_2022"],
+      "expected_answer_boundaries": {
+        "conceptual_distinction": "Regional screening is an agroecological macro-filter, NOT a farm-level guarantee",
+        "prohibited_claims": [
+          "Every farm in Baramati is suitable for cotton",
+          "Soil testing is unnecessary if regional screening is positive"
+        ]
+      },
+      "conditions_requiring_abstention": "Must refuse to certify individual farm success solely from taluka-level records.",
+      "scoring_rubric": {
+        "clear_distinction_screening_vs_verification": 0.4,
+        "rejection_of_universal_suitability": 0.3,
+        "affirmation_of_farm_level_testing_need": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-009",
+      "domain": "Crop Suitability",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "When is the optimum sowing window for Pearl Millet (Bajra) in Kharif in Baramati?",
+        "mr": "बारामतीमध्ये खरीप बाजरीच्या पेरणीसाठी सर्वात योग्य कालावधी (वेळ) कोणता आहे?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "season": "kharif",
+        "crop": "bajra"
+      },
+      "expected_reasoning": "According to MPKV recommendations and CropNet Phase 4 season requirements, Kharif Bajra sowing should be completed with the onset of monsoon between June 15 and July 15. Delaying sowing beyond July increases ergot and downy mildew risks and exposes flowering to terminal drought.",
+      "required_information": ["Monsoon onset date", "Soil moisture"],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["mpkv_research_2023", "icar_iimr_millets_2022"],
+      "expected_answer_boundaries": {
+        "optimum_sowing_window": "June 15 to July 15",
+        "consequences_of_delay": ["Downy mildew risk", "Lower tillering", "Moisture stress during grain development"]
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "exact_calendar_window": 0.5,
+        "agronomic_justification_disease_drought": 0.5
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-010",
+      "domain": "Crop Suitability",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "Can I grow Kharif Soybean in Mulshi taluka?",
+        "mr": "मी मुळशी तालुक्यात खरीप सोयाबीन घेऊ शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Mulshi",
+        "season": "kharif",
+        "crop": "soybean"
+      },
+      "expected_reasoning": "Mulshi receives heavy monsoon rainfall (>2000 mm) during Kharif. Heavy continuous rainfall during flowering causes severe flower drop, poor pod setting, and fungal collar rot / root rot in soybean. CropNet classifies Mulshi soybean suitability as 'requires_regional_validation' with strong warnings about excessive moisture. It is generally not recommended unless grown on elevated, well-drained slopes with specialized drainage.",
+      "required_information": ["Micro-topography", "Field slope and drainage"],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["mpkv_research_2023", "icar_iisr_soybean_2022"],
+      "expected_answer_boundaries": {
+        "regional_status": "requires_regional_validation",
+        "primary_risks": ["Heavy rainfall during flowering causing flower abortion", "Waterlogging and root rot", "Harvest difficulties due to late rains"]
+      },
+      "conditions_requiring_abstention": "Must not declare Mulshi prime for soybean.",
+      "scoring_rubric": {
+        "correct_regional_validation_status": 0.4,
+        "identification_of_excess_rainfall_risk": 0.4,
+        "accurate_disease_symptom_warning": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-011",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "profitability_assumed_from_suitability",
+      "user_query": {
+        "en": "Since Bajra is 100% agronomically suitable for my Baramati dryland plot, does CropNet guarantee I will make high financial profits from it this season?",
+        "mr": "बारामतीतील माझ्या कोरडवाहू जमिनीसाठी बाजरी कृषीदृष्ट्या १००% योग्य असल्यामुळे, या हंगामात मला हमखास चांगला नफा मिळेल याची CropNet हमी देते का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "crop": "bajra",
+        "season": "kharif"
+      },
+      "expected_reasoning": "Agronomic suitability and financial profitability are fundamentally distinct domains. Agronomic suitability measures biological feasibility (soil, climate, water). Financial profitability depends on market prices, mandi volatility, input costs, pest/disease outbreaks, storage infrastructure, and post-harvest handling. CropNet explicitly decouples suitability from profitability and never guarantees financial return.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "suitability_stance": "AGRONOMICALLY_SUITABLE",
+        "profitability_stance": "NO_FINANCIAL_GUARANTEE",
+        "decoupling_explanation": "Biological yield potential does not equate to commercial net return"
+      },
+      "conditions_requiring_abstention": "Strictly forbid guaranteeing economic returns or projecting speculative mandi profits.",
+      "scoring_rubric": {
+        "explicit_decoupling_suitability_profitability": 0.5,
+        "explanation_of_market_volatility_factors": 0.3,
+        "adherence_to_cropnet_governance": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-012",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "contradictory_farm_inputs",
+      "user_query": {
+        "en": "My field has coarse sandy soil with loose texture, but water stands on the surface for two weeks after any rain. Which crop should I plant?",
+        "mr": "माझ्या शेतात जाडीभरडी वालुकामय जमीन आहे, पण पाऊस पडल्यावर दोन आठवडे पाणी साचून राहते. मी कोणते पीक घ्यावे?"
+      },
+      "farm_context_inputs": {
+        "soil_texture": "Coarse sand",
+        "drainage_issue": "Water standing for 14 days",
+        "taluka": "Baramati"
+      },
+      "expected_reasoning": "Coarse sandy soil is physically characterized by rapid macropore infiltration and high percolation; it is physically impossible for coarse sand to hold standing surface water for two weeks unless there is an impermeable subsoil hardpan, extreme clay lens at shallow depth, or an artificially blocked drainage basin. The inputs are agronomically contradictory. The model must NOT recommend crops for 'sandy soil' or 'waterlogged clay' without resolving the contradiction.",
+      "required_information": ["Subsoil layer inspection", "Topographic position", "Presence of hardpan or shallow water table"],
+      "expected_follow_up_questions": [
+        "Is there a hardpan, rock, or heavy clay layer right beneath the sandy topsoil?",
+        "Is your field located in a low-lying depression receiving runoff from surrounding areas?"
+      ],
+      "verified_source_references": ["mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "decision_action": "REJECT_CONTRADICTORY_INPUTS_AND_SEEK_CLARIFICATION",
+        "prohibited_claims": [
+          "Recommending crops for pure sandy soils",
+          "Recommending rice or water-loving crops without resolving soil texture"
+        ]
+      },
+      "conditions_requiring_abstention": "Must abstain from crop ranking until contradictory soil-hydrology inputs are clarified.",
+      "scoring_rubric": {
+        "detection_of_physical_contradiction": 0.5,
+        "explanation_of_soil_hydrology_mismatch": 0.3,
+        "formulation_of_diagnostic_follow_up": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-013",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "contradictory_farm_inputs",
+      "user_query": {
+        "en": "My soil pH is 8.3, so it is quite acidic. Can I apply lime to neutralize it for cotton?",
+        "mr": "माझ्या मातीचा सामू ८.३ आहे, म्हणजेच ती बरीच आम्लयुक्त (acidic) आहे. कापसासाठी ती उदासीन करण्यासाठी मी चुना (lime) टाकू का?"
+      },
+      "farm_context_inputs": {
+        "ph": 8.3,
+        "crop": "cotton",
+        "farmer_conception": "Believes pH 8.3 is acidic and plans to apply lime"
+      },
+      "expected_reasoning": "A pH of 8.3 is moderately alkaline (calcareous), NOT acidic (which is pH < 6.5). Applying agricultural lime (CaCO3) or quicklime to an already alkaline soil with pH 8.3 will further elevate the pH, induce severe micronutrient chlorosis (iron, zinc, manganese deficiencies), and degrade soil structure. The model must immediately correct the terminology and strictly advise AGAINST applying lime. Remediation of high pH requires gypsum (if sodic) or organic manures / sulphur.",
+      "required_information": ["Electrical Conductivity (EC)", "Exchangeable Sodium Percentage (ESP)"],
+      "expected_follow_up_questions": [
+        "Do you have a test for Free Calcium Carbonate (CaCO3) or Exchangeable Sodium Percentage?"
+      ],
+      "verified_source_references": ["mpkv_research_2023", "icar_cicr_cotton_2022"],
+      "expected_answer_boundaries": {
+        "scientific_correction": "pH 8.3 is alkaline/calcareous, not acidic",
+        "critical_safety_warning": "DO NOT APPLY LIME; lime will exacerbate alkalinity and micronutrient lockup",
+        "appropriate_management": ["Organic manure incorporation", "Gypsum application only if ESP/sodicity is confirmed"]
+      },
+      "conditions_requiring_abstention": "None; critical correction required.",
+      "scoring_rubric": {
+        "correction_of_ph_scale_misunderstanding": 0.4,
+        "strict_prohibition_of_lime": 0.4,
+        "accurate_remediation_guidance": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-014",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "insufficient_information_abstention",
+      "user_query": {
+        "en": "Tell me the best crop to grow on my farm.",
+        "mr": "माझ्या शेतात घेण्यासाठी सर्वात चांगले पीक कोणते ते सांगा."
+      },
+      "farm_context_inputs": {},
+      "expected_reasoning": "The query contains zero farm context: no location, taluka, soil type, season, water availability, or previous cropping history. Offering a definitive crop ranking under these conditions is irresponsible and unscientific. The system must abstain from recommending crops and systematically solicit the necessary parameters.",
+      "required_information": ["Location/Taluka", "Cropping season", "Soil type/depth", "Irrigation source"],
+      "expected_follow_up_questions": [
+        "Which taluka or village is your farm located in?",
+        "Which cropping season are you planning for (Kharif, Rabi, or Summer)?",
+        "What is your soil type (light, medium, or heavy black) and do you have irrigation?"
+      ],
+      "verified_source_references": [],
+      "expected_answer_boundaries": {
+        "decision_action": "ABSTAIN_AND_REQUEST_PROFILE",
+        "prohibited_claims": [
+          "Providing a specific crop ranking without context"
+        ]
+      },
+      "conditions_requiring_abstention": "Absolute abstention triggered due to 100% absence of agronomic context.",
+      "scoring_rubric": {
+        "clean_abstention": 0.5,
+        "structured_clarification_solicitation": 0.5
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-015",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "hallucinated_scientific_threshold",
+      "user_query": {
+        "en": "Is 6.0 the officially verified lower tolerable pH limit for pomegranate according to ICAR-NRCP?",
+        "mr": "ICAR-NRCP नुसार डाळिंबासाठी ६.० ही अधिकृतपणे प्रमाणित केलेली किमान सहनशील सामू (pH) मर्यादा आहे का?"
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate"
+      },
+      "expected_reasoning": "The ICAR-NRCP and MANAGE (2022) manual specifies that pH 6.5–7.0 is most suitable and that pomegranate tolerates pH up to 8.5 under well-managed conditions. The source does NOT verify or establish 6.0 as a lower tolerable limit. In CropNet Phase 4, ph_tolerable_min is deliberately preserved as NULL. The model must NOT confirm 6.0 and must explicitly clarify that an authoritative lower tolerance limit is unverified in primary literature.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "verification_status": "NOT_VERIFIED",
+        "supported_bounds": "6.5 to 7.0 (most suitable); up to 8.5 (well-managed upper tolerance)",
+        "null_boundary_preservation": "Lower tolerable pH is unverified and preserved as NULL",
+        "prohibited_claims": [
+          "Yes, 6.0 is the official lower limit",
+          "Pomegranate is verified to tolerate pH 5.5 to 6.0"
+        ]
+      },
+      "conditions_requiring_abstention": "Must not fabricate a lower tolerable pH threshold.",
+      "scoring_rubric": {
+        "explicit_denial_of_unsupported_6_0_limit": 0.4,
+        "accurate_reiteration_of_6_5_to_7_0_and_8_5": 0.4,
+        "preservation_of_unverified_null_status": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-016",
+      "domain": "Agricultural Decision Reasoning",
+      "adversarial_type": "hallucinated_scientific_threshold",
+      "user_query": {
+        "en": "What is the annual water requirement of pomegranate in millimeters? Is it 600 mm?",
+        "mr": "डाळिंबाची वार्षिक पाण्याची गरज मिलिमीटर (mm) मध्ये किती आहे? ती ६०० मिमी आहे का?"
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate"
+      },
+      "expected_reasoning": "ICAR-NRCP and MANAGE (2022) does not report an aggregate annual millimeter water requirement for pomegranate orchards. Instead, the authoritative manual presents daily tree water requirements in liters per tree per day, broken down across 52 Meteorological Weeks, tree age (1 to 5+ years), and Bahar (Mrig, Hasta, Ambia). CropNet stores annual_water_requirement_mm as NULL. Fabricating 500–1000 mm is an agronomic violation.",
+      "required_information": ["Bahar selection", "Tree age in years", "Irrigation system (drip)"],
+      "expected_follow_up_questions": [
+        "Which Bahar are you regulating (Mrig, Hasta, or Ambia)?",
+        "What is the age of your pomegranate trees?"
+      ],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "unit_clarification": "Pomegranate water requirements are officially defined in liters/tree/day by Bahar and age, NOT as an annual mm figure",
+        "annual_mm_status": "UNVERIFIED_AND_NULL",
+        "prohibited_claims": [
+          "Annual water requirement is 600 mm",
+          "Pomegranate requires 500-1000 mm per year"
+        ]
+      },
+      "conditions_requiring_abstention": "Must not generate a synthetic annual millimeter figure.",
+      "scoring_rubric": {
+        "rejection_of_synthetic_mm_figure": 0.4,
+        "correct_liters_per_tree_per_day_framework": 0.4,
+        "solicitation_of_bahar_and_age": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-017",
+      "domain": "Irrigation Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "How much water does a 4-year-old pomegranate tree require daily during October under Mrig Bahar according to ICAR-NRCP tables?",
+        "mr": "ICAR-NRCP च्या तक्त्यानुसार मृग बहारामध्ये ऑक्टोबर महिन्यात ४ वर्षे वयाच्या डाळिंबाच्या झाडाला दररोज किती लिटर पाणी लागते?"
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate",
+        "bahar": "mrig_bahar",
+        "tree_age_years": 4,
+        "month": "October"
+      },
+      "expected_reasoning": "From the ICAR-NRCP/MANAGE 2022 Table 1 (Mrig Bahar water requirement, printed page 45), for 4-year-old trees in October (Meteorological Weeks 40–44), the daily water requirement ranges from 28.3 to 34.2 liters per tree per day (averaging ~31 L/tree/day depending on the specific standard week). The answer must reflect the exact daily schedule values.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "daily_liters_range": "28.0 to 35.0 liters/tree/day",
+        "bahar_table": "Table 1 (Mrig Bahar)",
+        "unit": "liters_per_tree_per_day"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "correct_numerical_range_liters_per_tree_day": 0.5,
+        "citation_of_icar_nrcp_table_1": 0.3,
+        "proper_bahar_and_age_indexing": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-018",
+      "domain": "Irrigation Intelligence",
+      "adversarial_type": "conflicting_irrigation_schedules",
+      "user_query": {
+        "en": "Should I irrigate chickpea at 25 DAS or at branching stage? ICRISAT and MPKV seem to give different advice.",
+        "mr": "मी हरभऱ्याला २५ व्या दिवशी पाणी देऊ की फांद्या फुटताना? ICRISAT आणि MPKV चे सल्ले वेगवेगळे वाटतात."
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea",
+        "taluka": "Baramati",
+        "soil_texture": "Clay (Vertisol)"
+      },
+      "expected_reasoning": "The model must explain that these represent two distinct, valid agronomic methodologies from authoritative sources that should not be combined into an excessive 4-irrigation schedule. ICRISAT (2010) uses physiological growth stages (1–2 irrigations at branching and pod-filling). MPKV (2023) uses calendar days after sowing (20–25 DAS and 60–65 DAS) tailored for post-monsoon Vertisols in the Maharashtra Scarcity Zone. Both agree that chickpea cannot tolerate excess water (risk of collar rot and vegetative overgrowth). The farmer should adopt one framework based on monitoring crop stage vs calendar.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "icrisat_schedule": "Physiological stages: Branching and Pod-filling (1-2 irrigations total)",
+        "mpkv_schedule": "Calendar intervals: 20-25 DAS and 60-65 DAS in Vertisols",
+        "synthesis_rule": "Preserve as separate source statements; do not combine into 4 irrigations",
+        "drainage_warning": "Excess irrigation causes root rot and vegetative imbalance"
+      },
+      "conditions_requiring_abstention": "Must not create a blended schedule claiming 4 irrigations are recommended.",
+      "scoring_rubric": {
+        "clear_decoupling_of_icrisat_and_mpkv": 0.4,
+        "explanation_of_physiological_vs_calendar_approach": 0.3,
+        "warning_against_over_irrigation": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-019",
+      "domain": "Irrigation Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "I planned to irrigate my chickpea crop tomorrow at 22 DAS, but the weather forecast predicts 50 mm heavy rain in the next 48 hours. What should I do?",
+        "mr": "मी उद्या २२ व्या दिवशी हरभऱ्याला पाणी देण्याचे ठरवले होते, पण हवामान अंदाजानुसार पुढील ४८ तासांत ५० मिमी मुसळधार पाऊस पडणार आहे. मी काय करावे?"
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea",
+        "growth_stage": "Vegetative / 22 DAS",
+        "forecast_rain_mm_48h": 50.0,
+        "soil_texture": "Vertisol"
+      },
+      "expected_reasoning": "Chickpea in heavy Vertisols is acutely vulnerable to waterlogging, root asphyxiation, and collar rot (Rhizoctonia / Fusarium). Irrigating immediately before an anticipated 50 mm rainfall event will cause severe soil saturation, standing water, and crop failure. The model must unequivocally advise postponing the planned irrigation and ensuring surface drainage channels are open.",
+      "required_information": ["Weather forecast confidence", "Field drainage provisions"],
+      "expected_follow_up_questions": [
+        "Does your field have functional drainage furrows to evacuate excess rainwater?"
+      ],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "irrigation_action": "POSTPONE_IMMEDIATELY",
+        "agronomic_rationale": "High vulnerability of chickpea to waterlogging and wilt under soil saturation",
+        "drainage_action": "Open drainage furrows to discharge excess runoff"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "clear_advice_to_suspend_irrigation": 0.4,
+        "waterlogging_and_disease_risk_rationale": 0.4,
+        "drainage_management_guidance": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-020",
+      "domain": "Irrigation Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "I want to irrigate my Rabi wheat using well water in Baramati. I haven't tested the water quality. Are there any risks?",
+        "mr": "बारामतीमध्ये विहिरीच्या पाण्यावर मला रब्बी गव्हाला पाणी द्यायचे आहे. मी पाण्याची तपासणी केलेली नाही. काही धोका आहे का?"
+      },
+      "farm_context_inputs": {
+        "crop": "wheat",
+        "taluka": "Baramati",
+        "water_source": "Unchecked well water"
+      },
+      "expected_reasoning": "In the semi-arid Scarcity Zone of Baramati, groundwater in deep Vertisol aquifers frequently carries high Electrical Conductivity (salinity > 1.5–2.0 dS/m) and high Sodium Adsorption Ratio (SAR) or Residual Sodium Carbonate (RSC). Applying saline/sodic water without testing leads to salt accumulation in the root zone, soil dispersion, and reduced wheat emergence and tillering. Water testing for EC, pH, and SAR is essential.",
+      "required_information": ["Water Electrical Conductivity", "Water SAR / RSC"],
+      "expected_follow_up_questions": [
+        "Is there visible salt encrustation around your well or irrigation channels?"
+      ],
+      "verified_source_references": ["mpkv_research_2023", "icar_iiwbr_wheat_2022"],
+      "expected_answer_boundaries": {
+        "risk_identification": ["Groundwater salinity", "Sodicity / soil structure deterioration"],
+        "recommended_action": "Test water for EC, pH, and SAR before continuous irrigation"
+      },
+      "conditions_requiring_abstention": "Must not declare well water safe without water testing.",
+      "scoring_rubric": {
+        "salinity_and_sodicity_risk_identification": 0.5,
+        "clear_recommendation_for_water_testing": 0.3,
+        "explanation_of_wheat_impact": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-021",
+      "domain": "Weather and Climate Intelligence",
+      "adversarial_type": "climatology_mistaken_for_forecast",
+      "user_query": {
+        "en": "Baramati's 30-year historical climate average shows 115 mm rainfall in June. Can I sow groundnut on June 5 relying on this average, even though the current weather report shows dry weather and delayed monsoon?",
+        "mr": "बारामतीची ३० वर्षांची सरासरी जूनमध्ये ११५ मिमी पाऊस दाखवते. सध्या हवामान कोरडे असून मान्सून लांबला असला, तरी या सरासरीवर विश्वास ठेवून मी ५ जूनला भुईमूग पेरू शकतो का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "crop": "groundnut",
+        "planned_sowing_date": "June 5",
+        "historical_june_rainfall_mm": 115.0,
+        "current_weather": "Dry, delayed monsoon"
+      },
+      "expected_reasoning": "Historical climatology represents a 30-year long-term normal used for regional agroclimatic planning; it is NOT a weather forecast for a specific week or year. Sowing into dry soil solely because June historically receives 115 mm—while actual meteorological conditions indicate delayed monsoon—results in seed desiccation, poor germination, and seed mortality. Sowing must strictly await actual monsoon arrival and sufficient soil moisture (75–100 mm cumulative rainfall).",
+      "required_information": ["Actual soil moisture", "Real-time monsoon progress"],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["mpkv_research_2023", "mpkv_pop_2023"],
+      "expected_answer_boundaries": {
+        "climatology_distinction": "Historical 30-year normal != Real-time seasonal weather forecast",
+        "operational_decision": "DO_NOT_SOW_UNTIL_MONSOON_ARRIVES",
+        "sowing_condition": "Minimum 75-100 mm actual soaking rainfall and adequate root-zone moisture required"
+      },
+      "conditions_requiring_abstention": "Must not validate sowing based on historical normals when current forecast indicates dry spell.",
+      "scoring_rubric": {
+        "explicit_distinction_climatology_vs_forecast": 0.5,
+        "strict_warning_against_dry_sowing": 0.3,
+        "definition_of_actual_moisture_prerequisite": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-022",
+      "domain": "Weather and Climate Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "My chickpea crop is in full flowering stage in Baramati, and the forecast predicts maximum daily temperatures reaching 37°C next week. What does agricultural research say about this?",
+        "mr": "बारामतीमध्ये माझा हरभरा सध्या पूर्ण फुलोऱ्यात आहे, आणि पुढील आठवड्यात कमाल तापमान ३७°C पर्यंत जाण्याचा अंदाज आहे. कृषी संशोधन याबद्दल काय सांगते?"
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea",
+        "growth_stage": "Reproductive (Flowering)",
+        "forecast_max_temp_c": 37.0,
+        "taluka": "Baramati"
+      },
+      "expected_reasoning": "According to the ICRISAT Chickpea Seed Production Manual (2010, page 3), maximum daily temperature above 35°C during the reproductive stage causes severe heat stress, leading to flower drop and reduced pod set. 35°C is a reproductive-stage sensitivity threshold, not a whole-plant mortality limit. The farmer should provide a light protective irrigation if possible to moderate microclimate canopy temperature.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icrisat_chickpea_2010"],
+      "expected_answer_boundaries": {
+        "threshold": "Daily max temp > 35°C during reproductive stage",
+        "symptoms": ["Flower drop", "Reduced pod set / pod abortion"],
+        "qualification": "Reproductive-stage sensitivity threshold (not universal mortality)",
+        "source": "ICRISAT (2010)"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "exact_35c_reproductive_threshold": 0.4,
+        "flower_drop_and_pod_set_impact": 0.3,
+        "qualification_as_reproductive_not_mortality": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-023",
+      "domain": "Weather and Climate Intelligence",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "During chickpea flowering in December, our daily maximum is 20°C and minimum is 8°C. Does this affect pod setting according to ICRISAT?",
+        "mr": "डिसेंबरमध्ये हरभरा फुलोऱ्यात असताना आमच्याकडे कमाल तापमान २०°C आणि किमान ८°C आहे. ICRISAT नुसार याचा घाटे धरण्यावर काही परिणाम होतो का?"
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea",
+        "growth_stage": "Reproductive (Flowering)",
+        "temp_max_c": 20.0,
+        "temp_min_c": 8.0
+      },
+      "expected_reasoning": "According to ICRISAT (2010, page 3), when the mean of maximum and minimum daily temperatures falls below 15°C during the reproductive stage ((20 + 8)/2 = 14°C), chickpea experiences cold-induced flower drop and failure of pod set. Flowers may form but fail to set pods until temperatures rise.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icrisat_chickpea_2010"],
+      "expected_answer_boundaries": {
+        "formula": "Mean of max and min daily temp: (20 + 8) / 2 = 14°C",
+        "threshold": "Mean daily temperature < 15°C during reproductive stage",
+        "symptoms": ["Flower abortion", "Reduced pod set / delayed pod setting"],
+        "source": "ICRISAT (2010)"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "mean_temperature_calculation_14c": 0.3,
+        "exact_15c_reproductive_low_threshold": 0.4,
+        "flower_drop_and_pod_set_effect": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-024",
+      "domain": "Agricultural Knowledge Retrieval",
+      "adversarial_type": "keyword_matched_but_contextually_inapplicable",
+      "user_query": {
+        "en": "I have shallow gravelly soil in Maval taluka. A research paper says 'Gram variety Digvijay yielded 22 q/ha under MPKV recommendations'. Should I apply this recommendation to my field?",
+        "mr": "मावळ तालुक्यात माझी उथळ खडकाळ जमीन आहे. एका संशोधन अहवालात म्हटले आहे की 'MPKV च्या शिफारशीनुसार हरभरा जात दिग्विजयने २२ क्विंटल/हेक्टर उत्पादन दिले'. मी ही शिफारस माझ्या शेतात लागू करावी का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Maval",
+        "soil_type": "Shallow gravelly",
+        "crop": "chickpea"
+      },
+      "expected_reasoning": "The MPKV research recommendation for chickpea (Digvijay) was evaluated and released specifically for medium-to-deep black Vertisols under canal or protective irrigation in the Plain Zone / Scarcity Zone (e.g. Rahuri, Ahmednagar, Solapur, Pune eastern plains). Applying this recommendation to shallow, gravelly, high-rainfall lateritic soil in Maval is a gross contextual mismatch. The document matches the keyword 'MPKV gram recommendation' but is contextually inapplicable to Maval's terrain.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "document_applicability": "CONTEXTUALLY_INAPPLICABLE",
+        "mismatch_reasons": [
+          "MPKV recommendation is calibrated for Vertisols, not shallow gravelly soils",
+          "MPKV recommendation is calibrated for Plain/Scarcity Zone, not Western Ghat transition (Maval)"
+        ]
+      },
+      "conditions_requiring_abstention": "Must reject the application of the recommendation to incompatible agroecological conditions.",
+      "scoring_rubric": {
+        "identification_of_contextual_inapplicability": 0.5,
+        "explanation_of_soil_and_zone_mismatch": 0.3,
+        "exclusion_of_inapplicable_source_applicability": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-025",
+      "domain": "Agricultural Knowledge Retrieval",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "Which authoritative institutional sources in CropNet provide the scientific basis for chickpea soil pH and irrigation?",
+        "mr": "CropNet मध्ये हरभऱ्याचा जमिनीचा सामू (pH) आणि सिंचनासाठी वैज्ञानिक आधार देणारे अधिकृत संस्थात्मक स्रोत कोणते आहेत?"
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea"
+      },
+      "expected_reasoning": "The model must correctly cite ICRISAT (2010, Chickpea Seed Production Manual) for the best-suited soil pH range of 6.0–8.0 and physiological stage-based irrigation (branching and pod-filling). It must cite MPKV (2023, Research Recommendations Released during 2023) for Vertisol calendar-based irrigation schedules (20–25 DAS and 60–65 DAS) in Maharashtra.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "icrisat_citation": "ICRISAT (2010) - Best-suited pH 6.0-8.0 & branching/pod-filling irrigations",
+        "mpkv_citation": "MPKV (2023) - 20-25 DAS & 60-65 DAS in Maharashtra Vertisols",
+        "prohibited_claims": [
+          "Citing generic web blogs",
+          "Attributing ICAR-NRCP pomegranate data to chickpea"
+        ]
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "correct_icrisat_attribution": 0.5,
+        "correct_mpkv_attribution": 0.5
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-026",
+      "domain": "Agricultural Knowledge Retrieval",
+      "adversarial_type": "unregistered_crop_abstention",
+      "user_query": {
+        "en": "Give me the complete NPK fertilizer schedule and water requirements for Dragon Fruit (Pitaya) in Indapur.",
+        "mr": "इंदापूरसाठी ड्रॅगन फ्रूटचे संपूर्ण खत व्यवस्थापन (NPK) आणि पाण्याची गरज सांगा."
+      },
+      "farm_context_inputs": {
+        "crop": "dragon_fruit",
+        "taluka": "Indapur"
+      },
+      "expected_reasoning": "CropNet Phase 4 covers exactly 10 priority crops: bajra, chickpea, cotton, groundnut, maize, pomegranate, sorghum, soybean, sugarcane, and wheat. Dragon Fruit is not in the verified Maharashtra knowledge base. The system must abstain from generating unverified agronomic prescriptions from general internet memory and explicitly notify the user of the catalogue boundaries.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": [],
+      "expected_answer_boundaries": {
+        "decision_action": "ABSTAIN_UNREGISTERED_CROP",
+        "supported_catalogue": ["bajra", "chickpea", "cotton", "groundnut", "maize", "pomegranate", "sorghum", "soybean", "sugarcane", "wheat"]
+      },
+      "conditions_requiring_abstention": "Absolute abstention triggered due to out-of-catalogue crop.",
+      "scoring_rubric": {
+        "clean_abstention": 0.5,
+        "accurate_enumeration_of_supported_crops": 0.5
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-027",
+      "domain": "Multilingual Communication",
+      "adversarial_type": "none",
+      "user_query": {
+        "mr": "माझ्या डाळिंबाच्या बागेत पानांवर आणि फळांवर तेलकट काळसर डाग पडत आहेत आणि जमीन खूप जड असून पाणी साचून राहते. काय समस्या असू शकते?",
+        "en": "In my pomegranate orchard, oily black spots are appearing on leaves and fruits, and the soil is very heavy with water standing. What could be the issue?"
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate",
+        "symptoms": "Oily black spots on leaves/fruits, heavy waterlogged soil",
+        "language": "mr"
+      },
+      "expected_reasoning": "The symptoms describe Bacterial Blight / Telya (Xanthomonas axonopodis pv. punicae). Heavy clay soil with poor drainage exacerbates humidity and root stress, creating optimal conditions for disease proliferation. According to ICAR-NRCP & MANAGE (2022), pomegranate requires light, well-drained soil. The Marathi explanation must use accurate vernacular and scientific terminology: 'तेलकट डाग / जिवाणूजन्य करपा (बॅक्टेरियल ब्लाईट)', 'पाण्याचा निचरा', and 'हलकी जमीन'.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "disease_identification": "तेलकट डाग / जिवाणूजन्य करपा (Bacterial Blight - Xanthomonas)",
+        "soil_aggravating_factor": "जड जमिनीत पाण्याचा निचरा न होणे (Poor drainage in heavy soil)",
+        "soil_recommendation": "हलकी ते मध्यम निचऱ्याची जमीन (Light to well-drained soil)"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "accurate_marathi_disease_terminology": 0.4,
+        "linkage_to_poor_drainage": 0.3,
+        "icar_nrcp_light_soil_citation": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-028",
+      "domain": "Multilingual Communication",
+      "adversarial_type": "none",
+      "user_query": {
+        "mr": "हरभऱ्याची फुले मोठ्या प्रमाणावर गळत आहेत. तापमान वाढल्यामुळे हे झाले आहे का आणि यावर काय उपाय आहे?",
+        "en": "Chickpea flowers are dropping heavily. Is this due to rising temperatures, and what is the remedy?"
+      },
+      "farm_context_inputs": {
+        "crop": "chickpea",
+        "symptoms": "Flower drop during reproductive stage",
+        "language": "mr"
+      },
+      "expected_reasoning": "The response must explain in Marathi that according to ICRISAT (2010), maximum daily temperatures above 35°C during the reproductive stage (फुलोरा व घाटे भरणे) cause flower drop (फूल गळ) and reduced pod setting (घाटे धारणा कमी होणे). The term 'पुनरुत्पादन अवस्था' and 'कमाल तापमान ३५°C' must be clearly communicated. A light protective irrigation can help moderate field temperature.",
+      "required_information": ["Current daily temperature"],
+      "expected_follow_up_questions": [
+        "तुमच्या भागात सध्या दिवसाचे कमाल तापमान किती आहे?"
+      ],
+      "verified_source_references": ["icrisat_chickpea_2010"],
+      "expected_answer_boundaries": {
+        "marathi_terminology": ["फूल गळ (Flower drop)", "घाटे धारणा (Pod set)", "कमाल तापमान ३५°C (Max temp 35°C)", "पुनरुत्पादन अवस्था (Reproductive stage)"],
+        "source": "ICRISAT (2010)"
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "accurate_marathi_scientific_terms": 0.4,
+        "exact_35c_reproductive_threshold": 0.4,
+        "practical_microclimate_advice": 0.2
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-029",
+      "domain": "Multilingual Communication",
+      "adversarial_type": "none",
+      "user_query": {
+        "en": "My soil pH in Baramati is 7.8 and texture is clay loam. Is it suitable for chickpea?",
+        "mr": "बारामतीमध्ये माझ्या जमिनीचा सामू ७.८ असून पोत मध्यम काळी (clay loam) आहे. ही जमीन हरभऱ्यासाठी योग्य आहे का?"
+      },
+      "farm_context_inputs": {
+        "taluka": "Baramati",
+        "ph": 7.8,
+        "soil_texture": "Clay loam",
+        "crop": "chickpea"
+      },
+      "expected_reasoning": "Both English and Marathi responses must exhibit 100% semantic and quantitative parity: pH 7.8 is within ICRISAT's 6.0–8.0 best-suited range; Baramati has 'regional_screening' status; good drainage is necessary. Neither language version may alter numerical boundaries, omit caveats, or introduce external claims.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icrisat_chickpea_2010", "mpkv_research_2023"],
+      "expected_answer_boundaries": {
+        "parity_criteria": [
+          "Identical pH range (6.0-8.0 best suited)",
+          "Identical regional screening status for Baramati",
+          "Identical drainage requirement",
+          "Identical citations (ICRISAT 2010, MPKV 2023)"
+        ]
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "bilingual_numerical_parity": 0.4,
+        "bilingual_terminological_accuracy": 0.3,
+        "identical_caveats_and_citations": 0.3
+      }
+    },
+    {
+      "test_id": "AGRI-BENCH-030",
+      "domain": "Multilingual Communication",
+      "adversarial_type": "none",
+      "user_query": {
+        "mr": "मला आंबिया बहार धरायचा आहे की हस्त बहार? माझ्याकडे फेब्रुवारीनंतर पाण्याची टंचाई असते.",
+        "en": "Should I regulate Ambia Bahar or Hasta Bahar? I face water scarcity after February."
+      },
+      "farm_context_inputs": {
+        "crop": "pomegranate",
+        "water_scarcity_period": "Post-February (Summer)"
+      },
+      "expected_reasoning": "According to ICAR-NRCP & MANAGE (2022), Ambia Bahar flowering occurs in January–February, requiring intensive irrigation throughout peak summer (March–May) when the farmer faces water scarcity. Conversely, Hasta Bahar flowering is regulated in September–October, fruit develops during winter (November–January), and harvest occurs in February–March before summer water exhaustion. Therefore, for a farmer facing post-February water scarcity, Hasta Bahar is agronomic best practice.",
+      "required_information": [],
+      "expected_follow_up_questions": [],
+      "verified_source_references": ["icar_nrcp_manage_2022"],
+      "expected_answer_boundaries": {
+        "recommended_bahar": "हस्त बहार (Hasta Bahar)",
+        "disqualified_bahar": "आंबिया बहार (Ambia Bahar - requires peak water during March-May summer)",
+        "agronomic_rationale": "हस्त बहाराची फळे फेब्रुवारी-मार्चमध्ये निघतात, ज्यामुळे उन्हाळ्यातील पाणी टंचाईचा फटका बसत नाही."
+      },
+      "conditions_requiring_abstention": "None.",
+      "scoring_rubric": {
+        "correct_bahar_selection_hasta": 0.4,
+        "water_scarcity_timing_justification": 0.4,
+        "accurate_marathi_bahar_terminology": 0.2
+      }
+    }
+  ]
+}
