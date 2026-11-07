@@ -10,6 +10,7 @@ from cropnet.services.api.app.schemas.soil import UnifiedSoilProfile, SoilAnalys
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
+from cropnet.services.api.app.models.weather import FarmWeatherSnapshotModel, FarmClimateSummaryModel
 from cropnet.services.api.app.services.spatial_extractor import (
     calculate_polygon_area,
     SpatialSoilService
@@ -385,10 +386,17 @@ async def delete_farm(
 
     if db_farm:
         try:
+            farm_id_str = str(farm_id)
+            db.query(FarmWeatherSnapshotModel).filter(FarmWeatherSnapshotModel.farm_id == farm_id_str).delete(synchronize_session=False)
+            db.query(FarmClimateSummaryModel).filter(FarmClimateSummaryModel.farm_id == farm_id_str).delete(synchronize_session=False)
             db.delete(db_farm)
             db.commit()
-        except Exception:
+        except Exception as e:
             db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete farm from database: {str(e)}"
+            )
 
     if farm_id in _FARM_STORAGE:
         del _FARM_STORAGE[farm_id]
