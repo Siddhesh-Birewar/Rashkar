@@ -48,7 +48,7 @@ class WaterAvailabilityEvaluator:
         tier = EvidenceGate.get_tier(profile.water.source_id if profile.water else primary_src_id)
 
         # -------------------------------------------------------------
-        # 1. Sugarcane Hydrological & Seasonal Water Constraint
+        # 1. Sugarcane Hydrological & Seasonal Water Constraint (Phase 5.1.3 Hardened)
         # -------------------------------------------------------------
         if crop_id == "sugarcane":
             capacity = (ctx.irrigation_capacity or "").lower()
@@ -56,79 +56,60 @@ class WaterAvailabilityEvaluator:
             query_lower = (ctx.user_query or "").lower()
 
             if ctx.irrigation_available is False:
-                # Verified hard constraint: sugarcane cannot be grown rainfed in semi-arid Maharashtra
-                res.is_disqualified = True
+                # Phase 5.1.3: Downgraded to CONDITIONAL_CONSTRAINT.
+                # MPKV Research 2023 Rec. 3 recommends drip irrigation for yield, but does not prove
+                # that rainfed sugarcane is universally disqualified across every microclimate or high-rainfall zone.
+                res.is_disqualified = False
                 msg = (
-                    "Hydrological disqualification: Sugarcane requires assured perennial water throughout its 12–18 month duration. "
-                    "Annual rainfall in semi-arid Maharashtra is insufficient to sustain commercial sugarcane without irrigation. "
-                    "Rainfed sugarcane without irrigation is completely unfeasible."
+                    "Hydrological advisory: Sugarcane requires 1500–2500 mm of water throughout its 12–18 month duration "
+                    "(MPKV PoP 2023 / ICAR-IISR 2022). Rainfed cultivation in semi-arid Maharashtra carries severe moisture stress "
+                    "risks and substantial yield reduction without supplemental irrigation, though microclimates with high rainfall (> 1500 mm) "
+                    "or deep Vertisols with high moisture retention can sustain biomass. Assured supplemental irrigation is strongly advised."
                 )
-                res.limiting_factors.append(msg)
+                res.warnings.append(msg)
+                res.limiting_factors.append(
+                    "High water requirement (1500–2500 mm) without assured irrigation carries high risk of moisture stress and yield loss."
+                )
+                res.missing_parameters.append("supplemental_irrigation_plan")
                 res.applied_rules.append(AppliedRuleRecord(
                     rule_id="RULE_SUGARCANE_RAINFED_DISQUALIFICATION",
                     domain="Irrigation Intelligence",
                     parameter_checked="irrigation_available",
-                    rule_statement="Sugarcane cannot be cultivated rainfed without irrigation in semi-arid Maharashtra",
+                    rule_statement="Sugarcane has high water demand (1500–2500 mm); rainfed cultivation carries severe moisture stress risk without supplemental irrigation",
                     condition_met=False,
-                    evidence_tier=EvidenceTier.VERIFIED,
+                    evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
                     citation=citation,
-                    claim_verification_status="VERIFIED",
+                    claim_verification_status="CONDITIONALLY_SUPPORTED",
                     source_id="mpkv_research_2023",
                     document_title="MPKV Research Recommendations 2023",
                     section_or_pages="Rec. 3",
-                    supporting_statement="Sugarcane requires assured perennial micro-irrigation or canal irrigation; cannot be grown rainfed.",
+                    supporting_statement="Recommends drip micro-irrigation for Suru sugarcane with trash mulching for higher cane and sugar yield.",
                     applicability_conditions="irrigation_available is False",
-                    enforcement_level=EnforcementLevel.VERIFIED_HARD_CONSTRAINT,
-                    can_trigger_disqualification=True
+                    enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                    can_trigger_disqualification=False
                 ))
-            elif ("dry_by_february" in capacity or "seasonal" in capacity or "february" in source) and (
-                "only one" in query_lower or "फक्त एक" in query_lower or "runs dry" in query_lower or "आटते" in query_lower or "no alternative" in query_lower or capacity == "seasonal_dry_by_february"
-            ):
-                # When actual farm water capacity is verified exhausted before summer tillering (March–May) with no alternative
-                res.is_disqualified = True
-                msg = (
-                    "Hydrological disqualification: Sugarcane requires assured perennial irrigation throughout its 12–18 month duration "
-                    "(2000–3000 mm under furrow, or 1000–1500 mm under drip per MPKV PoP 2023 & MPKV Research 2023 Rec. 3). "
-                    "A seasonal water source exhausted by February coincides with the critical summer tillering "
-                    "and stem elongation phase (March–May), causing acute moisture stress, desiccation, and complete crop loss (MPKV PoP 2023). "
-                    "Sugarcane cannot be sustained without perennial irrigation."
-                )
-                res.warnings.append(msg)
-                res.limiting_factors.append(msg)
-                res.applied_rules.append(AppliedRuleRecord(
-                    rule_id="RULE_SUGARCANE_SUMMER_WATER_DEPLETION",
-                    domain="Irrigation Intelligence",
-                    parameter_checked="irrigation_capacity",
-                    rule_statement="Sugarcane requires perennial water; summer tillering (March–May) is the critical moisture stress period (MPKV PoP 2023)",
-                    condition_met=False,
-                    evidence_tier=EvidenceTier.VERIFIED,
-                    citation=citation,
-                    claim_verification_status="VERIFIED",
-                    source_id="mpkv_research_2023",
-                    document_title="MPKV Research Recommendations 2023",
-                    section_or_pages="Rec. 3",
-                    supporting_statement="Moisture stress during summer formative stage severely reduces tillering and cane yield.",
-                    applicability_conditions="actual water capacity exhausted before summer formative stage",
-                    enforcement_level=EnforcementLevel.VERIFIED_HARD_CONSTRAINT,
-                    can_trigger_disqualification=True
-                ))
-            elif "seasonal" in capacity or "february" in source or (ctx.proposed_sowing_date and "-02-" in ctx.proposed_sowing_date):
-                # Month-only or unconfirmed seasonal constraint: Do NOT automatically disqualify based only on calendar month!
-                # Return conditional water-risk outcome assessing alternative irrigation.
+            elif ("dry_by_february" in capacity or "seasonal" in capacity or "february" in source or "runs dry" in query_lower or "आटते" in query_lower or "seasonal" in source or (ctx.proposed_sowing_date and "-02-" in ctx.proposed_sowing_date)):
+                # Phase 5.1.3: Removed February hard disqualification boundary.
+                # No literature establishes February as an absolute calendar boundary.
+                # Evaluates seasonal irrigation adequacy as a conditional water-risk assessment and asks about alternative water sources.
                 res.is_disqualified = False
                 msg = (
-                    "Hydrological risk / Conditional constraint: Sugarcane requires 12–18 months of assured water. "
-                    "A seasonal water source that depletes during summer leaves the crop vulnerable during the critical "
-                    "formative stage (March–May) unless supplemental alternative irrigation (tanker, farm pond, canal rotation) is available. "
-                    "Inquire whether alternative summer irrigation is available."
+                    "Hydrological risk / Conditional constraint: Sugarcane requires assured water throughout its 12–18 month duration "
+                    "(1000–1500 mm under drip, 2000–3000 mm under furrow per MPKV PoP 2023). A seasonal water source that depletes "
+                    "before or during the summer tillering and stem elongation phase (March–May) creates acute moisture stress, "
+                    "unless supplemental alternative irrigation (e.g. farm ponds / shet tale, canal rotation turns, or tankers) is available. "
+                    "Evaluate alternative summer irrigation before proceeding."
                 )
                 res.warnings.append(msg)
+                res.limiting_factors.append(
+                    "Seasonal water depletion during summer tillering/formative stage (March–May) causes severe moisture deficit unless alternative irrigation is available."
+                )
                 res.missing_parameters.append("alternative_summer_irrigation")
                 res.applied_rules.append(AppliedRuleRecord(
                     rule_id="RULE_SUGARCANE_SUMMER_WATER_DEPLETION",
                     domain="Irrigation Intelligence",
                     parameter_checked="irrigation_capacity",
-                    rule_statement="Sugarcane requires perennial water; assess alternative summer irrigation during March–May tillering",
+                    rule_statement="Sugarcane requires perennial water; evaluate alternative summer irrigation sources (farm ponds, canal turns, tankers) during March–May tillering",
                     condition_met=False,
                     evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
                     citation=citation,
@@ -136,8 +117,8 @@ class WaterAvailabilityEvaluator:
                     source_id="mpkv_pop_2023",
                     document_title="Package of Practices for Field Crops of Western Maharashtra",
                     section_or_pages="Compendium requires physical inspection",
-                    supporting_statement="Summer moisture stress severely restricts tillering unless supplemental water is provided.",
-                    applicability_conditions="seasonal irrigation with potential alternative water",
+                    supporting_statement="Summer moisture stress severely restricts tillering and cane yield unless supplemental water is provided.",
+                    applicability_conditions="seasonal water capacity with summer moisture deficit",
                     enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
                     can_trigger_disqualification=False
                 ))

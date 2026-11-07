@@ -19,6 +19,7 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     DecisionState,
     SoilDataProvenance,
     EvidenceTier,
+    EnforcementLevel,
     FollowUpAnswerRequest
 )
 from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
@@ -88,8 +89,8 @@ def test_total_nitrogen_vs_available_nitrogen_separation():
     assert any("280 kg/ha standard" in w for w in sorghum_outcome.uncertainty_notes)
 
 
-def test_pomegranate_hard_depth_and_drainage_disqualification():
-    """Verify pomegranate disqualification under poor drainage with depth triggering pit planting advisory."""
+def test_pomegranate_drainage_and_depth_conditional_constraint():
+    """Verify pomegranate conditional constraint under poor drainage with depth triggering pit planting advisory."""
     ctx = FarmContextInput(
         taluka="Indapur",
         soil_ph=6.8, # Ideal pH
@@ -99,9 +100,12 @@ def test_pomegranate_hard_depth_and_drainage_disqualification():
     )
     res = engine.evaluate_farm(ctx)
     pom_outcome = next(o for o in res.crop_outcomes if o.crop_id == "pomegranate")
-    assert pom_outcome.is_disqualified is True
-    assert pom_outcome.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
-    assert any("Poor drainage" in f or "Waterlogging" in f for f in pom_outcome.limiting_factors)
+    # Phase 5.1.3: Pomegranate drainage downgraded to CONDITIONAL_CONSTRAINT; not auto-disqualified
+    assert pom_outcome.is_disqualified is False
+    drain_rule = next(r for r in pom_outcome.applied_rules if r.rule_id == "RULE_DRAINAGE_POMEGRANATE")
+    assert drain_rule.enforcement_level == EnforcementLevel.CONDITIONAL_CONSTRAINT
+    assert drain_rule.can_trigger_disqualification is False
+    assert any("moderate slope (3–5%)" in w or "Phytophthora" in w for w in pom_outcome.uncertainty_notes)
     assert any("pit planting" in w.lower() or "depth" in w.lower() for w in pom_outcome.uncertainty_notes)
 
 
@@ -187,8 +191,8 @@ def test_chickpea_decoupled_irrigation_and_rainfall_suspension():
     assert any("postpone" in w.lower() for w in chk_outcome.uncertainty_notes)
 
 
-def test_sugarcane_summer_water_depletion_disqualification():
-    """Verify sugarcane disqualification when well water dries by February with no alternative."""
+def test_sugarcane_summer_water_depletion_conditional_constraint():
+    """Verify sugarcane seasonal water depletion evaluated as conditional constraint requesting alternative irrigation."""
     ctx = FarmContextInput(
         taluka="Indapur",
         target_crops=["sugarcane"],
@@ -196,9 +200,13 @@ def test_sugarcane_summer_water_depletion_disqualification():
     )
     res = engine.evaluate_farm(ctx)
     cane = next(o for o in res.crop_outcomes if o.crop_id == "sugarcane")
-    assert cane.is_disqualified is True
-    assert cane.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
-    assert any("exhausted by February" in f for f in cane.limiting_factors)
+    # Phase 5.1.3: Removed February hard disqualification cutoff; evaluated as conditional water risk
+    assert cane.is_disqualified is False
+    sc_rule = next(r for r in cane.applied_rules if r.rule_id == "RULE_SUGARCANE_SUMMER_WATER_DEPLETION")
+    assert sc_rule.enforcement_level == EnforcementLevel.CONDITIONAL_CONSTRAINT
+    assert sc_rule.can_trigger_disqualification is False
+    assert "alternative_summer_irrigation" in cane.missing_information
+    assert any("March–May" in w or "summer" in w for w in cane.uncertainty_notes)
 
 
 def test_kharif_dry_sowing_rainfall_gate():
@@ -386,3 +394,89 @@ def test_phase5_1_2_negative_evidence_boundaries():
     assert len(res_unusual.crop_outcomes) > 0 # Evaluated, not rejected
     assert len(res_unusual.contradictions_detected) > 0
     assert any("Input Clarification Required" in c for c in res_unusual.contradictions_detected)
+
+
+def test_phase5_1_3_hard_constraint_authorization_boundaries():
+    """Verify Section 6 requirements for Phase 5.1.3 hard-constraint audit:
+    - Ambiguous drainage ("water drains slowly") triggers clarification, not automatic rejection.
+    - Confirmed high water table triggers chickpea constraint.
+    - Rainfed sugarcane without supporting conditions is not automatically rejected.
+    - A February calendar reference alone cannot disqualify sugarcane.
+    - Verified hard constraints remain functional where evidence supports them.
+    """
+    # 1. Ambiguous drainage ("water drains slowly") triggers clarification, not automatic rejection
+    ctx_ambiguous = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["chickpea"],
+        drainage="water drains slowly",
+        user_query="My field's water drains slowly after irrigation"
+    )
+    res_ambiguous = engine.evaluate_farm(ctx_ambiguous)
+    chk_amb = next(o for o in res_ambiguous.crop_outcomes if o.crop_id == "chickpea")
+    assert chk_amb.is_disqualified is False
+    assert "water_table_depth" in chk_amb.missing_information
+    rule_amb = next(r for r in chk_amb.applied_rules if r.rule_id == "RULE_DRAINAGE_CHICKPEA")
+    assert rule_amb.enforcement_level == EnforcementLevel.CONDITIONAL_CONSTRAINT
+    assert rule_amb.can_trigger_disqualification is False
+    assert any("slow drainage" in w.lower() or "clarification" in w.lower() for w in chk_amb.uncertainty_notes)
+
+    # 2. Confirmed high water table triggers chickpea constraint
+    ctx_hwt = FarmContextInput(
+        taluka="Baramati",
+        target_crops=["chickpea"],
+        water_table_depth="high",
+        water_table_depth_m=0.8
+    )
+    res_hwt = engine.evaluate_farm(ctx_hwt)
+    chk_hwt = next(o for o in res_hwt.crop_outcomes if o.crop_id == "chickpea")
+    assert chk_hwt.is_disqualified is True
+    assert chk_hwt.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
+    rule_hwt = next(r for r in chk_hwt.applied_rules if r.rule_id == "RULE_DRAINAGE_CHICKPEA")
+    assert rule_hwt.enforcement_level == EnforcementLevel.VERIFIED_HARD_CONSTRAINT
+    assert rule_hwt.can_trigger_disqualification is True
+    assert any("high water table" in f.lower() for f in chk_hwt.limiting_factors)
+
+    # 3. Rainfed sugarcane without supporting conditions is not automatically rejected
+    ctx_sc_rainfed = FarmContextInput(
+        taluka="Indapur",
+        target_crops=["sugarcane"],
+        irrigation_available=False
+    )
+    res_sc_rainfed = engine.evaluate_farm(ctx_sc_rainfed)
+    cane_rf = next(o for o in res_sc_rainfed.crop_outcomes if o.crop_id == "sugarcane")
+    assert cane_rf.is_disqualified is False
+    rf_rule = next(r for r in cane_rf.applied_rules if r.rule_id == "RULE_SUGARCANE_RAINFED_DISQUALIFICATION")
+    assert rf_rule.enforcement_level == EnforcementLevel.CONDITIONAL_CONSTRAINT
+    assert rf_rule.can_trigger_disqualification is False
+    assert any("1500–2500 mm" in w for w in cane_rf.uncertainty_notes)
+
+    # 4. A February calendar reference alone cannot disqualify sugarcane
+    ctx_feb = FarmContextInput(
+        taluka="Indapur",
+        target_crops=["sugarcane"],
+        proposed_sowing_date="2026-02-15",
+        user_query="Can I plant sugarcane in February?"
+    )
+    res_feb = engine.evaluate_farm(ctx_feb)
+    cane_feb = next(o for o in res_feb.crop_outcomes if o.crop_id == "sugarcane")
+    assert cane_feb.is_disqualified is False
+    feb_rule = next(r for r in cane_feb.applied_rules if r.rule_id == "RULE_SUGARCANE_SUMMER_WATER_DEPLETION")
+    assert feb_rule.enforcement_level == EnforcementLevel.CONDITIONAL_CONSTRAINT
+    assert feb_rule.can_trigger_disqualification is False
+    assert "alternative_summer_irrigation" in cane_feb.missing_information
+
+    # 5. Verified hard constraints remain functional where evidence supports them
+    # Chickpea with confirmed saline soil (EC >= 2.0 dS/m per ICRISAT 2010, p. 8)
+    ctx_saline = FarmContextInput(
+        taluka="Indapur",
+        target_crops=["chickpea"],
+        electrical_conductivity_ds_m=2.5
+    )
+    res_saline = engine.evaluate_farm(ctx_saline)
+    chk_saline = next(o for o in res_saline.crop_outcomes if o.crop_id == "chickpea")
+    assert chk_saline.is_disqualified is True
+    assert chk_saline.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
+    rule_saline = next(r for r in chk_saline.applied_rules if r.rule_id == "RULE_DRAINAGE_CHICKPEA")
+    assert rule_saline.enforcement_level == EnforcementLevel.VERIFIED_HARD_CONSTRAINT
+    assert rule_saline.can_trigger_disqualification is True
+

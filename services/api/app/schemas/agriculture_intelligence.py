@@ -72,6 +72,8 @@ class FarmContextInput(BaseModel):
     soil_texture: Optional[str] = Field(None, description="Soil texture class (e.g. Light soil, Coarse sand, Clay Loam, Vertisol)")
     soil_depth_cm: Optional[float] = Field(None, ge=0.0, le=300.0, description="Effective soil depth in centimeters")
     drainage: Optional[str] = Field(None, description="Drainage condition (e.g. Well-drained, Moderate, Poor / Waterlogged)")
+    water_table_depth: Optional[str] = Field(None, description="Water table depth category ('deep', 'moderate', 'high', 'shallow')")
+    water_table_depth_m: Optional[float] = Field(None, ge=0.0, le=100.0, description="Measured water table depth in meters")
     standing_water_days: Optional[int] = Field(None, ge=0, le=60, description="Days standing water persists after rainfall")
     electrical_conductivity_ds_m: Optional[float] = Field(None, ge=0.0, le=30.0, description="Soil EC in dS/m (1:2 extract)")
     
@@ -92,6 +94,7 @@ class FarmContextInput(BaseModel):
     irrigation_available: Optional[bool] = Field(None, description="Whether irrigation water is accessible")
     irrigation_source: Optional[str] = Field(None, description="Irrigation source (canal, well, borewell, dryland/rainfed)")
     irrigation_capacity: Optional[str] = Field(None, description="Hydrological capacity (perennial, seasonal_dry_by_february, critical_only)")
+    alternative_summer_irrigation: Optional[str] = Field(None, description="Alternative summer irrigation availability (farm_pond, canal, tanker, none)")
     irrigation_water_salinity_tested: Optional[bool] = Field(None, description="Whether irrigation water has been tested for EC/SAR")
     irrigation_water_ec_ds_m: Optional[float] = Field(None, ge=0.0, le=25.0, description="Irrigation water EC in dS/m")
 

@@ -1,6 +1,6 @@
 # CropNet AI — Phase 5.1 Benchmark Execution Report
 
-- **Execution Timestamp**: 2026-11-07T11:32:51.251909Z
+- **Execution Timestamp**: 2026-11-07T11:47:03.681528Z
 - **Total Benchmark Cases**: 30
 - **Passed Cases**: 30
 - **Failed Cases**: 0
@@ -13,12 +13,12 @@
 | Test ID | Domain | Track A (Retrieval) | Track B (Reasoning) | Status | Notes |
 |---------|--------|---------------------|---------------------|--------|-------|
 | AGRI-BENCH-001 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly separated Total N from Available N (< 280 kg/ha low flagged) |
-| AGRI-BENCH-002 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly disqualified pomegranate on poor drainage and flagged shallow depth pit planting advisory |
+| AGRI-BENCH-002 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly evaluated conditional drainage constraint and shallow depth pit planting advisory for pomegranate |
 | AGRI-BENCH-003 | Soil Intelligence | 1.00 | 1.00 | PASS | Flagged low soil organic carbon |
 | AGRI-BENCH-004 | Soil Intelligence | 1.00 | 1.00 | PASS | Correctly withheld unconditional suitability pending EC data |
 | AGRI-BENCH-005 | Soil Intelligence | 1.00 | 1.00 | PASS | Verified pomegranate soil requirements: Light soil, pH 6.5-7.0 optimum, 8.5 max |
 | AGRI-BENCH-006 | Crop Suitability | 1.00 | 1.00 | PASS | Correctly marked Maval chickpea as REQUIRES_REGIONAL_VALIDATION |
-| AGRI-BENCH-007 | Crop Suitability | 1.00 | 1.00 | PASS | Correctly disqualified sugarcane due to summer water exhaustion post-February |
+| AGRI-BENCH-007 | Crop Suitability | 1.00 | 1.00 | PASS | Correctly evaluated sugarcane summer water deficit as conditional constraint and requested alternative irrigation |
 | AGRI-BENCH-008 | Crop Suitability | 1.00 | 1.00 | PASS | Correctly treated regional screening as macro-filter, requiring soil validation |
 | AGRI-BENCH-009 | Crop Suitability | 1.00 | 1.00 | PASS | Preserved optimum June 15 - July 15 sowing window |
 | AGRI-BENCH-010 | Crop Suitability | 1.00 | 1.00 | PASS | Correctly marked Mulshi soybean as REQUIRES_REGIONAL_VALIDATION |
@@ -38,7 +38,7 @@
 | AGRI-BENCH-024 | Agricultural Knowledge Retrieval | 1.00 | 1.00 | PASS | Identified contextual inapplicability of plain Vertisol recommendations to Maval |
 | AGRI-BENCH-025 | Agricultural Knowledge Retrieval | 1.00 | 1.00 | PASS | Dual institutional citations retrieved: ICRISAT 2010 and MPKV 2023 |
 | AGRI-BENCH-026 | Agricultural Knowledge Retrieval | 1.00 | 1.00 | PASS | Strictly abstained from advice on unregistered crop (dragon_fruit) |
-| AGRI-BENCH-027 | Multilingual Communication | 1.00 | 1.00 | PASS | Accurate Marathi terminology for bacterial blight and poor drainage disqualification |
+| AGRI-BENCH-027 | Multilingual Communication | 1.00 | 1.00 | PASS | Accurate Marathi linkage of bacterial blight risk to poor drainage and ICAR-NRCP light soil citation |
 | AGRI-BENCH-028 | Multilingual Communication | 1.00 | 1.00 | PASS | Accurate Marathi terminology for reproductive heat stress (फूल गळ, घाटे धारणा) |
 | AGRI-BENCH-029 | Multilingual Communication | 1.00 | 1.00 | PASS | Cross-lingual agronomic parity: English and Marathi yield identical decision state |
 | AGRI-BENCH-030 | Multilingual Communication | 1.00 | 1.00 | PASS | Accurate Marathi recommendation of Hasta Bahar over Ambia Bahar under water scarcity |

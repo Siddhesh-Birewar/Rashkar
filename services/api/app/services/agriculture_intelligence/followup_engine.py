@@ -130,6 +130,36 @@ class FollowUpQuestionEngine:
 
         # Pomegranate Bahar Selection
         target_crops = [o.crop_id for o in outcomes]
+        outcome_missing = {m for o in outcomes for m in o.missing_information}
+
+        # Water Table Depth (Chickpea / Pomegranate Drainage Diagnostic)
+        if "water_table_depth" in outcome_missing and "water_table_depth" not in asked_params:
+            questions.append(FollowUpQuestion(
+                question_id="Q_WATER_TABLE_DEPTH",
+                target_parameter="water_table_depth",
+                priority=1,
+                question_text_en="What is the seasonal water table depth in your field, or does the field experience prolonged subsoil water stagnation?",
+                question_text_mr="आपल्या शेतातील भूजल पातळी किती खोल आहे किंवा जमिनीत पाणी जास्त काळ साचून राहते का?",
+                question_type="choice",
+                options=["Deep (> 2 meters)", "Moderate (1–2 meters)", "High / shallow (< 1 meter)", "Waterlogging / saline seepage"],
+                agronomic_rationale="ICRISAT (2010, p. 8) establishes that chickpea is not suitable for fields with a high water table or salinity."
+            ))
+            asked_params.add("water_table_depth")
+
+        # Alternative Summer Irrigation (Sugarcane Seasonal Water Risk)
+        if "alternative_summer_irrigation" in outcome_missing and "alternative_summer_irrigation" not in asked_params:
+            questions.append(FollowUpQuestion(
+                question_id="Q_SUGARCANE_ALTERNATIVE_IRRIGATION",
+                target_parameter="alternative_summer_irrigation",
+                priority=1,
+                question_text_en="Do you have access to alternative summer irrigation (e.g. farm pond, canal turns, or tankers) during March–May tillering?",
+                question_text_mr="मार्च ते मे दरम्यान उसाच्या फुटव्यांच्या काळात आपल्याकडे पर्यायी पाण्याची सोय (उदा. शेततळे, कालव्याचे आवर्तन किंवा टँकर) उपलब्ध आहे का?",
+                question_type="choice",
+                options=["Yes, farm pond available", "Yes, canal rotation turns available", "Yes, water tanker available", "No alternative water available"],
+                agronomic_rationale="Sugarcane water requirement is critical during summer tillering; without supplemental water, severe yield loss occurs."
+            ))
+            asked_params.add("alternative_summer_irrigation")
+
         if "pomegranate" in target_crops and ctx.target_bahar is None and "target_bahar" not in asked_params:
             questions.append(FollowUpQuestion(
                 question_id="Q_POMEGRANATE_BAHAR",

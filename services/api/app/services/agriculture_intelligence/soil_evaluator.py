@@ -109,38 +109,117 @@ class SoilConstraintEvaluator:
             res.missing_parameters.append("soil_depth_cm")
 
         # -------------------------------------------------------------
-        # 2. Soil Drainage & Waterlogging Constraint (Phase 5.1.2 Hardened)
+        # 2. Soil Drainage & Waterlogging Constraint (Phase 5.1.3 Hardened)
         # -------------------------------------------------------------
         drainage_val = (ctx.drainage or "").lower()
-        is_explicitly_waterlogged = ("waterlog" in drainage_val or "poor" in drainage_val or "ill-drained" in drainage_val)
+        query_val = (ctx.user_query or "").lower()
+        is_poor_drainage = ("waterlog" in drainage_val or "poor" in drainage_val or "ill-drained" in drainage_val)
+        is_slow_drainage = ("slow" in drainage_val or "moderate" in drainage_val or "sluggish" in drainage_val or "drains slowly" in query_val or "पाणी साचून" in query_val)
 
-        if is_explicitly_waterlogged:
-            if crop_id in ("pomegranate", "chickpea"):
+        if crop_id == "chickpea":
+            # ICRISAT 2010 (p. 8): "Saline soil and fields with a high water table are not suitable for chickpea."
+            has_high_water_table = (
+                (ctx.water_table_depth or "").lower() in ("high", "shallow", "< 1m", "<1m", "surface", "waterlogging")
+                or (ctx.water_table_depth_m is not None and ctx.water_table_depth_m < 1.0)
+            )
+            has_salinity = (
+                (ctx.electrical_conductivity_ds_m is not None and ctx.electrical_conductivity_ds_m >= 2.0)
+                or ("saline" in (ctx.soil_texture or "").lower())
+                or ("salin" in drainage_val)
+            )
+            is_chronic_submerged = ("chronic" in drainage_val or "submerged" in drainage_val or "marsh" in drainage_val)
+
+            if has_high_water_table or has_salinity or is_chronic_submerged:
+                # Verified hard constraint explicitly authorized by ICRISAT 2010 (p. 8)
                 res.is_disqualified = True
                 reason = (
-                    "Poor drainage / waterlogged soil violates mandatory root aeration requirement. "
-                    "In pomegranate, waterlogging triggers devastating Phytophthora root rot and bacterial blight (ICAR-NRCP 2022, p. 3). "
-                    "In chickpea, water stagnation causes collar rot and rapid Fusarium wilt (ICRISAT 2010, p. 8)."
+                    "Hydrological / Salinity disqualification: Saline soil and fields with a high water table "
+                    "are not suitable for chickpea (ICRISAT 2010, p. 8). Chickpea plants are highly sensitive "
+                    "to poor soil aeration, water stagnation, and root rot / Fusarium wilt under shallow water tables."
                 )
                 res.limiting_factors.append(reason)
                 res.applied_rules.append(AppliedRuleRecord(
-                    rule_id=f"RULE_DRAINAGE_{crop_id.upper()}",
+                    rule_id="RULE_DRAINAGE_CHICKPEA",
                     domain="Soil Intelligence",
-                    parameter_checked="drainage",
-                    rule_statement="Mandatory well-drained soil; highly intolerant of waterlogged or ill-drained conditions",
+                    parameter_checked="water_table_depth / salinity",
+                    rule_statement="Saline soil and fields with a high water table are not suitable for chickpea (ICRISAT 2010, p. 8)",
                     condition_met=False,
                     evidence_tier=tier,
                     citation=citation,
                     claim_verification_status="VERIFIED",
-                    source_id="icar_nrcp_manage_2022" if crop_id == "pomegranate" else "icrisat_chickpea_2010",
-                    document_title="Pomegranate Cultivation, Processing and Value Addition" if crop_id == "pomegranate" else "Chickpea Seed Production Manual",
-                    section_or_pages="p. 3" if crop_id == "pomegranate" else "p. 8",
-                    supporting_statement="Performs poorly in ill-drained heavy soils" if crop_id == "pomegranate" else "Saline soil and fields with high water table are not suitable; water stagnation causes collar rot",
-                    applicability_conditions="drainage in ('poor', 'waterlogged', 'ill-drained')",
+                    source_id="icrisat_chickpea_2010",
+                    document_title="Chickpea Seed Production Manual",
+                    section_or_pages="p. 8",
+                    supporting_statement="Saline soil and fields with a high water table are not suitable for chickpea. Chickpea plants are highly sensitive to poor aeration in the soil.",
+                    applicability_conditions="high water table (< 1 m) or saline soil condition confirmed",
                     enforcement_level=EnforcementLevel.VERIFIED_HARD_CONSTRAINT,
                     can_trigger_disqualification=True
                 ))
-        elif ctx.standing_water_days and ctx.standing_water_days > 0:
+            elif is_poor_drainage or is_slow_drainage:
+                # Ambiguous drainage description: ICRISAT 2010 notes sensitivity to poor aeration,
+                # but ambiguous farmer descriptions ("water drains slowly") trigger clarification, NOT automatic rejection!
+                res.is_disqualified = False
+                warn_msg = (
+                    f"Drainage concern reported ('{ctx.drainage or 'slow drainage'}'). "
+                    "ICRISAT (2010, p. 8) establishes that chickpea requires well-aerated soil and is unsuitable for high water tables, "
+                    "with water stagnation causing collar rot. However, ambiguous or slow drainage alone without confirmed high water table or salinity "
+                    "does not justify hard disqualification. Clarification on field drainage furrows and water-table depth is required."
+                )
+                res.warnings.append(warn_msg)
+                res.missing_parameters.extend(["water_table_depth", "drainage_provisions"])
+                res.applied_rules.append(AppliedRuleRecord(
+                    rule_id="RULE_DRAINAGE_CHICKPEA",
+                    domain="Soil Intelligence",
+                    parameter_checked="drainage",
+                    rule_statement="Ambiguous drainage triggers diagnostic clarification of water table and aeration; does not auto-disqualify",
+                    condition_met=False,
+                    evidence_tier=tier,
+                    citation=citation,
+                    claim_verification_status="VERIFIED",
+                    source_id="icrisat_chickpea_2010",
+                    document_title="Chickpea Seed Production Manual",
+                    section_or_pages="p. 8",
+                    supporting_statement="Chickpea plants are highly sensitive to poor aeration in the soil; water stagnation causes collar rot.",
+                    applicability_conditions="drainage slow/poor without confirmed high water table or salinity",
+                    enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                    can_trigger_disqualification=False
+                ))
+
+        elif crop_id == "pomegranate":
+            if is_poor_drainage or is_slow_drainage:
+                # ICAR-NRCP 2022 (p. 3) recommends well-drained land (3-5% slope).
+                # This is a site-selection guideline, NOT a hard categorical disqualifier!
+                res.is_disqualified = False
+                msg = (
+                    "Drainage risk: ICAR-NRCP 2022 (p. 3) recommends well-drained land with a moderate slope (3–5%) "
+                    "for pomegranate site selection. Ill-drained or waterlogged conditions increase risks of Phytophthora root rot "
+                    "and bacterial blight (Xanthomonas axonopodis pv. punicae). Raised-bed planting, broad bed furrows, or "
+                    "surface drainage channels are advised to mitigate drainage risk."
+                )
+                res.warnings.append(msg)
+                res.limiting_factors.append(
+                    "Ill-drained heavy soil violates ICAR-NRCP 2022 (p. 3) site-selection guideline (well-drained land with 3–5% slope recommended); poses bacterial blight and root rot risk."
+                )
+                res.missing_parameters.extend(["drainage_provisions", "water_table_depth"])
+                res.applied_rules.append(AppliedRuleRecord(
+                    rule_id="RULE_DRAINAGE_POMEGRANATE",
+                    domain="Soil Intelligence",
+                    parameter_checked="drainage",
+                    rule_statement="ICAR-NRCP 2022 (p. 3) recommends well-drained land (3–5% slope); ill-drained soils pose high disease risks requiring drainage interventions",
+                    condition_met=False,
+                    evidence_tier=tier,
+                    citation=citation,
+                    claim_verification_status="VERIFIED",
+                    source_id="icar_nrcp_manage_2022",
+                    document_title="Pomegranate Cultivation, Processing and Value Addition: A Training Manual",
+                    section_or_pages="p. 3",
+                    supporting_statement="Select well-drained land with a moderate slope (3-5%). Performs poorly in ill-drained heavy soils.",
+                    applicability_conditions="drainage in ('poor', 'waterlogged', 'ill-drained')",
+                    enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                    can_trigger_disqualification=False
+                ))
+
+        if ctx.standing_water_days and ctx.standing_water_days > 0:
             # Phase 5.1.2: Duration alone without verified poor drainage does NOT trigger hard disqualification
             if crop_id in ("pomegranate", "chickpea"):
                 warn_msg = (
