@@ -1,0 +1,58 @@
+{
+  "document_id": "TC-04",
+  "document_filename": "tc04_soil_card_photo.jpg",
+  "expected_document_type": "image_jpeg",
+  "expected_metadata": {
+    "laboratory_name": "District Soil Testing Laboratory, Pune",
+    "sample_id": "MH-PUN-2024-9102",
+    "farmer_name": "Sanjay More",
+    "report_date": "2024-06-12",
+    "collection_date": "2024-06-01",
+    "sample_depth": "0-15 cm",
+    "village": "Daund",
+    "taluka": "Daund",
+    "district": "Pune"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 7.4,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.32,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.58,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 185.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_phosphorus": {
+      "value": 14.8,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 290.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "sulphur": {
+      "value": 11.0,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "zinc": {
+      "value": 0.48,
+      "unit": "ppm",
+      "is_ambiguous": false
+    }
+  }
+}

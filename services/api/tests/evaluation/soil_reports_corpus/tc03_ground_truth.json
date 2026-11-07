@@ -1,0 +1,71 @@
+{
+  "document_id": "TC-03",
+  "document_filename": "tc03_mpkv_rahuri_report.pdf",
+  "expected_document_type": "text_pdf",
+  "expected_metadata": {
+    "laboratory_name": "MPKV Agricultural University Soil Testing Laboratory, Rahuri",
+    "sample_id": "MPKV-SL-2024-551",
+    "farmer_name": "Anand Deshmukh",
+    "report_date": "2024-05-10",
+    "collection_date": "2024-04-28",
+    "sample_depth": "0-15 cm",
+    "sampling_point": "Sector 3, Canal Block"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 8.1,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.28,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.65,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 245.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_phosphorus": {
+      "value": 22.5,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 410.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "zinc": {
+      "value": 0.75,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "iron": {
+      "value": 4.6,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "manganese": {
+      "value": 7.5,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "copper": {
+      "value": 1.8,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "boron": {
+      "value": 0.58,
+      "unit": "ppm",
+      "is_ambiguous": false
+    }
+  }
+}

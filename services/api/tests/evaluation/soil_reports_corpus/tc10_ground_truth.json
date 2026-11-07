@@ -1,0 +1,8 @@
+{
+  "document_id": "TC-10",
+  "document_filename": "tc10_fertilizer_invoice.pdf",
+  "expected_document_type": "text_pdf",
+  "is_negative_control": true,
+  "expected_status": "FAILED",
+  "expected_parameters_count": 0
+}
