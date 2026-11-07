@@ -24,7 +24,7 @@ PARAMETER_PATTERNS = [
     ("total_nitrogen", re.compile(r"\b(total\s*nitrogen|total\s*n\b|n\s*\(total\)|एकूण\s*नत्र)", re.IGNORECASE)),
     
     # Available Nitrogen
-    ("available_nitrogen", re.compile(r"\b(available\s*nitrogen|avail(?:able|\.)?\s*n\b|mineral\s*nitrogen|उपलब्ध\s*नत्र)", re.IGNORECASE)),
+    ("available_nitrogen", re.compile(r"\b(available\s*nitrogen|avail(?:able|\.)?\s*n\b|mineral\s*nitrogen|उपलब्ध\s*नत्र|\bनत्र\b)", re.IGNORECASE)),
     
     # Organic Matter (SOM) (checked before OC to prevent SOM matching OC)
     ("organic_matter", re.compile(r"\b(organic\s*matter|soil\s*organic\s*matter|s\.?o\.?m\.?\b|सेंद्रिय\s*पदार्थ)", re.IGNORECASE)),
@@ -36,37 +36,37 @@ PARAMETER_PATTERNS = [
     ("soil_ph", re.compile(r"(?:\bsoil\s*p[hH]\b|\bp[hH]\b(?!\s*osphorus|\s*os\b|\s*hate)|\bp[hH]\s*\(1:2\.?5?\)|\bसामू\b)", re.IGNORECASE)),
     
     # Electrical Conductivity (EC)
-    ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता)", re.IGNORECASE)),
+    ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता|\bईसी\b)", re.IGNORECASE)),
     
     # Available Phosphorus (P2O5 / Avail P) - note P206 is OCR confusion
-    ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद)\b", re.IGNORECASE)),
+    ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद|\bस्फुरद\b)\b", re.IGNORECASE)),
 
     # Elemental / Reported Phosphorus [P]
     ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?|\b\[P\]|\(P\)|\bP\b(?!\s*h\b|\s*H\b|\s*[oO]\b|\s*value|\s*level|\s*scale|\s*2o5|\s*205|\s*206))\b", re.IGNORECASE)),
     
     # Available Potassium (K2O / Avail K) - note K20 is OCR confusion
-    ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)\b", re.IGNORECASE)),
+    ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश|\bपालाश\b)\b", re.IGNORECASE)),
 
     # Elemental / Reported Potassium [K]
     ("potassium", re.compile(r"\b(potassium(?:\s*\[K\]|\s*\(K\))?|\b\[K\]|\(K\)|\bK\b(?!\s*g\b|\s*m\b|\s*[oO]\b|\s*cal|\s*2o|\s*20))\b", re.IGNORECASE)),
     
     # Sulphur / Sulfur
-    ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|available\s*sulphur|available\s*sulfur|\bs\b\s*\(available\)|\bso4\b|गंधक)", re.IGNORECASE)),
+    ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|available\s*sulphur|available\s*sulfur|\bs\b\s*\(available\)|\bso4\b|गंधक|सल्फर)", re.IGNORECASE)),
     
     # Zinc
-    ("zinc", re.compile(r"\b(zinc|avail(?:able|\.)?\s*zn\b|available\s*zinc|\bzn\b|जस्त)", re.IGNORECASE)),
+    ("zinc", re.compile(r"\b(zinc|avail(?:able|\.)?\s*zn\b|available\s*zinc|\bzn\b|जस्त|झिंक)", re.IGNORECASE)),
     
     # Iron
     ("iron", re.compile(r"\b(iron|avail(?:able|\.)?\s*fe\b|available\s*iron|\bfe\b|लोह)", re.IGNORECASE)),
     
     # Manganese
-    ("manganese", re.compile(r"\b(manganese|avail(?:able|\.)?\s*mn\b|available\s*manganese|\bmn\b|मॅंगनीज)", re.IGNORECASE)),
+    ("manganese", re.compile(r"\b(manganese|avail(?:able|\.)?\s*mn\b|available\s*manganese|\bmn\b|मॅंगनीज|मॅगनीज)", re.IGNORECASE)),
     
     # Copper
     ("copper", re.compile(r"\b(copper|avail(?:able|\.)?\s*cu\b|available\s*copper|\bcu\b|तांबे)", re.IGNORECASE)),
     
     # Boron
-    ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|available\s*boron|\bb\b(?!\s*arcode)|बोरॉन)", re.IGNORECASE)),
+    ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|available\s*boron|\bb\b(?!\s*arcode)|बोरॉन|बोरोन)", re.IGNORECASE)),
 ]
 
 # Column definitions for horizontal/columnar multi-parameter tables
@@ -414,10 +414,10 @@ class SoilReportParser:
         while i < len(lines):
             line = lines[i]
 
-            # Detect recommendation or dosage sections (e.g. "RECOMMENDATIONS", "Fertilizer to Apply")
-            if re.search(r"\b(?:RECOMMENDATIONS|Fertilizer to Apply|Actual Nutrient Need|Lime to Apply)\b", line, re.IGNORECASE):
+            # Detect recommendation or dosage sections (e.g. "RECOMMENDATIONS", "Fertilizer to Apply", "खत शिफारशी")
+            if re.search(r"\b(?:RECOMMENDATIONS|Fertilizer to Apply|Actual Nutrient Need|Lime to Apply|खत\s*शिफारशी|खतांची\s*मात्रा|शिफारशी|खतांचा\s*डोस|Recommended\s*Dose|RDF)\b", line, re.IGNORECASE):
                 in_recommendations = True
-            elif re.search(r"\b(?:LABORATORY ANALYSIS|SOIL TEST RESULTS|TEST RESULTS|ANALYTICAL REPORT)\b", line, re.IGNORECASE):
+            elif re.search(r"\b(?:LABORATORY ANALYSIS|SOIL TEST RESULTS|TEST RESULTS|ANALYTICAL REPORT|माती\s*परीक्षण\s*निकाल)\b", line, re.IGNORECASE):
                 in_recommendations = False
 
             # Explicit guardrail: Skip recommendation sections and dosage headers
@@ -425,8 +425,8 @@ class SoilReportParser:
                 i += 1
                 continue
 
-            # Skip lines containing fertilizer dosage rate units (e.g. lbs/100 ft², lbs/1000 ft², lbs/acre)
-            if re.search(r"\b(?:lbs?/(?:100|1,?000)?\s*ft|lbs?/acre|kg/ha\s*recommended)\b", line, re.IGNORECASE):
+            # Skip lines containing fertilizer dosage rate units (e.g. lbs/100 ft², lbs/1000 ft², lbs/acre, kg/ha recommended, किलो/एकर)
+            if re.search(r"\b(?:lbs?/(?:100|1,?000)?\s*ft|lbs?/acre|kg/ha\s*recommended|किलो/एकर|किलो/हेक्टर|पिशव्या/एकर)\b", line, re.IGNORECASE):
                 i += 1
                 continue
 
@@ -588,12 +588,16 @@ class SoilReportParser:
             line_lower = line_str.lower()
 
             # Safeguard: Do not extract fertilizer recommendation table numbers as soil measurements
-            if any(h in line_lower for h in ["recommendations", "fertilizer to apply", "nutrient need", "lime to apply"]):
+            if any(h in line_lower for h in [
+                "recommendations", "fertilizer to apply", "nutrient need", "lime to apply",
+                "खत शिफारशी", "खतांची मात्रा", "शिफारशी", "खतांचा डोस", "fertilizer recommendations",
+                "dose of fertilizer", "rdf", "युरिया", "रासायनिक खते"
+            ]):
                 in_rec_section = True
-            if any(h in line_lower for h in ["laboratory analysis", "soil test results", "analytical results", "test parameters"]):
+            if any(h in line_lower for h in ["laboratory analysis", "soil test results", "analytical results", "test parameters", "माती परीक्षण निकाल"]):
                 in_rec_section = False
 
-            if in_rec_section and not any(h in line_lower for h in ["laboratory analysis", "soil test results"]):
+            if in_rec_section and not any(h in line_lower for h in ["laboratory analysis", "soil test results", "माती परीक्षण निकाल"]):
                 continue
 
             if line.startswith("|") or "<td" in line.lower() or "<table" in line.lower():
