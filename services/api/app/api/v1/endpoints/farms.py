@@ -577,6 +577,7 @@ def _fuse_confirmed_laboratory_measurements(
         )
     else:
         profile = profile.model_copy(deep=True)
+        profile.profile_id = str(uuid.uuid4())
 
     def _make_lab_obs(key: str, meas: SoilMeasurementModel, display_name: str, scientific_note: Optional[str] = None) -> SoilParameterObservation:
         lab_name = meas.report.laboratory_name if (meas.report and meas.report.laboratory_name) else "Certified Laboratory"
@@ -616,14 +617,14 @@ def _fuse_confirmed_laboratory_measurements(
     # 1. Precedence: soil_ph
     if "soil_ph" in latest_by_param:
         m = latest_by_param["soil_ph"]
-        if profile.ph:
+        if profile.ph and profile.ph.verification_status != VerificationStatus.LABORATORY_VERIFIED:
             profile.additional_parameters["isric_ph"] = profile.ph
         profile.ph = _make_lab_obs("ph", m, "Soil pH (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
 
     # 2. Precedence: organic_carbon
     if "organic_carbon" in latest_by_param:
         m = latest_by_param["organic_carbon"]
-        if profile.organic_carbon:
+        if profile.organic_carbon and profile.organic_carbon.verification_status != VerificationStatus.LABORATORY_VERIFIED:
             profile.additional_parameters["isric_soc"] = profile.organic_carbon
         profile.organic_carbon = _make_lab_obs("soc", m, "Soil Organic Carbon (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
 
@@ -725,6 +726,7 @@ def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[U
 
     fused = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db)
     if fused:
+        fused.profile_id = str(uuid.uuid4())
         fused.version = (profile.version + 1) if profile else 2
         fused.created_at = datetime.utcnow()
         spatial_soil_service.save_profile(db, fused)
@@ -857,7 +859,10 @@ async def evaluate_farm_advisory(
                 ctx_dict["soil_ph"] = profile.ph.value
                 ctx_dict["soil_data_provenance"] = SoilDataProvenance.SPATIALLY_ESTIMATED_ISRIC
             if ctx_dict.get("soil_organic_carbon_pct") is None and profile.organic_carbon and profile.organic_carbon.value is not None:
-                ctx_dict["soil_organic_carbon_pct"] = profile.organic_carbon.value
+                soc_val = profile.organic_carbon.value
+                if getattr(profile.organic_carbon, "unit", "") == "g/kg" or soc_val > 10.0:
+                    soc_val = round(soc_val / 10.0, 3)
+                ctx_dict["soil_organic_carbon_pct"] = soc_val
 
     context_input = FarmContextInput(**ctx_dict)
     decision_engine = DeterministicDecisionEngine()

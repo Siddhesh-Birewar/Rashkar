@@ -298,9 +298,13 @@ class SpatialSoilService:
             )
             params_by_key[p.parameter_key] = obs
 
-        primary_keys = ["ph", "soc", "sand_percent", "silt_percent", "clay_percent", "total_nitrogen", "cation_exchange_capacity"]
+        primary_keys = {"ph", "soc", "sand_percent", "silt_percent", "clay_percent", "total_nitrogen", "cation_exchange_capacity", "available_nitrogen", "available_phosphorus", "available_potassium"}
         available_count = sum(1 for k in primary_keys if k in params_by_key and params_by_key[k].value is not None)
-        total_count = len(primary_keys) + 3
+        total_count = len(primary_keys)
+
+        additional_params: Dict[str, SoilParameterObservation] = {
+            k: obs for k, obs in params_by_key.items() if k not in primary_keys
+        }
 
         return UnifiedSoilProfile(
             profile_id=profile_model.id,
@@ -328,8 +332,9 @@ class SpatialSoilService:
             available_nitrogen=params_by_key.get("available_nitrogen"),
             available_phosphorus=params_by_key.get("available_phosphorus"),
             available_potassium=params_by_key.get("available_potassium"),
+            additional_parameters=additional_params,
             total_requested_parameters=total_count,
-            available_parameters_count=available_count,
+            available_parameters_count=available_count + len(additional_params),
             data_completeness_ratio=round(available_count / total_count, 2)
         )
 
@@ -357,12 +362,16 @@ class SpatialSoilService:
                 )
                 db.add(profile_model)
 
-                for obs in [
+                all_obs = [
                     profile.ph, profile.organic_carbon, profile.sand_percent,
                     profile.silt_percent, profile.clay_percent, profile.total_nitrogen,
                     profile.cation_exchange_capacity, profile.available_nitrogen,
                     profile.available_phosphorus, profile.available_potassium
-                ]:
+                ]
+                if profile.additional_parameters:
+                    all_obs.extend(profile.additional_parameters.values())
+
+                for obs in all_obs:
                     if obs:
                         db.add(SoilParameterModel(
                             id=str(uuid.uuid4()),
