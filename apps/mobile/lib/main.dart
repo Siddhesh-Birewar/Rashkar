@@ -270,7 +270,33 @@ class MyFarmsDashboard extends StatelessWidget {
                 ],
               ),
             )
-          : RefreshIndicator(
+          : repo.error != null && farms.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.cloud_off_outlined, size: 64, color: Colors.redAccent),
+                        const SizedBox(height: 16),
+                        const Text('Unable to connect to CropNet server', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(repo.error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1B5E20),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => repo.loadFarms(),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry Connection'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
               onRefresh: () => repo.loadFarms(),
               child: farms.isEmpty
                   ? ListView(
@@ -1108,10 +1134,37 @@ class SoilIntelligenceScreen extends StatelessWidget {
             const Text('Registered Farms Available for Analysis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             if (farms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
                 child: Center(
-                  child: Text('No farms registered yet. Please add a farm first.', style: TextStyle(color: Colors.black54)),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.terrain_outlined, size: 48, color: Colors.grey),
+                      const SizedBox(height: 12),
+                      const Text('No farms registered yet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 6),
+                      const Text('Please register a farm boundary first to inspect soil parameters.', style: TextStyle(color: Colors.black54)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.add_location_alt),
+                        label: const Text('Register New Farm'),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => AddEditFarmScreen(
+                                onSave: (farm) => FarmRepository.instance.addFarm(farm),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
@@ -1832,10 +1885,37 @@ class WeatherIntelligenceScreen extends StatelessWidget {
             const Text('Select Farm for Weather & Climate Profile:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             if (farms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
                 child: Center(
-                  child: Text('No farms registered yet. Please add a farm first.', style: TextStyle(color: Colors.black54)),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.terrain_outlined, size: 48, color: Colors.grey),
+                      const SizedBox(height: 12),
+                      const Text('No farms registered yet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 6),
+                      const Text('Please register a farm boundary first to inspect soil parameters.', style: TextStyle(color: Colors.black54)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.add_location_alt),
+                        label: const Text('Register New Farm'),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => AddEditFarmScreen(
+                                onSave: (farm) => FarmRepository.instance.addFarm(farm),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
@@ -3271,6 +3351,12 @@ class _CropCatalogScreenState extends State<CropCatalogScreen> {
       ),
       body: Column(
         children: [
+          if (_isLoading)
+            const LinearProgressIndicator(
+              color: Color(0xFF1B5E20),
+              backgroundColor: Color(0xFFE8F5E9),
+              minHeight: 2,
+            ),
           // Search & Filter Header
           Container(
             padding: const EdgeInsets.all(12),

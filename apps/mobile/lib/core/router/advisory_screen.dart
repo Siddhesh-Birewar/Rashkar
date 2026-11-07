@@ -1589,23 +1589,48 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
   }
 
   Widget _buildErrorBanner() {
+    final isMr = _selectedLanguage == 'mr';
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red.shade200),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+          const Icon(Icons.error_outline, color: Colors.red, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: const TextStyle(fontSize: 12, color: Colors.red),
+              style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w500),
             ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _errorMessage = null);
+              _runDeterministicEvaluation();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red.shade900,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              isMr ? 'पुन्हा प्रयत्न' : 'Retry',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: Colors.red),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() => _errorMessage = null);
+            },
           ),
         ],
       ),
@@ -1723,6 +1748,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
   }
 
   Widget _buildChatInputBar(bool isMr) {
+    final isBusy = _isEvaluating || _isSendingMessage;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1735,14 +1761,17 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
             Expanded(
               child: TextField(
                 controller: _textController,
+                enabled: !isBusy,
                 decoration: InputDecoration(
-                  hintText: isMr
-                      ? 'उदा. हरभरा, ऊस किंवा मातीबद्दल विचारा...'
-                      : 'Ask about sugarcane, chickpea, or soil in $_selectedTaluka...',
+                  hintText: isBusy
+                      ? (isMr ? 'सल्ला तयार होत आहे...' : 'Consulting agricultural engine...')
+                      : (isMr
+                          ? 'उदा. हरभरा, ऊस किंवा मातीबद्दल विचारा...'
+                          : 'Ask about sugarcane, chickpea, or soil in $_selectedTaluka...'),
                   hintStyle: const TextStyle(fontSize: 13),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: isBusy ? Colors.grey.shade100 : Colors.grey.shade50,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide(color: Colors.grey.shade300),
@@ -1752,17 +1781,23 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
                     borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
                 ),
-                onSubmitted: _sendMessage,
+                onSubmitted: isBusy ? null : _sendMessage,
               ),
             ),
             const SizedBox(width: 8),
             IconButton.filled(
-              icon: const Icon(Icons.send, size: 18),
+              icon: isBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.send, size: 18),
               style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFF1B5E20),
+                backgroundColor: isBusy ? Colors.grey : const Color(0xFF1B5E20),
                 foregroundColor: Colors.white,
               ),
-              onPressed: () => _sendMessage(_textController.text),
+              onPressed: isBusy ? null : () => _sendMessage(_textController.text),
             ),
           ],
         ),

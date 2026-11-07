@@ -42,28 +42,34 @@ class _AssessmentHistoryScreenState extends State<AssessmentHistoryScreen> {
             children: [
               // Metrics Header
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 color: const Color(0xFFF1F8E9),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildMetricCard('Total Runs', '${allRecords.length}', Icons.analytics_outlined),
-                    _buildMetricCard(
-                      'Soil Profiles',
-                      '${allRecords.where((r) => r.assessmentType.contains("Soil")).length}',
-                      Icons.terrain_outlined,
-                    ),
-                    _buildMetricCard(
-                      'Crop Feasibility',
-                      '${allRecords.where((r) => r.assessmentType.contains("Crop")).length}',
-                      Icons.grass_outlined,
-                    ),
-                    _buildMetricCard(
-                      'Regions',
-                      '${allRecords.map((r) => r.taluka).toSet().length}',
-                      Icons.location_on_outlined,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildMetricCard('Total Runs', '${allRecords.length}', Icons.analytics_outlined),
+                      const SizedBox(width: 20),
+                      _buildMetricCard(
+                        'Soil Profiles',
+                        '${allRecords.where((r) => r.assessmentType.contains("Soil")).length}',
+                        Icons.terrain_outlined,
+                      ),
+                      const SizedBox(width: 20),
+                      _buildMetricCard(
+                        'Crop Feasibility',
+                        '${allRecords.where((r) => r.assessmentType.contains("Crop")).length}',
+                        Icons.grass_outlined,
+                      ),
+                      const SizedBox(width: 20),
+                      _buildMetricCard(
+                        'Regions',
+                        '${allRecords.map((r) => r.taluka).toSet().length}',
+                        Icons.location_on_outlined,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
