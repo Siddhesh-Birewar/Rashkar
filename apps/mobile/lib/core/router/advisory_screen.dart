@@ -3,6 +3,7 @@ import 'package:cropnet_mobile/core/router/farm_state.dart';
 import 'package:cropnet_mobile/features/advisory/data/advisory_repository.dart';
 import 'package:cropnet_mobile/features/advisory/models/advisory_models.dart';
 import 'package:cropnet_mobile/features/soil/data/soil_repository.dart';
+import 'package:cropnet_mobile/features/soil/models/soil_models.dart';
 import 'package:cropnet_mobile/main.dart' show FarmItem;
 
 /// Chat message model for Agricultural AI Assistant & Advisory session.
@@ -60,6 +61,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
   String? _selectedDistrict;
   String? _selectedFarmId;
   double? _soilPh; // Real soil pH only if measured or profiled for selected farm
+  bool _isLabVerifiedSoil = false;
   bool? _irrigationAvailable;
   String? _irrigationSource;
   String _selectedSeason = 'kharif'; // 'kharif', 'rabi', 'summer'
@@ -134,6 +136,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
       if (mounted && profile.ph?.value != null) {
         setState(() {
           _soilPh = profile.ph!.value!;
+          _isLabVerifiedSoil = profile.ph!.verificationStatus == VerificationStatus.laboratoryVerified;
         });
         _resetConversation();
       }
@@ -197,7 +200,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
     final district = currentFarm.district;
     final farmName = currentFarm.name;
     final phText = _soilPh != null
-        ? '${_soilPh!.toStringAsFixed(1)} (Measured)'
+        ? '${_soilPh!.toStringAsFixed(1)} ${_isLabVerifiedSoil ? (isMr ? "(प्रयोगशाळा प्रमाणित)" : "(Lab Ground Truth)") : (isMr ? "(SoilGrids अंदाज)" : "(SoilGrids Model)")}'
         : (isMr ? 'माती चाचणी आवश्यक' : 'Soil test required');
     final irrigText = currentFarm.irrigationType != 'rainfed'
         ? currentFarm.waterSource
@@ -1062,7 +1065,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
                 _buildContextChip(
                   icon: Icons.science,
                   label: _soilPh != null
-                      ? 'Soil pH: ${_soilPh!.toStringAsFixed(1)}'
+                      ? 'Soil pH: ${_soilPh!.toStringAsFixed(1)}${_isLabVerifiedSoil ? " [Lab Ground Truth]" : " [SoilGrids]"}'
                       : (isMr ? 'सामू (pH): माती चाचणी आवश्यक' : 'Soil pH: Lab test required'),
                 ),
                 _buildContextChip(
