@@ -1657,9 +1657,9 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _buildUnavailableRow('Available Nitrogen (N)', 'Lab Soil Test Required — not inferred from digital map'),
-                          _buildUnavailableRow('Available Phosphorus (P2O5)', 'Lab Soil Test Required — not inferred from digital map'),
-                          _buildUnavailableRow('Available Potassium (K2O)', 'Lab Soil Test Required — not inferred from digital map'),
+                          _buildUnavailableRow('Available Nitrogen (N)', 'Physical soil test required'),
+                          _buildUnavailableRow('Available Phosphorus (P2O5)', 'Physical soil test required'),
+                          _buildUnavailableRow('Available Potassium (K2O)', 'Physical soil test required'),
                         ],
                       ),
                     ),
@@ -1754,14 +1754,23 @@ class _SoilIntelligenceReportScreenState extends State<SoilIntelligenceReportScr
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(nutrient, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFEBEE),
-              borderRadius: BorderRadius.circular(4),
+          Expanded(
+            child: Text(nutrient, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                status,
+                style: const TextStyle(color: Color(0xFFC62828), fontSize: 10.5, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            child: Text(status, style: const TextStyle(color: Color(0xFFC62828), fontSize: 10.5, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

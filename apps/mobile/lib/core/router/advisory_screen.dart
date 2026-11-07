@@ -90,7 +90,11 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
     super.initState();
     _mobileTabController = TabController(length: 2, vsync: this);
     _resetConversation();
-    _loadFarmsAndContext();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadFarmsAndContext();
+      }
+    });
   }
 
   @override
@@ -103,20 +107,22 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
 
   /// Initial load of registered farms belonging to the user
   Future<void> _loadFarmsAndContext() async {
-    await FarmRepository.instance.loadFarms();
+    if (FarmRepository.instance.farms.isEmpty) {
+      await FarmRepository.instance.loadFarms();
+    }
     if (!mounted) return;
 
     final farms = FarmRepository.instance.farms;
     if (farms.isNotEmpty) {
-      final firstFarm = farms.first;
+      final selectedId = FarmRepository.instance.selectedFarmId;
+      final selected = (selectedId != null ? FarmRepository.instance.getFarmById(selectedId) : null) ?? farms.first;
       setState(() {
-        _selectedFarmId = firstFarm.id;
-        _selectedTaluka = firstFarm.taluka;
-        _selectedDistrict = firstFarm.district;
-        _irrigationAvailable = firstFarm.irrigationType != 'rainfed';
-        _irrigationSource = firstFarm.waterSource;
+        _selectedFarmId = selected.id;
+        _selectedTaluka = selected.taluka;
+        _selectedDistrict = selected.district;
+        _irrigationAvailable = selected.irrigationType != 'rainfed';
+        _irrigationSource = selected.waterSource;
       });
-      _fetchFarmSoilProfile(firstFarm.id);
     }
   }
 
@@ -658,7 +664,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isMr ? 'कृषी एआय सल्लागार' : 'AI Agricultural Assistant & Advisory',
+              isMr ? 'कृषी एआय सल्लागार' : 'AI Dialogue & Advisory',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
@@ -887,8 +893,8 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
           Expanded(
             child: Text(
               isMr
-                  ? 'हमीभाव व पीक पात्रता: केवळ निश्चित अल्गोरिदम ठरवतो (LLM कधीही स्वतः ठरवत नाही).'
-                  : 'Authority Notice: Crop suitability is exclusively decided by the deterministic rule engine.',
+                  ? 'Qwen3:8B Agronomic Dialogue • हमीभाव व पीक पात्रता: केवळ निश्चित अल्गोरिदम ठरवतो (LLM कधीही स्वतः ठरवत नाही).'
+                  : 'Qwen3:8B Agronomic Dialogue • Authority Notice: Crop suitability is exclusively decided by the deterministic rule engine.',
               style: TextStyle(fontSize: 11, color: Colors.green.shade900, fontWeight: FontWeight.w600),
             ),
           ),
@@ -916,9 +922,11 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
               children: [
                 const Icon(Icons.landscape, color: Color(0xFF1B5E20), size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  isMr ? 'शेत संदर्भ आणि मूल्यांकन निवडक' : 'Farm Context & Evaluation Selector',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
+                Expanded(
+                  child: Text(
+                    isMr ? 'शेत संदर्भ आणि मूल्यांकन निवडक' : 'Farm Context & Evaluation Selector',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
+                  ),
                 ),
               ],
             ),
@@ -1209,15 +1217,20 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> with SingleTickerProvid
                 children: [
                   const Icon(Icons.verified, size: 18, color: Color(0xFF1B5E20)),
                   const SizedBox(width: 6),
-                  Text(
-                    isMr ? 'प्रमाणित पीक मूल्यांकन निष्कर्ष' : 'Deterministic Feasibility Outcomes',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      isMr ? 'प्रमाणित पीक मूल्यांकन निष्कर्ष' : 'Deterministic Feasibility Outcomes',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
-                  Text(
-                    'ID: ${_decisionId ?? ""}',
-                    style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey.shade600),
-                  ),
+                  if (_decisionId != null) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      'ID: $_decisionId',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey.shade600),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),

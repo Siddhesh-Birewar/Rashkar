@@ -175,6 +175,9 @@ void main() {
       expect(find.text('AI Dialogue & Advisory'), findsOneWidget);
       expect(find.textContaining('Qwen3:8B Agronomic Dialogue'), findsOneWidget);
       expect(find.textContaining('Namaste! Welcome to CropNet AI Agronomic Advisory'), findsOneWidget);
+
+      // Advance fake clock past ApiClient timeout so no pending timers remain
+      await tester.pump(const Duration(seconds: 31));
     });
 
     testWidgets('Deep links directly to /history', (tester) async {
@@ -286,6 +289,9 @@ void main() {
       await tester.tap(find.text('Farms').first);
       await tester.pumpAndSettle();
       expect(find.text('My Registered Farms'), findsOneWidget);
+
+      // Advance fake clock past ApiClient timeout so no pending timers remain
+      await tester.pump(const Duration(seconds: 31));
     });
   });
 }
