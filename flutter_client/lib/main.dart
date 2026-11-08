@@ -1,28 +1,16 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/my_crop_screen.dart';
 import 'screens/heat_safety_screen.dart';
-import 'screens/farm_registration_screen.dart';
-import 'localization/app_localizations.dart';
+import 'screens/extra_income_screen.dart';
+import 'screens/ask_rashkar_screen.dart';
 
 void main() {
   runApp(const RashkarFarmerApp());
 }
 
-class RashkarFarmerApp extends StatefulWidget {
+class RashkarFarmerApp extends StatelessWidget {
   const RashkarFarmerApp({Key? key}) : super(key: key);
-
-  @override
-  State<RashkarFarmerApp> createState() => _RashkarFarmerAppState();
-}
-
-class _RashkarFarmerAppState extends State<RashkarFarmerApp> {
-  String _currentLanguage = 'mr'; // Default Marathi for Maharashtra farmers
-
-  void _toggleLanguage() {
-    setState(() {
-      _currentLanguage = _currentLanguage == 'mr' ? 'en' : 'mr';
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,33 +20,28 @@ class _RashkarFarmerAppState extends State<RashkarFarmerApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32),
-          primary: const Color(0xFF2E7D32),
+          seedColor: const Color(0xFF1B5E20),
+          primary: const Color(0xFF1B5E20),
           secondary: const Color(0xFFD84315),
+          surface: Colors.white,
         ),
         fontFamily: 'Roboto',
         textTheme: const TextTheme(
           bodyLarge: TextStyle(fontSize: 16.0),
           bodyMedium: TextStyle(fontSize: 14.0),
         ),
+        cardTheme: const CardTheme(
+          elevation: 1,
+          margin: EdgeInsets.zero,
+        ),
       ),
-      home: MainNavigationShell(
-        lang: _currentLanguage,
-        onToggleLang: _toggleLanguage,
-      ),
+      home: const MainNavigationShell(),
     );
   }
 }
 
 class MainNavigationShell extends StatefulWidget {
-  final String lang;
-  final VoidCallback onToggleLang;
-
-  const MainNavigationShell({
-    Key? key,
-    required this.lang,
-    required this.onToggleLang,
-  }) : super(key: key);
+  const MainNavigationShell({Key? key}) : super(key: key);
 
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
@@ -67,41 +50,51 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    MyCropScreen(),
+    HeatSafetyScreen(),
+    ExtraIncomeScreen(),
+    AskRashkarScreen(),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final lang = widget.lang;
-
-    final screens = [
-      DashboardScreen(
-        lang: lang,
-        onToggleLang: widget.onToggleLang,
-      ),
-      HeatSafetyScreen(lang: lang),
-      FarmRegistrationScreen(lang: lang),
-    ];
-
     return Scaffold(
-      body: screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           setState(() => _currentIndex = index);
         },
-        destinations: [
+        destinations: const [
           NavigationDestination(
-            icon: const Icon(Icons.agriculture_outlined),
-            selectedIcon: const Icon(Icons.agriculture),
-            label: AppStrings.get('nav_dashboard', lang: lang),
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.warning_amber_rounded),
-            selectedIcon: const Icon(Icons.warning),
-            label: AppStrings.get('nav_heat_safety', lang: lang),
+            icon: Icon(Icons.grass_outlined),
+            selectedIcon: Icon(Icons.grass),
+            label: 'My Crop',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.add_location_alt_outlined),
-            selectedIcon: const Icon(Icons.add_location_alt),
-            label: AppStrings.get('nav_farm', lang: lang),
+            icon: Icon(Icons.wb_sunny_outlined),
+            selectedIcon: Icon(Icons.wb_sunny),
+            label: 'Heat Safety',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.savings_outlined),
+            selectedIcon: Icon(Icons.savings),
+            label: 'Income',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Ask Rashkar',
           ),
         ],
       ),

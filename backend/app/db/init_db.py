@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from backend.app.db.session import engine, Base, SessionLocal
 from backend.app.db.models.registry import DatasetRegistryModel
-from backend.app.db.models.farm import FarmModel, FarmPlotModel, CropCycleModel
+from backend.app.db.models.farm import FarmerModel, FarmModel, FarmPlotModel, CropCycleModel, SoilProfileModel
 from backend.app.db.models.crop_knowledge import (
     CanonicalCropMasterModel,
     CropStageReferenceModel,
@@ -13,15 +13,24 @@ from backend.app.db.models.risk import (
     WorkerHazardAuditLogModel,
     CropHeatAssessmentLogModel
 )
+from backend.app.db.models.income import IncomeOpportunityModel, IncomeScenarioModel
+from backend.app.db.models.pmfby import CropLossCaseModel
+from backend.app.db.models.assistant import AssistantSessionModel, AssistantMessageModel
+from datetime import date, datetime
 
 def init_db():
     # Attempt non-destructive column migration for local SQLite
     with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE canonical_crops ADD COLUMN support_level VARCHAR(50) DEFAULT 'data_limited'"))
-            conn.commit()
-        except Exception:
-            pass
+        for stmt in [
+            "ALTER TABLE canonical_crops ADD COLUMN support_level VARCHAR(50) DEFAULT 'data_limited'",
+            "ALTER TABLE farms ADD COLUMN total_area_acres FLOAT",
+            "ALTER TABLE crop_cycles ADD COLUMN planted_area_acres FLOAT"
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass
 
     # Create all tables in the engine
     Base.metadata.create_all(bind=engine)
@@ -37,6 +46,10 @@ def init_db():
             seed_agronomic_thresholds(db)
         if db.query(AgronomicAdvisoryCatalogueModel).count() == 0:
             seed_advisories(db)
+        if db.query(FarmerModel).count() == 0:
+            seed_demo_farmer_and_farm(db)
+        if db.query(IncomeOpportunityModel).count() == 0:
+            seed_income_opportunities(db)
     finally:
         db.close()
 
@@ -673,4 +686,153 @@ def seed_advisories(db):
         )
     ]
     db.add_all(advisories)
+    db.commit()
+
+def seed_demo_farmer_and_farm(db):
+    farmer = FarmerModel(
+        farmer_id="farmer_demo_01",
+        full_name="Ramesh Patil",
+        phone_number="+91 98765 43210",
+        state="Maharashtra",
+        district="Pune",
+        taluka="Baramati",
+        village="Malegaon Budruk",
+        preferred_language="en"
+    )
+    db.add(farmer)
+    db.flush()
+
+    farm = FarmModel(
+        farm_id="farm_demo_pune_01",
+        owner_id=farmer.farmer_id,
+        farm_name="Patil Krishi Farm",
+        total_area_acres=4.5,
+        state="Maharashtra",
+        district="Pune",
+        taluka="Baramati",
+        village="Malegaon Budruk",
+        latitude=18.151,
+        longitude=74.577
+    )
+    db.add(farm)
+    db.flush()
+
+    plot = FarmPlotModel(
+        plot_id="plot_demo_01",
+        farm_id=farm.farm_id,
+        plot_name="Wadgaon Shivar Plot 1",
+        area_acres=2.5,
+        irrigation_type="rainfed",
+        polygon_geojson={
+            "type": "Polygon",
+            "coordinates": [[[74.576, 18.150], [74.578, 18.150], [74.578, 18.152], [74.576, 18.152], [74.576, 18.150]]]
+        }
+    )
+    db.add(plot)
+    db.flush()
+
+    cycle = CropCycleModel(
+        cycle_id="cycle_demo_01",
+        plot_id=plot.plot_id,
+        crop_code="soybean",
+        variety_name="JS 335",
+        season="kharif",
+        sowing_date=date(2024, 6, 15),
+        planted_area_acres=2.5,
+        current_stage_code="stage_pod_development",
+        is_active=True
+    )
+    db.add(cycle)
+
+    soil = SoilProfileModel(
+        soil_id="soil_demo_01",
+        farm_id=farm.farm_id,
+        depth_interval="0-30cm",
+        ph=7.8,
+        organic_carbon_pct=0.58,
+        clay_pct=52.0,
+        sand_pct=18.0,
+        silt_pct=30.0,
+        bulk_density_g_cm3=1.32,
+        cec_cmol_kg=48.5,
+        available_water_capacity_mm_m=160.0,
+        data_provenance="CropNet_UnifiedSoilProfile_v1",
+        is_lab_measured=False
+    )
+    db.add(soil)
+    db.commit()
+
+def seed_income_opportunities(db):
+    opps = [
+        IncomeOpportunityModel(
+            opportunity_id="OPP_VERMICOMPOST_01",
+            title="Farm-Scale Vermicomposting from Crop Residues",
+            category="byproduct_utilization",
+            target_crops=["soybean", "cotton", "sugarcane"],
+            required_resources=["crop_residue", "cow_dung", "shade_net", "water"],
+            min_investment_inr=18000.0,
+            max_investment_inr=35000.0,
+            payback_period_months=4,
+            potential_annual_profit_inr=54000.0,
+            risk_level="low",
+            summary="Convert harvested crop biomass into high-value organic vermicompost for self-farm nutrition and local nursery sales.",
+            key_assumptions=[
+                "Biomass availability: 2-3 tonnes per season",
+                "Compost cycle time: 60-75 days",
+                "Local bulk sales price: ₹6 to ₹8 per kg"
+            ],
+            key_risks=[
+                "Moisture management during peak summer heat",
+                "Termite infestation if bed is dry"
+            ],
+            source_attribution="KVK Baramati & ICAR-NIASM Baramati Agri-Allied Practice"
+        ),
+        IncomeOpportunityModel(
+            opportunity_id="OPP_OSMANABADI_GOAT_01",
+            title="Osmanabadi Goat Rearing Unit (10+1)",
+            category="livestock",
+            target_crops=["soybean", "jowar", "bajra"],
+            required_resources=["shed", "fodder", "fencing"],
+            min_investment_inr=85000.0,
+            max_investment_inr=140000.0,
+            payback_period_months=12,
+            potential_annual_profit_inr=95000.0,
+            risk_level="moderate",
+            summary="Hardy drought-tolerant indigenous breed reared on farm-grown dry fodders and pulse husks with high meat market demand.",
+            key_assumptions=[
+                "Twinning rate: ~60-70% for Osmanabadi breed",
+                "Kid marketing at 8-10 months (25-30 kg live weight)",
+                "Live weight price: ₹300-340 per kg"
+            ],
+            key_risks=[
+                "PPR and enterotoxemia disease outbreaks if vaccinations are missed",
+                "Green fodder shortage in April-May"
+            ],
+            source_attribution="MPKV Rahuri Goat & Sheep Directorate / Pune District KVK"
+        ),
+        IncomeOpportunityModel(
+            opportunity_id="OPP_SOLAR_DRYER_01",
+            title="Solar Conduction Dryer for Onion & Chillies",
+            category="value_addition",
+            target_crops=["onion", "tomato"],
+            required_resources=["direct_sunlight", "grading_area", "packaging"],
+            min_investment_inr=45000.0,
+            max_investment_inr=85000.0,
+            payback_period_months=8,
+            potential_annual_profit_inr=65000.0,
+            risk_level="moderate",
+            summary="Prevents distress sales during market gluts by dehydrating surplus produce into shelf-stable flakes and powders.",
+            key_assumptions=[
+                "Processing capacity: 15-20 kg per batch",
+                "Dehydration ratio: 8:1 for onions",
+                "Dry onion flake market price: ₹220-280 per kg"
+            ],
+            key_risks=[
+                "Unseasonal cloudy weather or rain during Kharif drying cycles",
+                "Moisture-proof packing requirements"
+            ],
+            source_attribution="ICAR-DOGR (Directorate of Onion and Garlic Research), Rajgurunagar, Pune"
+        )
+    ]
+    db.add_all(opps)
     db.commit()

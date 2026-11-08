@@ -1,34 +1,73 @@
-class Farm {
+class FarmSummary {
+  final String farmerId;
+  final String farmerName;
   final String farmId;
-  final String ownerId;
   final String farmName;
-  final String district;
-  final String taluka;
-  final String village;
+  final String locationDisplay;
   final double latitude;
   final double longitude;
+  final double? totalAreaAcres;
+  final String? activeCropCode;
+  final String? activeCropName;
+  final String? sowingDate;
+  final int? daysAfterSowing;
+  final String? estimatedStageCode;
+  final String? estimatedStageName;
+  final double? plantedAreaAcres;
+  final String? irrigationType;
+  final Map<String, dynamic> weatherSummary;
+  final String dataLastUpdated;
+  final bool isDataStale;
+  final Map<String, dynamic>? soilSummary;
+  final List<Map<String, dynamic>> activeAlerts;
 
-  Farm({
+  FarmSummary({
+    required this.farmerId,
+    required this.farmerName,
     required this.farmId,
-    required this.ownerId,
     required this.farmName,
-    required this.district,
-    required this.taluka,
-    required this.village,
+    required this.locationDisplay,
     required this.latitude,
     required this.longitude,
+    this.totalAreaAcres,
+    this.activeCropCode,
+    this.activeCropName,
+    this.sowingDate,
+    this.daysAfterSowing,
+    this.estimatedStageCode,
+    this.estimatedStageName,
+    this.plantedAreaAcres,
+    this.irrigationType,
+    required this.weatherSummary,
+    required this.dataLastUpdated,
+    required this.isDataStale,
+    this.soilSummary,
+    required this.activeAlerts,
   });
 
-  factory Farm.fromJson(Map<String, dynamic> json) {
-    return Farm(
+  factory FarmSummary.fromJson(Map<String, dynamic> json) {
+    return FarmSummary(
+      farmerId: json['farmer_id'] ?? '',
+      farmerName: json['farmer_name'] ?? 'Farmer',
       farmId: json['farm_id'] ?? '',
-      ownerId: json['owner_id'] ?? '',
       farmName: json['farm_name'] ?? 'My Farm',
-      district: json['district'] ?? 'Pune',
-      taluka: json['taluka'] ?? 'Baramati',
-      village: json['village'] ?? '',
+      locationDisplay: json['location_display'] ?? '',
       latitude: (json['latitude'] as num?)?.toDouble() ?? 18.15,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 74.57,
+      totalAreaAcres: (json['total_area_acres'] as num?)?.toDouble(),
+      activeCropCode: json['active_crop_code'],
+      activeCropName: json['active_crop_name'],
+      sowingDate: json['sowing_date'],
+      daysAfterSowing: json['days_after_sowing'],
+      estimatedStageCode: json['estimated_stage_code'],
+      estimatedStageName: json['estimated_stage_name'],
+      plantedAreaAcres: (json['planted_area_acres'] as num?)?.toDouble(),
+      irrigationType: json['irrigation_type'],
+      weatherSummary: Map<String, dynamic>.from(json['weather_summary'] ?? {}),
+      dataLastUpdated: json['data_last_updated'] ?? 'Recently',
+      isDataStale: json['is_data_stale'] ?? false,
+      soilSummary: json['soil_summary'] != null ? Map<String, dynamic>.from(json['soil_summary']) : null,
+      activeAlerts: List<Map<String, dynamic>>.from(json['active_alerts'] ?? []),
     );
   }
 }
@@ -70,7 +109,6 @@ class YieldAssessment {
   final String cropCode;
   final String cropStageCode;
   final String cropStageNameEn;
-  final String cropStageNameMr;
   final int das;
   final List<RiskDimensionItem> risks;
   final Map<String, dynamic> baseline;
@@ -80,7 +118,6 @@ class YieldAssessment {
     required this.cropCode,
     required this.cropStageCode,
     required this.cropStageNameEn,
-    required this.cropStageNameMr,
     required this.das,
     required this.risks,
     required this.baseline,
@@ -94,7 +131,6 @@ class YieldAssessment {
       cropCode: json['crop_code'] ?? 'soybean',
       cropStageCode: stage['stage_code'] ?? 'VEGETATIVE',
       cropStageNameEn: stage['stage_name_en'] ?? 'Vegetative',
-      cropStageNameMr: stage['stage_name_mr'] ?? 'शाकीय वाढ',
       das: stage['days_after_sowing'] ?? 45,
       risks: rawRisks.map((r) => RiskDimensionItem.fromJson(r)).toList(),
       baseline: json['yield_baseline'] ?? {},
@@ -102,70 +138,242 @@ class YieldAssessment {
   }
 }
 
-class WorkerHeatProjection {
-  final int hourOffset;
-  final String timeIst;
+class WorkerHeatResponse {
+  final String hazardLevel;
+  final double wbgtSunC;
+  final double wbgtShadeC;
   final double airTempC;
   final double rhPct;
-  final double wbgtEffectiveC;
-  final String hazardLevel;
-  final bool exceedsScreening;
+  final String advice;
+  final String methodology;
 
-  WorkerHeatProjection({
-    required this.hourOffset,
-    required this.timeIst,
+  WorkerHeatResponse({
+    required this.hazardLevel,
+    required this.wbgtSunC,
+    required this.wbgtShadeC,
     required this.airTempC,
     required this.rhPct,
-    required this.wbgtEffectiveC,
-    required this.hazardLevel,
-    required this.exceedsScreening,
+    required this.advice,
+    required this.methodology,
   });
 
-  factory WorkerHeatProjection.fromJson(Map<String, dynamic> json) {
-    return WorkerHeatProjection(
-      hourOffset: json['forecast_hour_offset'] ?? 0,
-      timeIst: json['valid_time_ist'] ?? '',
-      airTempC: (json['air_temp_c'] as num?)?.toDouble() ?? 32.0,
-      rhPct: (json['relative_humidity_pct'] as num?)?.toDouble() ?? 50.0,
-      wbgtEffectiveC: (json['wbgt_effective_c'] as num?)?.toDouble() ?? 28.0,
-      hazardLevel: json['hazard_level'] ?? 'low',
-      exceedsScreening: json['exceeds_screening_threshold'] ?? false,
+  factory WorkerHeatResponse.fromJson(Map<String, dynamic> json) {
+    final metrics = json['heat_metrics'] ?? {};
+    return WorkerHeatResponse(
+      hazardLevel: json['hazard_level'] ?? 'moderate',
+      wbgtSunC: (metrics['estimated_wbgt_sun_c'] as num?)?.toDouble() ?? 28.5,
+      wbgtShadeC: (metrics['estimated_wbgt_shade_c'] as num?)?.toDouble() ?? 26.0,
+      airTempC: (metrics['air_temp_c'] as num?)?.toDouble() ?? 33.0,
+      rhPct: (metrics['relative_humidity_pct'] as num?)?.toDouble() ?? 55.0,
+      advice: json['plain_language_advice'] ?? 'Drink water frequently and take rest in shade during peak afternoon.',
+      methodology: json['methodology'] ?? 'Liljegren_et_al_2008_energy_balance',
     );
   }
 }
 
-class WorkerHeatResponse {
-  final String currentHazardLevel;
-  final String maxHazardLevel;
-  final double maxWbgtEffectiveC;
-  final double screeningThresholdC;
-  final String disclaimer;
-  final List<String> safetyCautions;
-  final Map<String, dynamic> hydrationGuidance;
-  final List<WorkerHeatProjection> projections;
+class CropHeatAssessment {
+  final String cropCode;
+  final String stageCode;
+  final double maxForecastTempC;
+  final double criticalThresholdC;
+  final int exceedanceHours;
+  final String riskLevel;
+  final String citation;
 
-  WorkerHeatResponse({
-    required this.currentHazardLevel,
-    required this.maxHazardLevel,
-    required this.maxWbgtEffectiveC,
-    required this.screeningThresholdC,
-    required this.disclaimer,
-    required this.safetyCautions,
-    required this.hydrationGuidance,
-    required this.projections,
+  CropHeatAssessment({
+    required this.cropCode,
+    required this.stageCode,
+    required this.maxForecastTempC,
+    required this.criticalThresholdC,
+    required this.exceedanceHours,
+    required this.riskLevel,
+    required this.citation,
   });
 
-  factory WorkerHeatResponse.fromJson(Map<String, dynamic> json) {
-    final rawProj = json['hourly_projections'] as List? ?? [];
-    return WorkerHeatResponse(
-      currentHazardLevel: json['current_hazard_level'] ?? 'low',
-      maxHazardLevel: json['max_hazard_level_in_window'] ?? 'low',
-      maxWbgtEffectiveC: (json['max_wbgt_effective_c'] as num?)?.toDouble() ?? 27.0,
-      screeningThresholdC: (json['screening_threshold_c'] as num?)?.toDouble() ?? 28.0,
-      disclaimer: json['disclaimer'] ?? '',
-      safetyCautions: List<String>.from(json['safety_cautions'] ?? []),
-      hydrationGuidance: json['hydration_guidance'] ?? {},
-      projections: rawProj.map((p) => WorkerHeatProjection.fromJson(p)).toList(),
+  factory CropHeatAssessment.fromJson(Map<String, dynamic> json) {
+    return CropHeatAssessment(
+      cropCode: json['crop_code'] ?? 'soybean',
+      stageCode: json['stage_code'] ?? 'flowering',
+      maxForecastTempC: (json['max_forecast_temp_c'] as num?)?.toDouble() ?? 36.5,
+      criticalThresholdC: (json['critical_threshold_c'] as num?)?.toDouble() ?? 38.0,
+      exceedanceHours: json['exceedance_hours'] ?? 0,
+      riskLevel: json['risk_level'] ?? 'low',
+      citation: json['evidence_citation'] ?? 'MPKV Rahuri Package of Practices',
     );
   }
+}
+
+class IncomeOpportunity {
+  final String opportunityId;
+  final String title;
+  final String category;
+  final List<String> targetCrops;
+  final List<String> requiredResources;
+  final double minInvestmentInr;
+  final double maxInvestmentInr;
+  final int paybackPeriodMonths;
+  final double potentialAnnualProfitInr;
+  final String riskLevel;
+  final String summary;
+  final List<String> keyAssumptions;
+  final List<String> keyRisks;
+  final String sourceAttribution;
+
+  IncomeOpportunity({
+    required this.opportunityId,
+    required this.title,
+    required this.category,
+    required this.targetCrops,
+    required this.requiredResources,
+    required this.minInvestmentInr,
+    required this.maxInvestmentInr,
+    required this.paybackPeriodMonths,
+    required this.potentialAnnualProfitInr,
+    required this.riskLevel,
+    required this.summary,
+    required this.keyAssumptions,
+    required this.keyRisks,
+    required this.sourceAttribution,
+  });
+
+  factory IncomeOpportunity.fromJson(Map<String, dynamic> json) {
+    return IncomeOpportunity(
+      opportunityId: json['opportunity_id'] ?? '',
+      title: json['title'] ?? '',
+      category: json['category'] ?? '',
+      targetCrops: List<String>.from(json['target_crops'] ?? []),
+      requiredResources: List<String>.from(json['required_resources'] ?? []),
+      minInvestmentInr: (json['min_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      maxInvestmentInr: (json['max_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      paybackPeriodMonths: json['payback_period_months'] ?? 6,
+      potentialAnnualProfitInr: (json['potential_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      riskLevel: json['risk_level'] ?? 'moderate',
+      summary: json['summary'] ?? '',
+      keyAssumptions: List<String>.from(json['key_assumptions'] ?? []),
+      keyRisks: List<String>.from(json['key_risks'] ?? []),
+      sourceAttribution: json['source_attribution'] ?? '',
+    );
+  }
+}
+
+class IncomeScenario {
+  final String opportunityId;
+  final String opportunityTitle;
+  final double customBudgetInr;
+  final double calculatedCapexInr;
+  final double calculatedOpexAnnualInr;
+  final double calculatedGrossRevenueInr;
+  final double calculatedNetProfitAnnualInr;
+  final double calculatedBreakEvenMonths;
+  final List<String> assumptionsApplied;
+  final List<String> risksToMonitor;
+  final String sourceAttribution;
+  final String disclaimer;
+
+  IncomeScenario({
+    required this.opportunityId,
+    required this.opportunityTitle,
+    required this.customBudgetInr,
+    required this.calculatedCapexInr,
+    required this.calculatedOpexAnnualInr,
+    required this.calculatedGrossRevenueInr,
+    required this.calculatedNetProfitAnnualInr,
+    required this.calculatedBreakEvenMonths,
+    required this.assumptionsApplied,
+    required this.risksToMonitor,
+    required this.sourceAttribution,
+    required this.disclaimer,
+  });
+
+  factory IncomeScenario.fromJson(Map<String, dynamic> json) {
+    return IncomeScenario(
+      opportunityId: json['opportunity_id'] ?? '',
+      opportunityTitle: json['opportunity_title'] ?? '',
+      customBudgetInr: (json['custom_budget_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedCapexInr: (json['calculated_capex_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedOpexAnnualInr: (json['calculated_opex_annual_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedGrossRevenueInr: (json['calculated_gross_revenue_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedNetProfitAnnualInr: (json['calculated_net_profit_annual_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedBreakEvenMonths: (json['calculated_break_even_months'] as num?)?.toDouble() ?? 0.0,
+      assumptionsApplied: List<String>.from(json['assumptions_applied'] ?? []),
+      risksToMonitor: List<String>.from(json['risks_to_monitor'] ?? []),
+      sourceAttribution: json['source_attribution'] ?? '',
+      disclaimer: json['disclaimer'] ?? '',
+    );
+  }
+}
+
+class CropLossCase {
+  final String caseId;
+  final String farmerId;
+  final String farmId;
+  final String cropCode;
+  final String season;
+  final String eventDate;
+  final String perilType;
+  final double damageEstimatePct;
+  final double affectedAreaAcres;
+  final List<String> photoUrls;
+  final String dossierStatus;
+  final Map<String, dynamic> weatherEvidenceSummary;
+  final String? reviewerDecision;
+  final String? reviewerRationale;
+  final String createdAt;
+  final String disclaimer;
+
+  CropLossCase({
+    required this.caseId,
+    required this.farmerId,
+    required this.farmId,
+    required this.cropCode,
+    required this.season,
+    required this.eventDate,
+    required this.perilType,
+    required this.damageEstimatePct,
+    required this.affectedAreaAcres,
+    required this.photoUrls,
+    required this.dossierStatus,
+    required this.weatherEvidenceSummary,
+    this.reviewerDecision,
+    this.reviewerRationale,
+    required this.createdAt,
+    required this.disclaimer,
+  });
+
+  factory CropLossCase.fromJson(Map<String, dynamic> json) {
+    return CropLossCase(
+      caseId: json['case_id'] ?? '',
+      farmerId: json['farmer_id'] ?? '',
+      farmId: json['farm_id'] ?? '',
+      cropCode: json['crop_code'] ?? '',
+      season: json['season'] ?? 'kharif',
+      eventDate: json['event_date'] ?? '',
+      perilType: json['peril_type'] ?? '',
+      damageEstimatePct: (json['damage_estimate_pct'] as num?)?.toDouble() ?? 0.0,
+      affectedAreaAcres: (json['affected_area_acres'] as num?)?.toDouble() ?? 0.0,
+      photoUrls: List<String>.from(json['photo_urls'] ?? []),
+      dossierStatus: json['dossier_status'] ?? 'draft_saved',
+      weatherEvidenceSummary: Map<String, dynamic>.from(json['weather_evidence_summary'] ?? {}),
+      reviewerDecision: json['reviewer_decision'],
+      reviewerRationale: json['reviewer_rationale'],
+      createdAt: json['created_at'] ?? '',
+      disclaimer: json['disclaimer'] ?? '',
+    );
+  }
+}
+
+class AssistantChatMessage {
+  final String sender; // 'user' or 'assistant'
+  final String text;
+  final String? providerUsed;
+  final List<Map<String, String>> citations;
+  final DateTime timestamp;
+
+  AssistantChatMessage({
+    required this.sender,
+    required this.text,
+    this.providerUsed,
+    this.citations = const [],
+    required this.timestamp,
+  });
 }

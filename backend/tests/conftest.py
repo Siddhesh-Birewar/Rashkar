@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.main import app
 from backend.app.db.session import Base, get_db
 from backend.app.db.models.registry import DatasetRegistryModel
-from backend.app.db.models.farm import FarmModel, FarmPlotModel, CropCycleModel
+from backend.app.db.models.farm import FarmerModel, FarmModel, FarmPlotModel, CropCycleModel, SoilProfileModel
 from backend.app.db.models.crop_knowledge import (
     CanonicalCropMasterModel,
     CropStageReferenceModel,
@@ -18,11 +18,16 @@ from backend.app.db.models.risk import (
     WorkerHazardAuditLogModel,
     CropHeatAssessmentLogModel
 )
+from backend.app.db.models.income import IncomeOpportunityModel, IncomeScenarioModel
+from backend.app.db.models.pmfby import CropLossCaseModel
+from backend.app.db.models.assistant import AssistantSessionModel, AssistantMessageModel
 from backend.app.db.init_db import (
     seed_canonical_crops,
     seed_crop_stages,
     seed_agronomic_thresholds,
-    seed_advisories
+    seed_advisories,
+    seed_demo_farmer_and_farm,
+    seed_income_opportunities
 )
 
 # Test SQLite in-memory engine
@@ -43,6 +48,8 @@ def setup_test_db():
     seed_crop_stages(db)
     seed_agronomic_thresholds(db)
     seed_advisories(db)
+    seed_demo_farmer_and_farm(db)
+    seed_income_opportunities(db)
     db.close()
     yield
     Base.metadata.drop_all(bind=engine)
