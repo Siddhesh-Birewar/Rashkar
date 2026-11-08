@@ -26,6 +26,7 @@ from cropnet.services.api.app.models.satellite import SatelliteVegetationObserva
 from cropnet.services.api.app.services.satellite.copernicus_client import (
     copernicus_client,
     SCL_MASKED_CLASSES,
+    convert_raw_dn_to_reflectance,
 )
 from cropnet.services.api.app.api.v1.endpoints.farms import _FARM_STORAGE
 
@@ -141,12 +142,43 @@ def client(isolated_satellite_db):
 # ===========================================================================
 
 def test_scl_masking_classes():
-    # Masked classes: 3, 8, 9, 10, 11
+    # Masked classes: 0 (No data), 1 (Saturated), 3 (Shadows), 7 (Unclassified), 8 (Med cloud), 9 (High cloud), 10 (Cirrus), 11 (Snow/Ice)
+    assert 0 in SCL_MASKED_CLASSES  # No data
+    assert 1 in SCL_MASKED_CLASSES  # Saturated or defective
     assert 3 in SCL_MASKED_CLASSES  # Cloud shadows
+    assert 7 in SCL_MASKED_CLASSES  # Unclassified
     assert 8 in SCL_MASKED_CLASSES  # Cloud medium prob
     assert 9 in SCL_MASKED_CLASSES  # Cloud high prob
     assert 10 in SCL_MASKED_CLASSES # Cirrus
     assert 11 in SCL_MASKED_CLASSES # Snow/Ice
+
+
+def test_radiometric_offset_baseline_handling():
+    """Verify that PB 04.00+ applies BOA_ADD_OFFSET = -1000 DN while legacy Baselines do not."""
+    # PB N0500: BOA_ADD_OFFSET = -1000
+    # For DN = 2000: Reflectance = (2000 - 1000) / 10000 = 0.10
+    ref_n0500 = convert_raw_dn_to_reflectance(2000.0, processing_baseline="N0500")
+    assert pytest.approx(ref_n0500, 0.001) == 0.10
+
+    # PB N0214: Legacy baseline, BOA_ADD_OFFSET = 0
+    # For DN = 2000: Reflectance = 2000 / 10000 = 0.20
+    ref_legacy = convert_raw_dn_to_reflectance(2000.0, processing_baseline="N0214")
+    assert pytest.approx(ref_legacy, 0.001) == 0.20
+
+
+def test_satellite_endpoint_ownership_enforcement(client):
+    """Verify that a user cannot access another user's farm satellite observations."""
+    def override_other_user():
+        return CurrentUser(
+            user_id=OTHER_USER_ID,
+            email="intruder@cropnet.ai",
+            role="authenticated",
+        )
+
+    app.dependency_overrides[get_current_user] = override_other_user
+    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest")
+    assert res.status_code == 403
+    assert "permission" in res.json()["detail"].lower()
 
 
 def test_polygon_indices_computation_normal_farm():

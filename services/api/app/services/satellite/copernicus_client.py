@@ -30,10 +30,35 @@ CDSE_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/prot
 CDSE_CATALOG_URL = "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel2/search.json"
 
 # SCL (Scene Classification Layer) Masking Classes
-# Masked: 3 (Cloud shadow), 8 (Cloud med prob), 9 (Cloud high prob), 10 (Thin cirrus), 11 (Snow/Ice)
-SCL_MASKED_CLASSES = {3, 8, 9, 10, 11}
+# Masked: 0 (No data), 1 (Saturated/Defective), 3 (Cloud shadow), 7 (Unclassified),
+# 8 (Cloud med prob), 9 (Cloud high prob), 10 (Thin cirrus), 11 (Snow/Ice)
+SCL_MASKED_CLASSES = {0, 1, 3, 7, 8, 9, 10, 11}
 # Valid surface pixels: 4 (Vegetation), 5 (Not-vegetated / bare soil), 6 (Water)
 SCL_VALID_CLASSES = {4, 5, 6}
+
+
+def convert_raw_dn_to_reflectance(dn: float, processing_baseline: str = "N0500") -> float:
+    """
+    Converts raw Sentinel-2 Level-2A Digital Numbers (DN) to BOA Surface Reflectance.
+    
+    Processing Baseline Rule:
+    - For Processing Baseline 04.00+ (PB N0400, N0500 onwards, introduced Jan 2022):
+      ESA added a radiometric offset to avoid truncating negative reflectances:
+      BOA_ADD_OFFSET = -1000 DN.
+      Reflectance = (DN + BOA_ADD_OFFSET) / 10000.0 = (DN - 1000.0) / 10000.0.
+    - For legacy Baselines (PB < 04.00, e.g. N0214, N0300):
+      BOA_ADD_OFFSET = 0 DN.
+      Reflectance = DN / 10000.0.
+    """
+    pb_str = (processing_baseline or "").upper().replace("N", "")
+    try:
+        pb_num = int(pb_str[:4]) if len(pb_str) >= 4 else 500
+    except ValueError:
+        pb_num = 500
+
+    offset = -1000.0 if pb_num >= 400 else 0.0
+    reflectance = (dn + offset) / 10000.0
+    return max(0.0, reflectance)
 
 
 class CopernicusClient:

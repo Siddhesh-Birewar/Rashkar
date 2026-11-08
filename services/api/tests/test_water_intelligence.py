@@ -201,6 +201,56 @@ def test_calculate_sar_zero_divisor():
     assert indices.sar_status == "ZERO_DIVISOR"
 
 
+def test_calculate_sar_rsc_negative_inputs_rejected():
+    """Verify that negative ion concentrations are strictly rejected rather than computing misleading values."""
+    measurements = {
+        "sodium": {"normalized_value": -5.0, "normalized_unit": "meq/L"},
+        "calcium": {"normalized_value": 3.0, "normalized_unit": "meq/L"},
+        "magnesium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
+    }
+    indices = calculate_sar_and_rsc(measurements)
+    assert indices.sar is None
+    assert indices.sar_status == "INVALID_INPUT"
+    assert any("negative concentration" in note for note in indices.calculation_notes)
+
+
+def test_rsc_carbonate_ph_heuristics_and_provenance():
+    """Verify that CO3 is preserved as LAB_MEASURED when supplied, or INFERRED_PH_HEURISTIC when pH < 8.3."""
+    # Case A: CO3 explicitly supplied by lab
+    m_supplied = {
+        "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
+        "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
+        "carbonate": {"normalized_value": 0.2, "normalized_unit": "meq/L"},
+        "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
+        "ph": {"original_value": 7.8, "original_unit": "pH"},
+    }
+    res_a = calculate_sar_and_rsc(m_supplied)
+    assert res_a.rsc_status == "AVAILABLE"
+    assert res_a.inputs_used.get("CO3_provenance") == "LAB_MEASURED"
+
+    # Case B: CO3 missing but pH < 8.3 -> inferred as 0.0
+    m_inferred = {
+        "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
+        "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
+        "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
+        "ph": {"original_value": 7.5, "original_unit": "pH"},
+    }
+    res_b = calculate_sar_and_rsc(m_inferred)
+    assert res_b.rsc_status == "AVAILABLE"
+    assert res_b.inputs_used.get("CO3_provenance") == "INFERRED_PH_HEURISTIC"
+    assert res_b.rsc == round((0.0 + 4.0) - (2.0 + 1.0), 2)  # 1.0 meq/L
+
+    # Case C: CO3 missing and pH >= 8.3 -> cannot infer, marked INCOMPLETE_INPUTS
+    m_alkaline = {
+        "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
+        "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
+        "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
+        "ph": {"original_value": 8.7, "original_unit": "pH"},
+    }
+    res_c = calculate_sar_and_rsc(m_alkaline)
+    assert res_c.rsc_status == "INCOMPLETE_INPUTS"
+
+
 # ===========================================================================
 # 3. UNIT TESTS: INSTITUTIONAL RULE EVALUATION
 # ===========================================================================
@@ -225,7 +275,7 @@ def test_water_evaluator_institutional_rules():
     # EC rule
     assert "electrical_conductivity" in eval_map
     assert eval_map["electrical_conductivity"].hazard_level == "MEDIUM"
-    assert "BIS IS 11624:1986" in eval_map["electrical_conductivity"].applicable_standard
+    assert "BIS IS 11624" in eval_map["electrical_conductivity"].applicable_standard
 
     # RSC rule
     assert "rsc" in eval_map

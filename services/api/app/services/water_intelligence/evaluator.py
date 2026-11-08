@@ -126,6 +126,23 @@ def calculate_sar_and_rsc(
     inputs_used["CO3_meq_l"] = co3
     inputs_used["HCO3_meq_l"] = hco3
 
+    # Validation check: reject negative ionic inputs
+    invalid_negatives = []
+    for ion_name, val in [("Na", na), ("Ca", ca), ("Mg", mg), ("CO3", co3), ("HCO3", hco3)]:
+        if val is not None and val < 0:
+            invalid_negatives.append(f"{ion_name}={val}")
+
+    if invalid_negatives:
+        notes.append(f"Calculation rejected: negative concentration encountered ({', '.join(invalid_negatives)}).")
+        return WaterCalculatedIndicators(
+            sar=None,
+            sar_status="INVALID_INPUT",
+            rsc=None,
+            rsc_status="INVALID_INPUT",
+            inputs_used=inputs_used,
+            calculation_notes=notes,
+        )
+
     # Check if report explicitly provides pre-calculated SAR or RSC
     rep_sar = measurements.get("sar", {}).get("original_value")
     rep_rsc = measurements.get("rsc", {}).get("original_value")
@@ -156,20 +173,33 @@ def calculate_sar_and_rsc(
     rsc_val: Optional[float] = None
     rsc_status: str = "UNAVAILABLE"
 
-    # In many standard reports, carbonate (CO3) is 0 at pH < 8.3
-    # If CO3 is absent from report, we treat as 0 ONLY if HCO3, Ca, and Mg are present and report indicates pH < 8.3
+    # Carbonate (CO3) handling with provenance tracking:
+    # 1. If CO3 is supplied by lab, preserve it directly (LAB_MEASURED). Never overwrite supplied lab measurement.
+    # 2. If CO3 is absent from report, infer 0.0 ONLY if pH is provided and pH < 8.3 (INFERRED_PH_HEURISTIC).
+    # 3. If pH >= 8.3 or missing, CO3 cannot be assumed 0.0 and RSC is marked INCOMPLETE_INPUTS.
+    co3_provenance = "NOT_PROVIDED"
     co3_effective = co3
-    if co3_effective is None and hco3 is not None:
+    if co3 is not None:
+        co3_provenance = "LAB_MEASURED"
+        notes.append(f"Carbonate (CO3) preserved as laboratory-measured: {co3} meq/L.")
+    elif hco3 is not None:
         ph_item = measurements.get("ph")
         ph_val = ph_item.get("original_value") if ph_item else None
         if ph_val is not None and ph_val < 8.3:
             co3_effective = 0.0
-            notes.append(f"Carbonate (CO3) not detected or absent; assumed 0.0 meq/L based on pH {ph_val} < 8.3.")
+            co3_provenance = "INFERRED_PH_HEURISTIC"
+            notes.append(f"Carbonate (CO3) not reported; inferred as 0.0 meq/L per standard analytical convention (pH {ph_val} < 8.3).")
+        elif ph_val is not None and ph_val >= 8.3:
+            notes.append(f"Carbonate (CO3) not reported; cannot assume 0.0 meq/L because pH is alkaline ({ph_val} >= 8.3).")
+        else:
+            notes.append("Carbonate (CO3) not reported and pH is unavailable; cannot infer 0.0 meq/L.")
+
+    inputs_used["CO3_provenance"] = co3_provenance
 
     if hco3 is not None and ca is not None and mg is not None and co3_effective is not None:
         rsc_val = round((co3_effective + hco3) - (ca + mg), 2)
         rsc_status = "AVAILABLE"
-        notes.append(f"RSC calculated deterministically: {rsc_val} meq/L (CO3={co3_effective}, HCO3={hco3}, Ca={ca}, Mg={mg}).")
+        notes.append(f"RSC calculated deterministically: {rsc_val} meq/L (CO3={co3_effective} [{co3_provenance}], HCO3={hco3}, Ca={ca}, Mg={mg}).")
     elif rep_rsc is not None:
         rsc_val = float(rep_rsc)
         rsc_status = "REPORTED"
@@ -177,6 +207,8 @@ def calculate_sar_and_rsc(
     else:
         rsc_status = "INCOMPLETE_INPUTS"
         missing_rsc = [k for k, v in [("HCO3", hco3), ("Ca", ca), ("Mg", mg)] if v is None]
+        if co3_effective is None and "CO3" not in missing_rsc:
+            missing_rsc.append("CO3")
         notes.append(f"RSC unavailable: missing required anions/cations ({', '.join(missing_rsc)}).")
 
     return WaterCalculatedIndicators(
@@ -237,9 +269,9 @@ class WaterQualityEvaluator:
                     observed_unit="dS/m",
                     hazard_level=lvl,
                     hazard_title=title,
-                    rule_id="BIS-11624-TAB1-EC",
-                    source_citation="Bureau of Indian Standards IS 11624:1986, Table 1 (Salinity Classes)",
-                    applicable_standard="BIS IS 11624:1986",
+                    rule_id="BIS-11624-2019-TAB1-EC",
+                    source_citation="Bureau of Indian Standards IS 11624:2019 (First Revision), Table 1 & ICAR-CSSRI Guidelines",
+                    applicable_standard="BIS IS 11624:2019",
                     management_guidance=guide,
                     scope_and_limitations="Applies to mineral soils under typical semi-arid Indian irrigation conditions.",
                 )
@@ -273,9 +305,9 @@ class WaterQualityEvaluator:
                     observed_unit="ratio",
                     hazard_level=lvl,
                     hazard_title=title,
-                    rule_id="BIS-11624-TAB2-SAR",
-                    source_citation="Bureau of Indian Standards IS 11624:1986, Table 2 & ICAR-CSSRI Karnal",
-                    applicable_standard="BIS IS 11624:1986",
+                    rule_id="BIS-11624-2019-TAB2-SAR",
+                    source_citation="Bureau of Indian Standards IS 11624:2019 (First Revision), Table 2 & ICAR-CSSRI Karnal",
+                    applicable_standard="BIS IS 11624:2019",
                     management_guidance=guide,
                     scope_and_limitations="Texture-dependent: clay soils are significantly more sensitive to SAR than sandy loams.",
                 )
@@ -305,9 +337,9 @@ class WaterQualityEvaluator:
                     observed_unit="meq/L",
                     hazard_level=lvl,
                     hazard_title=title,
-                    rule_id="CSSRI-RSC-GUIDELINE",
-                    source_citation="ICAR-Central Soil Salinity Research Institute (CSSRI) Karnal, Bulletin 2/98 & BIS 11624:1986 Table 3",
-                    applicable_standard="ICAR-CSSRI Karnal & BIS IS 11624:1986",
+                    rule_id="CSSRI-RSC-GUIDELINE-1998",
+                    source_citation="ICAR-Central Soil Salinity Research Institute (CSSRI) Karnal, Bulletin 2/98 & BIS IS 11624:2019 Table 3",
+                    applicable_standard="ICAR-CSSRI Karnal & BIS IS 11624:2019",
                     management_guidance=guide,
                     scope_and_limitations="Directly affects soil permeability and pH through sodium accumulation in root zone.",
                 )
@@ -338,9 +370,9 @@ class WaterQualityEvaluator:
                     observed_unit="mg/L",
                     hazard_level=lvl,
                     hazard_title=title,
-                    rule_id="BIS-11624-BORON",
-                    source_citation="BIS IS 11624:1986, Table 4 (Boron Tolerances)",
-                    applicable_standard="BIS IS 11624:1986",
+                    rule_id="BIS-11624-2019-BORON",
+                    source_citation="Bureau of Indian Standards IS 11624:2019 (First Revision), Table 2 & ICAR-CSSRI",
+                    applicable_standard="BIS IS 11624:2019",
                     management_guidance=guide,
                     scope_and_limitations="Toxicity symptoms appear on older leaf tips and margins first.",
                 )
@@ -371,9 +403,9 @@ class WaterQualityEvaluator:
                     observed_unit="meq/L",
                     hazard_level=lvl,
                     hazard_title=title,
-                    rule_id="ICAR-CSSRI-CHLORIDE",
-                    source_citation="ICAR-CSSRI Guidelines for Saline Water Use in Agriculture (1998)",
-                    applicable_standard="ICAR-CSSRI Karnal",
+                    rule_id="ICAR-CSSRI-CHLORIDE-1998",
+                    source_citation="ICAR-CSSRI Guidelines for Saline Water Use in Agriculture (1998) & BIS IS 11624:2019",
+                    applicable_standard="ICAR-CSSRI Karnal & BIS IS 11624:2019",
                     management_guidance=guide,
                     scope_and_limitations="Overhead sprinkler irrigation significantly increases foliar injury risk.",
                 )

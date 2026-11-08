@@ -247,7 +247,7 @@ class WaterCalculatedIndicators(BaseModel):
     sar_status: str = Field("UNAVAILABLE", description="AVAILABLE, INCOMPLETE_INPUTS, ZERO_DIVISOR, or REPORTED")
     rsc: Optional[float] = Field(None, description="Residual Sodium Carbonate = (CO3 + HCO3) - (Ca + Mg) in meq/L")
     rsc_status: str = Field("UNAVAILABLE", description="AVAILABLE, INCOMPLETE_INPUTS, or REPORTED")
-    inputs_used: Dict[str, Optional[float]] = Field(default_factory=dict, description="Normalized meq/L values used in formulas")
+    inputs_used: Dict[str, Any] = Field(default_factory=dict, description="Normalized meq/L values and provenance used in formulas")
     calculation_notes: List[str] = Field(default_factory=list)
 
 
