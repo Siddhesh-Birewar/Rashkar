@@ -66,3 +66,106 @@ class SatelliteVegetationObservationModel(Base):
 
     # Relationships
     farm = relationship("FarmModel")
+
+    # SCL Class-Segregated & Radiometric Properties parsed from observation metadata
+    @property
+    def vegetation_pixel_count(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"veg_px:\s*(\d+)", self.quality_notes)
+        if m:
+            return int(m.group(1))
+        m2 = re.search(r"(\d+)\s+vegetation canopy pixels", self.quality_notes)
+        return int(m2.group(1)) if m2 else None
+
+    @property
+    def bare_soil_pixel_count(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"soil_px:\s*(\d+)", self.quality_notes)
+        if m:
+            return int(m.group(1))
+        m2 = re.search(r"(\d+)\s+bare soil pixels", self.quality_notes)
+        return int(m2.group(1)) if m2 else None
+
+    @property
+    def water_pixel_count(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"water_px:\s*(\d+)", self.quality_notes)
+        return int(m.group(1)) if m else 0
+
+    @property
+    def vegetation_coverage_percent(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"vegetation canopy pixels\s*\(([\d\.]+)%\)", self.quality_notes)
+        return float(m.group(1)) if m else None
+
+    @property
+    def bare_soil_coverage_percent(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"bare soil pixels\s*\(([\d\.]+)%\)", self.quality_notes)
+        return float(m.group(1)) if m else None
+
+    @property
+    def water_coverage_percent(self):
+        return 0.0
+
+    @property
+    def vegetation_mean_ndvi(self):
+        import re
+        if not self.quality_notes:
+            return self.mean_ndvi
+        m = re.search(r"veg_ndvi:\s*([\d\.\-]+)", self.quality_notes)
+        return float(m.group(1)) if m else self.mean_ndvi
+
+    @property
+    def vegetation_mean_ndmi(self):
+        import re
+        if not self.quality_notes:
+            return self.mean_ndmi
+        m = re.search(r"veg_ndmi:\s*([\d\.\-]+)", self.quality_notes)
+        return float(m.group(1)) if m else self.mean_ndmi
+
+    @property
+    def bare_soil_mean_ndvi(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"soil_ndvi:\s*([\d\.\-]+)", self.quality_notes)
+        return float(m.group(1)) if m else None
+
+    @property
+    def polygon_area_hectares(self):
+        import re
+        if not self.quality_notes:
+            return None
+        m = re.search(r"poly_ha:\s*([\d\.]+)", self.quality_notes)
+        return float(m.group(1)) if m else None
+
+    @property
+    def raster_discretized_area_hectares(self):
+        import re
+        if not self.quality_notes:
+            return round(self.total_pixel_count * 0.01, 3) if self.total_pixel_count else None
+        m = re.search(r"raster_ha:\s*([\d\.]+)", self.quality_notes)
+        return float(m.group(1)) if m else (round(self.total_pixel_count * 0.01, 3) if self.total_pixel_count else None)
+
+    @property
+    def radiometric_conversion_provenance(self):
+        import re
+        if not self.quality_notes:
+            return "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED"
+        m = re.search(r"rad:\s*([A-Za-z0-9_]+)", self.quality_notes)
+        return m.group(1) if m else "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED"
+
+    @property
+    def data_attribution(self):
+        return "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84."

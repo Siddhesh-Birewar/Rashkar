@@ -19,6 +19,7 @@ from cropnet.services.api.app.services.satellite.copernicus_client import (
     copernicus_client,
     calibrate_dn_to_reflectance,
     convert_raw_dn_to_reflectance,
+    validate_cog_reflectance_conversion,
     SCL_MASKED_CLASSES,
     SCL_VALID_CLASSES,
     CDSE_ODATA_URL,
@@ -87,6 +88,54 @@ class TestCopernicusUnitCalibration:
         }
         val = calibrate_dn_to_reflectance(4200.0, metadata=meta)
         assert pytest.approx(val, 0.0001) == 0.3200
+
+    def test_validate_cog_offset_already_applied(self):
+        """Element 84 Earth Search COGs with earthsearch:boa_offset_applied=True must use scale=0.0001, offset=0.0."""
+        props = {"earthsearch:boa_offset_applied": True, "s2:processing_baseline": "05.13"}
+        scale, offset, status = validate_cog_reflectance_conversion(item_props=props)
+        assert scale == 0.0001
+        assert offset == 0.0
+        assert status == "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED"
+
+    def test_validate_cog_offset_not_applied(self):
+        """COGs with earthsearch:boa_offset_applied=False on modern baseline PB>=04.00 must apply -0.10 offset."""
+        props = {"earthsearch:boa_offset_applied": False, "s2:processing_baseline": "05.13"}
+        scale, offset, status = validate_cog_reflectance_conversion(item_props=props)
+        assert scale == 0.0001
+        assert offset == -0.10
+        assert status == "RAW_SAFE_DN_OFFSET_REQUIRED"
+
+    def test_validate_cog_geotiff_embedded_tags(self):
+        """Embedded GeoTIFF tags for non-default scale/offset take precedence."""
+        scale, offset, status = validate_cog_reflectance_conversion(
+            raster_scales=(0.0002,), raster_offsets=(-0.05,)
+        )
+        assert scale == 0.0002
+        assert offset == -0.05
+        assert status == "GEOTIFF_EMBEDDED_METADATA"
+
+    def test_validate_cog_contradictory_metadata(self):
+        """Contradictory metadata (e.g. negative scale or invalid tags) fails closed with CONTRADICTORY_METADATA_UNVERIFIED."""
+        scale, offset, status = validate_cog_reflectance_conversion(
+            raster_scales=(-0.0001,), raster_offsets=(0.0,)
+        )
+        assert status == "CONTRADICTORY_METADATA_UNVERIFIED"
+        assert scale == 0.0
+        assert offset == 0.0
+
+    def test_validate_cog_missing_metadata(self):
+        """Missing metadata fails closed with MISSING_CONVERSION_METADATA_UNVERIFIED."""
+        scale, offset, status = validate_cog_reflectance_conversion(item_props=None, asset_dict=None)
+        assert status == "MISSING_CONVERSION_METADATA_UNVERIFIED"
+        assert scale == 0.0
+        assert offset == 0.0
+
+    def test_validate_cog_precalibrated_float(self):
+        """Pre-calibrated float reflectance yields unity scale and zero offset."""
+        scale, offset, status = validate_cog_reflectance_conversion(is_calibrated_reflectance=True)
+        assert scale == 1.0
+        assert offset == 0.0
+        assert status == "PRE_CALIBRATED_FLOAT"
 
 
 # ===========================================================================
@@ -283,13 +332,21 @@ class TestCopernicusLiveProvider:
         assert live_res["total_pixel_count"] == 1918
         assert live_res["valid_pixel_count"] == 1848
         assert live_res["farm_coverage_percent"] == 96.4
-        assert live_res["cloud_masked_percent"] == 3.6
-        assert live_res["quality_status"] == "VALID_OBSERVATION"
+        assert live_res["cloud_masked_percent"] == 0.0
+        assert live_res["boundary_masked_percent"] == 3.6
+        assert live_res["vegetation_pixel_count"] == 1104
+        assert live_res["bare_soil_pixel_count"] == 744
+        assert live_res["water_pixel_count"] == 0
+        assert live_res["quality_status"] == "VALID_OBSERVATION_WITH_MASKED_PIXELS"
+        assert live_res["radiometric_conversion_provenance"] == "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED"
+        assert live_res["polygon_area_hectares"] == 18.736
+        assert live_res["raster_discretized_area_hectares"] == 19.180
 
     def test_live_e_real_ndvi_calculation(self):
         """
         [STEP E] Validates pixel-level NDVI calculation: (B08 - B04) / (B08 + B04).
-        Verifies NDVI statistics fall strictly within valid agronomic bounds for vineyard canopy.
+        Verifies NDVI statistics fall strictly within valid agronomic bounds for vineyard canopy
+        and bare soil paths.
         """
         live_res = copernicus_client.fetch_live_raster_indices(
             polygon_geojson=self.BARAMATI_FARM_POLYGON,
@@ -300,6 +357,9 @@ class TestCopernicusLiveProvider:
 
         print("\n--- [STEP E] REAL NDVI CALCULATION EVIDENCE ---")
         print(f"Formula: NDVI = (B08 - B04) / (B08 + B04) at 10m native resolution")
+        print(f"Vegetation Canopy Mean NDVI (Class 4): {live_res['vegetation_mean_ndvi']}")
+        print(f"Bare Soil Mean NDVI (Class 5): {live_res['bare_soil_mean_ndvi']}")
+        print(f"Surface Aggregate Mean NDVI: {live_res['surface_mean_ndvi']}")
         print(f"Mean NDVI: {live_res['mean_ndvi']}")
         print(f"Median NDVI: {live_res['median_ndvi']}")
         print(f"Min NDVI: {live_res['min_ndvi']}")
@@ -308,8 +368,10 @@ class TestCopernicusLiveProvider:
         print("-----------------------------------------------\n")
 
         assert live_res["mean_ndvi"] is not None
-        assert 0.55 <= live_res["mean_ndvi"] <= 0.65
-        assert 0.58 <= live_res["median_ndvi"] <= 0.65
+        assert pytest.approx(live_res["mean_ndvi"], 0.01) == 0.640
+        assert pytest.approx(live_res["vegetation_mean_ndvi"], 0.01) == 0.640
+        assert pytest.approx(live_res["bare_soil_mean_ndvi"], 0.01) == 0.458
+        assert pytest.approx(live_res["surface_mean_ndvi"], 0.01) == 0.567
         assert -1.0 <= live_res["min_ndvi"] <= live_res["max_ndvi"] <= 1.0
         assert live_res["std_ndvi"] > 0.0
 
@@ -331,12 +393,16 @@ class TestCopernicusLiveProvider:
         print(f"B08 Native Resolution: {live_res['b08_native_resolution_meters']}m")
         print(f"Target Output Grid: {live_res['target_grid_meters']}m")
         print(f"Resampling Method: {live_res['resampling_method']}")
+        print(f"Vegetation Canopy Mean NDMI (Class 4): {live_res['vegetation_mean_ndmi']}")
+        print(f"Surface Aggregate Mean NDMI: {live_res['surface_mean_ndmi']}")
         print(f"Mean NDMI: {live_res['mean_ndmi']}")
         print(f"Resampling Notes: {live_res['resampling_notes']}")
         print("-----------------------------------------------\n")
 
         assert live_res["mean_ndmi"] is not None
-        assert 0.10 <= live_res["mean_ndmi"] <= 0.25
+        assert pytest.approx(live_res["mean_ndmi"], 0.01) == 0.217
+        assert pytest.approx(live_res["vegetation_mean_ndmi"], 0.01) == 0.217
+        assert pytest.approx(live_res["surface_mean_ndmi"], 0.01) == 0.157
         assert live_res["b11_native_resolution_meters"] == 20.0
         assert live_res["b08_native_resolution_meters"] == 10.0
         assert live_res["resampling_method"] == "bilinear"

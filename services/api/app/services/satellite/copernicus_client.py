@@ -127,6 +127,116 @@ def convert_raw_dn_to_reflectance(dn: float, processing_baseline: str = "N0500")
     return res if res is not None else 0.0
 
 
+def validate_cog_reflectance_conversion(
+    item_props: Optional[Dict[str, Any]] = None,
+    asset_dict: Optional[Dict[str, Any]] = None,
+    raster_scales: Optional[Tuple[float, ...]] = None,
+    raster_offsets: Optional[Tuple[float, ...]] = None,
+    is_calibrated_reflectance: bool = False,
+) -> Tuple[float, float, str]:
+    """
+    Independently validates and resolves the radiometric conversion formula
+    for Sentinel-2 Cloud-Optimized GeoTIFFs (COGs).
+
+    Returns: (scale_factor, additive_offset, conversion_status)
+    Where: Surface Reflectance = (DN * scale_factor) + additive_offset
+
+    Handling rules:
+    1. Pre-calibrated float reflectance:
+       Returns (1.0, 0.0, "PRE_CALIBRATED_FLOAT").
+    2. Embedded GeoTIFF scales/offsets:
+       If GeoTIFF headers explicitly define non-default scaling (scale != 1.0 or offset != 0.0),
+       uses embedded tags directly: (scale, offset, "GEOTIFF_EMBEDDED_METADATA").
+    3. Element 84 Earth Search COGs:
+       Item property `earthsearch:boa_offset_applied: True` indicates that Element 84
+       subtracted the ESA -1000 DN offset during COG creation.
+       Stored DN is already harmonized to [0, 10000]:
+       Reflectance = DN / 10000.0 = DN * 0.0001 (offset = 0.0).
+       Returns (0.0001, 0.0, "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED").
+    4. Raw ESA SAFE DNs (or earthsearch:boa_offset_applied: False):
+       For PB >= 04.00 (e.g. 05.13):
+       Reflectance = (DN - 1000.0) / 10000.0 = (DN * 0.0001) - 0.10.
+       Returns (0.0001, -0.10, "RAW_SAFE_DN_OFFSET_REQUIRED").
+       For legacy PB < 04.00:
+       Returns (0.0001, 0.0, "LEGACY_SAFE_DN_ZERO_OFFSET").
+    5. Contradictory Metadata:
+       If metadata provides conflicting or unresolvable instructions
+       (e.g. invalid negative scale, or contradictory flags),
+       fails closed and returns (0.0, 0.0, "CONTRADICTORY_METADATA_UNVERIFIED").
+    6. Missing Metadata:
+       If item_props is None or empty and no scales/offsets are supplied:
+       Returns (0.0, 0.0, "MISSING_CONVERSION_METADATA_UNVERIFIED").
+    """
+    if is_calibrated_reflectance:
+        return (1.0, 0.0, "PRE_CALIBRATED_FLOAT")
+
+    props = item_props or {}
+    asset = asset_dict or {}
+
+    # Check for embedded GeoTIFF tags
+    if raster_scales and len(raster_scales) > 0 and raster_scales[0] not in (1.0, 0.0, None):
+        scale = float(raster_scales[0])
+        if scale <= 0.0:
+            return (0.0, 0.0, "CONTRADICTORY_METADATA_UNVERIFIED")
+        offset = (
+            float(raster_offsets[0])
+            if (raster_offsets and len(raster_offsets) > 0 and raster_offsets[0] is not None)
+            else 0.0
+        )
+        return (scale, offset, "GEOTIFF_EMBEDDED_METADATA")
+
+    if not props and not asset:
+        return (0.0, 0.0, "MISSING_CONVERSION_METADATA_UNVERIFIED")
+
+    # Contradiction flag check
+    if props.get("contradictory_metadata") is True or asset.get("contradictory_metadata") is True:
+        return (0.0, 0.0, "CONTRADICTORY_METADATA_UNVERIFIED")
+
+    # Check scale factor in raster:bands
+    raster_bands = asset.get("raster:bands", [])
+    asset_scale = None
+    asset_offset = None
+    if raster_bands and isinstance(raster_bands, list) and len(raster_bands) > 0:
+        asset_scale = raster_bands[0].get("scale")
+        asset_offset = raster_bands[0].get("offset")
+
+    # Check for negative or zero scale (invalid physics)
+    if asset_scale is not None and float(asset_scale) <= 0.0:
+        return (0.0, 0.0, "CONTRADICTORY_METADATA_UNVERIFIED")
+
+    scale = float(asset_scale) if asset_scale is not None else 0.0001
+
+    # Check boa_offset_applied
+    boa_applied = props.get("earthsearch:boa_offset_applied")
+    if boa_applied is None:
+        boa_applied = props.get("boa_offset_applied")
+
+    if boa_applied is True:
+        # Harmonized COG where Element 84 already subtracted 1000 DN
+        # Stored DN represents reflectance * 10000
+        return (scale, 0.0, "HARMONIZED_COG_BOA_OFFSET_ALREADY_APPLIED")
+    elif boa_applied is False:
+        # Raw ESA SAFE DN
+        pb = str(props.get("s2:processing_baseline") or props.get("processing_baseline") or "05.13")
+        pb_clean = pb.upper().replace("N", "").replace(".", "").strip()
+        try:
+            pb_int = int(pb_clean[:4]) if len(pb_clean) >= 4 else int(pb_clean)
+        except (ValueError, TypeError):
+            pb_int = 500
+
+        if pb_int >= 400:
+            offset = -0.10 if scale == 0.0001 else (-1000.0 * scale)
+            return (scale, offset, "RAW_SAFE_DN_OFFSET_REQUIRED")
+        else:
+            return (scale, 0.0, "LEGACY_SAFE_DN_ZERO_OFFSET")
+    else:
+        # Neither True nor False specified
+        if asset_offset is not None and asset_scale is not None:
+            return (float(asset_scale), float(asset_offset), "ASSET_SPECIFIED_SCALE_AND_OFFSET")
+        return (0.0, 0.0, "MISSING_CONVERSION_METADATA_UNVERIFIED")
+
+
+
 class CopernicusClient:
     """
     Client for querying Sentinel-2 Level-2A imagery from Copernicus Data Space Ecosystem.
@@ -332,9 +442,12 @@ class CopernicusClient:
                 logger.warning("Required band URLs missing in STAC feature")
                 return None
 
-            # 2. Open B04 to get CRS and transform
+            # 2. Open B04 to get CRS, transform, and embedded scales/offsets
             with rasterio.open(b04_url) as src_b04:
                 raster_crs = src_b04.crs.to_string() if src_b04.crs else "EPSG:32643"
+                scales = src_b04.scales
+                offsets = src_b04.offsets
+
                 transformer = pyproj.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
 
                 def reproject_coords(coords):
@@ -344,16 +457,16 @@ class CopernicusClient:
                 poly_proj = shapely.transform(poly, reproject_coords)
                 geom_proj = [mapping(poly_proj)]
 
-                out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True)
+                out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True, all_touched=False)
 
             with rasterio.open(b08_url) as src_b08:
-                out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True)
+                out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True, all_touched=False)
 
             with rasterio.open(b11_url) as src_b11:
-                out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True)
+                out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True, all_touched=False)
 
             with rasterio.open(scl_url) as src_scl:
-                out_scl, transform_scl = mask(src_scl, geom_proj, crop=True)
+                out_scl, transform_scl = mask(src_scl, geom_proj, crop=True, all_touched=False)
 
             # 3. Resample B11 (20m -> 10m grid) using Bilinear interpolation
             b11_resampled = np.empty_like(out_b08, dtype=np.float32)
@@ -384,64 +497,159 @@ class CopernicusClient:
             b11_raw = b11_resampled[0]
             scl = scl_resampled[0]
 
-            # 5. Masking
+            # 5. Masking and Class Separation
             farm_mask = (b04_raw > 0)
             total_pixels = int(np.sum(farm_mask))
             if total_pixels == 0:
                 logger.warning("Farm polygon does not overlap any raster pixels")
                 return None
 
-            valid_scl_mask = farm_mask & np.isin(scl, [4, 5, 6])
-            valid_pixel_count = int(np.sum(valid_scl_mask))
-            invalid_pixel_count = total_pixels - valid_pixel_count
-            coverage_pct = round((valid_pixel_count / total_pixels) * 100.0, 1)
-            cloud_pct = round((invalid_pixel_count / total_pixels) * 100.0, 1)
+            # SCL Classes:
+            # 4: Vegetation
+            # 5: Bare Soil
+            # 6: Water
+            # 3, 8, 9, 10, 11: Cloud & Shadow
+            # 0, 1, 7: NoData / Defective / Unclassified
+            veg_mask = farm_mask & (scl == 4)
+            soil_mask = farm_mask & (scl == 5)
+            water_mask = farm_mask & (scl == 6)
+            cloud_mask = farm_mask & np.isin(scl, [3, 8, 9, 10, 11])
+            other_mask = farm_mask & np.isin(scl, [0, 1, 7])
+            valid_surface_mask = veg_mask | soil_mask | water_mask
 
-            # 6. Reflectance Calibration
-            offset_applied = props.get("earthsearch:boa_offset_applied", True)
-            if offset_applied:
-                b04_refl = b04_raw[valid_scl_mask] / 10000.0
-                b08_refl = b08_raw[valid_scl_mask] / 10000.0
-                b11_refl = b11_raw[valid_scl_mask] / 10000.0
+            n_veg = int(np.sum(veg_mask))
+            n_soil = int(np.sum(soil_mask))
+            n_water = int(np.sum(water_mask))
+            n_cloud = int(np.sum(cloud_mask))
+            n_other = int(np.sum(other_mask))
+            n_valid_surface = n_veg + n_soil + n_water
+            n_invalid = total_pixels - n_valid_surface
+
+            valid_surface_coverage_pct = round((n_valid_surface / total_pixels) * 100.0, 1)
+            veg_coverage_pct = round((n_veg / total_pixels) * 100.0, 1)
+            soil_coverage_pct = round((n_soil / total_pixels) * 100.0, 1)
+            water_coverage_pct = round((n_water / total_pixels) * 100.0, 1)
+            cloud_pct = round((n_cloud / total_pixels) * 100.0, 1)
+            other_pct = round((n_other / total_pixels) * 100.0, 1)
+
+            # 6. Radiometric Calibration Resolution (Fail-Closed Verification)
+            scale, offset, conv_status = validate_cog_reflectance_conversion(
+                item_props=props,
+                asset_dict=assets.get("red", {}),
+                raster_scales=scales,
+                raster_offsets=offsets,
+            )
+
+            if conv_status.endswith("UNVERIFIED"):
+                logger.warning("Radiometric conversion unverified: %s", conv_status)
+                return {
+                    "observation_date": datetime.utcnow(),
+                    "product_id": feature.get("id", "UNKNOWN"),
+                    "tile_id": "43QDA",
+                    "sensor": "Sentinel-2 L2A",
+                    "processing_baseline": f"N{props.get('s2:processing_baseline', '05.13').replace('.', '')}",
+                    "product_cloud_coverage_percent": round(float(props.get("eo:cloud_cover", 0.0)), 2),
+                    "mean_ndvi": None,
+                    "median_ndvi": None,
+                    "min_ndvi": None,
+                    "max_ndvi": None,
+                    "std_ndvi": None,
+                    "mean_ndmi": None,
+                    "valid_pixel_count": n_valid_surface,
+                    "total_pixel_count": total_pixels,
+                    "farm_coverage_percent": valid_surface_coverage_pct,
+                    "cloud_masked_percent": cloud_pct,
+                    "spatial_resolution_meters": 10.0,
+                    "quality_status": "UNVERIFIED_RADIOMETRY",
+                    "quality_notes": f"Observation unverified: {conv_status}.",
+                    "radiometric_conversion_provenance": conv_status,
+                }
+
+            # 7. Compute Class-Segregated Indices
+            # Pure Vegetation Canopy Metrics (Class 4)
+            if n_veg >= 5:
+                v_b04 = (b04_raw[veg_mask] * scale) + offset
+                v_b08 = (b08_raw[veg_mask] * scale) + offset
+                v_b11 = (b11_raw[veg_mask] * scale) + offset
+
+                veg_ndvi_pixels = np.clip((v_b08 - v_b04) / (v_b08 + v_b04 + 1e-8), -1.0, 1.0)
+                veg_ndmi_pixels = np.clip((v_b08 - v_b11) / (v_b08 + v_b11 + 1e-8), -1.0, 1.0)
+
+                veg_mean_ndvi = round(float(np.mean(veg_ndvi_pixels)), 3)
+                veg_median_ndvi = round(float(np.median(veg_ndvi_pixels)), 3)
+                veg_min_ndvi = round(float(np.min(veg_ndvi_pixels)), 3)
+                veg_max_ndvi = round(float(np.max(veg_ndvi_pixels)), 3)
+                veg_std_ndvi = round(float(np.std(veg_ndvi_pixels)), 3)
+                veg_mean_ndmi = round(float(np.mean(veg_ndmi_pixels)), 3)
             else:
-                pb = props.get("s2:processing_baseline", "05.13")
-                offset = -1000.0 if "05" in pb or "04" in pb else 0.0
-                b04_refl = (b04_raw[valid_scl_mask] + offset) / 10000.0
-                b08_refl = (b08_raw[valid_scl_mask] + offset) / 10000.0
-                b11_refl = (b11_raw[valid_scl_mask] + offset) / 10000.0
+                veg_mean_ndvi = veg_median_ndvi = veg_min_ndvi = veg_max_ndvi = veg_std_ndvi = veg_mean_ndmi = None
 
-            # 7. Compute indices
-            if valid_pixel_count > 0:
-                ndvi_pixels = (b08_refl - b04_refl) / (b08_refl + b04_refl + 1e-8)
-                ndmi_pixels = (b08_refl - b11_refl) / (b08_refl + b11_refl + 1e-8)
-
-                # Clamp indices to physical range [-1.0, 1.0]
-                ndvi_pixels = np.clip(ndvi_pixels, -1.0, 1.0)
-                ndmi_pixels = np.clip(ndmi_pixels, -1.0, 1.0)
-
-                mean_ndvi = round(float(np.mean(ndvi_pixels)), 3)
-                median_ndvi = round(float(np.median(ndvi_pixels)), 3)
-                min_ndvi = round(float(np.min(ndvi_pixels)), 3)
-                max_ndvi = round(float(np.max(ndvi_pixels)), 3)
-                std_ndvi = round(float(np.std(ndvi_pixels)), 3)
-                mean_ndmi = round(float(np.mean(ndmi_pixels)), 3)
+            # Bare Soil Metrics (Class 5)
+            if n_soil > 0:
+                s_b04 = (b04_raw[soil_mask] * scale) + offset
+                s_b08 = (b08_raw[soil_mask] * scale) + offset
+                soil_ndvi_pixels = np.clip((s_b08 - s_b04) / (s_b08 + s_b04 + 1e-8), -1.0, 1.0)
+                bare_soil_mean_ndvi = round(float(np.mean(soil_ndvi_pixels)), 3)
             else:
-                mean_ndvi = median_ndvi = min_ndvi = max_ndvi = std_ndvi = mean_ndmi = None
+                bare_soil_mean_ndvi = None
 
-            is_small_farm = (farm_area_ha < 0.5) or (valid_pixel_count < 5)
+            # Combined Surface Metrics (Classes 4+5+6, for multi-surface reference)
+            if n_valid_surface > 0:
+                c_b04 = (b04_raw[valid_surface_mask] * scale) + offset
+                c_b08 = (b08_raw[valid_surface_mask] * scale) + offset
+                c_b11 = (b11_raw[valid_surface_mask] * scale) + offset
 
-            if cloud_pct > 50.0:
+                surf_ndvi_pixels = np.clip((c_b08 - c_b04) / (c_b08 + c_b04 + 1e-8), -1.0, 1.0)
+                surf_ndmi_pixels = np.clip((c_b08 - c_b11) / (c_b08 + c_b11 + 1e-8), -1.0, 1.0)
+
+                surface_mean_ndvi = round(float(np.mean(surf_ndvi_pixels)), 3)
+                surface_mean_ndmi = round(float(np.mean(surf_ndmi_pixels)), 3)
+            else:
+                surface_mean_ndvi = surface_mean_ndmi = None
+
+            # Set primary canopy indices to pure vegetation (Class 4) if present, else surface
+            mean_ndvi = veg_mean_ndvi if veg_mean_ndvi is not None else surface_mean_ndvi
+            median_ndvi = veg_median_ndvi if veg_median_ndvi is not None else surface_mean_ndvi
+            min_ndvi = veg_min_ndvi if veg_min_ndvi is not None else None
+            max_ndvi = veg_max_ndvi if veg_max_ndvi is not None else None
+            std_ndvi = veg_std_ndvi if veg_std_ndvi is not None else 0.0
+            mean_ndmi = veg_mean_ndmi if veg_mean_ndmi is not None else surface_mean_ndmi
+
+            # 8. Spatial Discretization Accounting
+            raster_discretized_area_ha = round(total_pixels * 0.01, 3)
+            discretization_delta_ha = round(raster_discretized_area_ha - farm_area_ha, 3)
+
+            # 9. Quality Status Classification
+            is_small_farm = (farm_area_ha < 0.5) or (n_valid_surface < 5)
+
+            if n_valid_surface == 0:
+                quality = "NO_USABLE_OBSERVATION"
+                notes = "Zero valid surface pixels inside parcel boundary."
+            elif cloud_pct > 50.0:
                 quality = "CLOUD_OBSTRUCTED"
-                notes = f"Observation obstructed by clouds ({cloud_pct}% masked)."
-            elif coverage_pct < 50.0:
-                quality = "INSUFFICIENT_PIXELS"
-                notes = f"Insufficient valid pixels ({coverage_pct}% farm coverage)."
+                notes = f"Observation obstructed by clouds ({cloud_pct}% cloud masked)."
+            elif valid_surface_coverage_pct < 50.0:
+                quality = "LOW_VALID_PIXEL_COVERAGE"
+                notes = f"Low valid surface coverage ({valid_surface_coverage_pct}% of parcel)."
+            elif n_veg < 5:
+                quality = "INSUFFICIENT_VEGETATION_PIXELS"
+                notes = f"Insufficient vegetation canopy pixels ({n_veg} pixels); {n_soil} bare soil pixels detected."
             elif is_small_farm:
                 quality = "SMALL_FARM_WARNING"
-                notes = f"Farm parcel ({farm_area_ha:.2f} ha, {valid_pixel_count} pixels) is subject to 10m Sentinel-2 boundary pixel edge effects."
+                notes = f"Farm parcel ({farm_area_ha:.2f} ha, {n_valid_surface} pixels) is subject to 10m Sentinel-2 boundary edge effects."
+            elif (n_cloud + n_other) > 0:
+                quality = "VALID_OBSERVATION_WITH_MASKED_PIXELS"
+                notes = f"Valid observation with {n_veg} vegetation canopy pixels ({veg_coverage_pct}%) and {n_soil} bare soil pixels ({soil_coverage_pct}%); {n_cloud + n_other} boundary/shadow pixels masked."
             else:
                 quality = "VALID_OBSERVATION"
-                notes = f"High quality cloud-free observation ({valid_pixel_count} valid 10m pixels)."
+                notes = f"100% cloud-free observation with {n_veg} vegetation canopy pixels."
+
+            meta_tag = (
+                f"[veg_px: {n_veg}, soil_px: {n_soil}, water_px: {n_water}, "
+                f"veg_ndvi: {veg_mean_ndvi}, veg_ndmi: {veg_mean_ndmi}, soil_ndvi: {bare_soil_mean_ndvi}, "
+                f"poly_ha: {farm_area_ha}, raster_ha: {raster_discretized_area_ha}, rad: {conv_status}]"
+            )
+            notes = f"{notes} {meta_tag}"
 
             dt_str = props.get("datetime")
             obs_dt = (
@@ -463,10 +671,25 @@ class CopernicusClient:
                 "max_ndvi": max_ndvi,
                 "std_ndvi": std_ndvi,
                 "mean_ndmi": mean_ndmi,
-                "valid_pixel_count": valid_pixel_count,
+                "surface_mean_ndvi": surface_mean_ndvi,
+                "surface_mean_ndmi": surface_mean_ndmi,
+                "vegetation_pixel_count": n_veg,
+                "bare_soil_pixel_count": n_soil,
+                "water_pixel_count": n_water,
+                "vegetation_coverage_percent": veg_coverage_pct,
+                "bare_soil_coverage_percent": soil_coverage_pct,
+                "water_coverage_percent": water_coverage_pct,
+                "vegetation_mean_ndvi": veg_mean_ndvi,
+                "vegetation_mean_ndmi": veg_mean_ndmi,
+                "bare_soil_mean_ndvi": bare_soil_mean_ndvi,
+                "valid_pixel_count": n_valid_surface,
                 "total_pixel_count": total_pixels,
-                "farm_coverage_percent": coverage_pct,
+                "farm_coverage_percent": valid_surface_coverage_pct,
                 "cloud_masked_percent": cloud_pct,
+                "boundary_masked_percent": other_pct,
+                "polygon_area_hectares": farm_area_ha,
+                "raster_discretized_area_hectares": raster_discretized_area_ha,
+                "discretization_delta_hectares": discretization_delta_ha,
                 "spatial_resolution_meters": 10.0,
                 "b11_native_resolution_meters": 20.0,
                 "b08_native_resolution_meters": 10.0,
@@ -478,6 +701,8 @@ class CopernicusClient:
                 "quality_notes": notes,
                 "is_small_farm_warning": is_small_farm,
                 "copernicus_provider_status": "LIVE_SENTINEL_2_L2A_RASTER",
+                "radiometric_conversion_provenance": conv_status,
+                "data_attribution": "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.",
                 "raster_crs": raster_crs,
                 "asset_urls": {
                     "b04": b04_url,
