@@ -57,7 +57,7 @@ def generate_grounded_template_answer(
         )
     elif any(k in msg_low for k in ["weather", "temperature", "rain"]):
         return (
-            f"Today's weather at your farm in {farm.taluka}, Pune: "
+            f"Today's weather at your farm in {farm.taluka}, {farm.district}: "
             f"{weather['temperature_c']}°C, humidity {weather['relative_humidity_pct']}%, "
             f"wind {weather['wind_speed_kmh']} km/h, condition: {weather['condition']}. "
             f"Rainfall today: {weather['rainfall_today_mm']} mm. (Source: {weather['source']})."

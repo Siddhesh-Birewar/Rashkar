@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/app_state.dart';
 import 'screens/home_screen.dart';
 import 'screens/my_crop_screen.dart';
 import 'screens/heat_safety_screen.dart';
@@ -6,6 +7,8 @@ import 'screens/extra_income_screen.dart';
 import 'screens/ask_rashkar_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  AppState.instance.initialize();
   runApp(const RashkarFarmerApp());
 }
 

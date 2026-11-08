@@ -46,18 +46,24 @@ class CropNetService:
     def create_synthetic_test_profile(farm_id: str, plot_id: Optional[str] = None, taluka: str = "Baramati") -> UnifiedSoilProfile:
         """
         Construct a test fixture strictly flagged with is_synthetic_test_data=True.
-        Represents realistic agro-climatic soil characteristics of Pune pilot talukas
-        (Baramati/Indapur Vertisols vs Maval/Mulshi Lateritic soils) without fabricating lab data.
+        Represents realistic agro-climatic soil characteristics across Maharashtra:
+        Black Vertisols for Deccan/Marathwada/Vidarbha vs Lateritic/coastal soils for Konkan/Ghats.
         """
-        is_vertisol = taluka.lower() in ["baramati", "indapur"]
+        t_low = (taluka or "").lower()
+        is_coastal_lateritic = any(k in t_low for k in [
+            "maval", "mulshi", "ratnagiri", "sindhudurg", "raigad", "thane", "palghar",
+            "ghat", "konkan", "paud", "wadgaon", "chiplun", "khed", "sawantwadi", "dahanu"
+        ])
+
+        is_vertisol = not is_coastal_lateritic
 
         ph_val = 7.8 if is_vertisol else 6.2
         clay_val = 52.0 if is_vertisol else 28.0
         sand_val = 18.0 if is_vertisol else 45.0
         silt_val = 30.0 if is_vertisol else 27.0
         texture_code = "clay" if is_vertisol else "sandy_clay_loam"
-        texture_display = "Heavy Black Clay (Vertisol)" if is_vertisol else "Sandy Clay Loam (Transition Zone)"
-        zone_id = "ZONE_PUNE_VERTISOL_DEEP" if is_vertisol else "ZONE_PUNE_GHAT_LATERITIC"
+        texture_display = "Medium to Deep Black Clay (Vertisol)" if is_vertisol else "Lateritic / Sandy Clay Loam (Western Ghats & Coastal)"
+        zone_id = "ZONE_MAHA_VERTISOL_DEEP" if is_vertisol else "ZONE_MAHA_COASTAL_LATERITIC"
 
         return UnifiedSoilProfile(
             profile_id=f"CN_SOIL_TEST_{farm_id}",

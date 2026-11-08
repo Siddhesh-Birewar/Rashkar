@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class AskRashkarScreen extends StatefulWidget {
   const AskRashkarScreen({Key? key}) : super(key: key);
@@ -26,11 +27,37 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
   @override
   void initState() {
     super.initState();
-    // Initial welcome message
+    AppState.instance.addListener(_onStateChange);
+    _initWelcome();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onStateChange() {
+    if (mounted) {
+      setState(() {
+        _initWelcome();
+      });
+    }
+  }
+
+  void _initWelcome() {
+    final appState = AppState.instance;
+    final farm = appState.activeFarm;
+    final loc = farm != null ? '${appState.activeTaluka}, ${appState.activeDistrict}' : 'Maharashtra';
+    final crop = farm != null ? appState.activeCropName : 'crops';
+
+    _messages.clear();
     _messages.add(
       AssistantChatMessage(
         sender: 'assistant',
-        text: 'Namaste! I am Rashkar Assistant. I have loaded your active farm and weather conditions in Baramati. How can I help you today?',
+        text: 'Namaste! I am Rashkar Assistant. I have loaded your farm and weather conditions in $loc ($crop). How can I assist you with weather, agronomic advisories, or heat safety today?',
         timestamp: DateTime.now(),
       ),
     );
@@ -54,9 +81,13 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
 
     _scrollToBottom();
 
+    final appState = AppState.instance;
+    final farmerId = appState.activeFarmerId ?? 'farmer_demo_01';
+    final farmId = appState.activeFarmId ?? 'farm_demo_pune_01';
+
     final response = await ApiService.sendAssistantMessage(
-      farmerId: 'farmer_demo_01',
-      farmId: 'farm_demo_pune_01',
+      farmerId: farmerId,
+      farmId: farmId,
       message: clean,
       sessionId: _sessionId,
     );
@@ -95,10 +126,21 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = AppState.instance;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       appBar: AppBar(
-        title: const Text('Ask Rashkar Assistant', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Ask Rashkar Assistant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              '${appState.activeFarm?.farmName ?? "Farm"} · ${appState.activeTaluka}, ${appState.activeDistrict}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),

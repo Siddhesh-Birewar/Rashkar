@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class ExtraIncomeScreen extends StatefulWidget {
   const ExtraIncomeScreen({Key? key}) : super(key: key);
@@ -20,18 +21,37 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
   @override
   void initState() {
     super.initState();
+    AppState.instance.addListener(_onStateChange);
+    _loadOpportunities();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    super.dispose();
+  }
+
+  void _onStateChange() {
     _loadOpportunities();
   }
 
   Future<void> _loadOpportunities() async {
     setState(() => _isLoading = true);
-    final opps = await ApiService.getIncomeOpportunities(cropCode: 'soybean');
+    final crop = AppState.instance.activeCropCode;
+    var opps = await ApiService.getIncomeOpportunities(cropCode: crop);
+    if (opps.isEmpty) {
+      // Fallback to general opportunities if no crop-specific match
+      opps = await ApiService.getIncomeOpportunities();
+    }
+
     if (mounted) {
       setState(() {
         _opportunities = opps;
         if (opps.isNotEmpty) {
           _selectedOpportunity = opps.first;
           _customBudget = opps.first.minInvestmentInr;
+        } else {
+          _selectedOpportunity = null;
         }
         _isLoading = false;
       });
@@ -58,12 +78,26 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = AppState.instance;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       appBar: AppBar(
-        title: const Text('Extra Income & Diversification', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Extra Income & Diversification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              'For ${appState.activeCropName} · ${appState.activeTaluka}, ${appState.activeDistrict}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF00695C),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadOpportunities),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00695C)))
@@ -72,6 +106,29 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Crop Context Tag
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2F1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF80CBC4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.eco, size: 16, color: Color(0xFF004D40)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Enterprises compatible with ${appState.activeCropName} residues & resources in ${appState.activeDistrict}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF004D40)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   const Text(
                     'CURATED AGRO-ENTERPRISES',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
@@ -80,7 +137,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
 
                   // Opportunity Selector Horizontal Cards
                   SizedBox(
-                    height: 120,
+                    height: 125,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: _opportunities.length,
@@ -96,7 +153,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                             _calculateScenario();
                           },
                           child: Container(
-                            width: 220,
+                            width: 230,
                             margin: const EdgeInsets.only(right: 12),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -126,7 +183,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF00695C)),
                                 ),
                                 Text(
-                                  'Payback: ~${opp.paybackPeriodMonths} mos',
+                                  'Payback: ~${opp.paybackPeriodMonths} mos · Profit: ₹${opp.potentialAnnualProfitInr.toInt()}/yr',
                                   style: const TextStyle(fontSize: 11, color: Colors.black54),
                                 ),
                               ],

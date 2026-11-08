@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class CropLossScreen extends StatefulWidget {
   const CropLossScreen({Key? key}) : super(key: key);
@@ -34,12 +35,31 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    AppState.instance.addListener(_onStateChange);
+    _cropCode = AppState.instance.activeCropCode;
     _loadCases();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onStateChange() {
+    if (mounted) {
+      setState(() {
+        _cropCode = AppState.instance.activeCropCode;
+      });
+      _loadCases();
+    }
   }
 
   Future<void> _loadCases() async {
     setState(() => _isLoading = true);
-    final c = await ApiService.getFarmerLossCases('farmer_demo_01');
+    final farmerId = AppState.instance.activeFarmerId ?? 'farmer_demo_01';
+    final c = await ApiService.getFarmerLossCases(farmerId);
     if (mounted) {
       setState(() {
         _cases = c;
@@ -50,15 +70,18 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
 
   Future<void> _submitCase({required bool isDraft}) async {
     setState(() => _isSubmitting = true);
+    final farmerId = AppState.instance.activeFarmerId ?? 'farmer_demo_01';
+    final farmId = AppState.instance.activeFarmId ?? 'farm_demo_pune_01';
+
     final newCase = await ApiService.submitCropLossCase(
-      farmerId: 'farmer_demo_01',
-      farmId: 'farm_demo_pune_01',
+      farmerId: farmerId,
+      farmId: farmId,
       cropCode: _cropCode,
       eventDate: '${_eventDate.year}-${_eventDate.month.toString().padLeft(2, '0')}-${_eventDate.day.toString().padLeft(2, '0')}',
       perilType: _perilType,
       damageEstimatePct: _damagePct,
       affectedAreaAcres: _affectedAcres,
-      photoUrls: ['/storage/photos/demo_damage_01.jpg'],
+      photoUrls: ['/storage/photos/damage_field_evidence.jpg'],
       isDraft: isDraft,
     );
 
@@ -80,12 +103,26 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final appState = AppState.instance;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       appBar: AppBar(
-        title: const Text('PMFBY Crop Loss Evidence', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('PMFBY Crop Loss Evidence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              '${appState.activeFarm?.farmName ?? "Farm"} · ${appState.activeTaluka}, ${appState.activeDistrict}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF4527A0),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadCases),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -108,11 +145,36 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
   }
 
   Widget _buildFormTab() {
+    final appState = AppState.instance;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Active Farm Indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDE7F6),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFB39DDB)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield_outlined, size: 16, color: Color(0xFF4527A0)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Filing for: ${appState.activeFarm?.farmName ?? "Active Farm"} (${appState.activeCropName}) in ${appState.activeDistrict}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4527A0)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           const Text(
             'RECORD CROP LOSS INCIDENT',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
@@ -205,22 +267,23 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Geotagged Field Photos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Text('Field Photos (with GPS & Timestamp)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 8),
                   Container(
-                    height: 90,
+                    height: 100,
+                    width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEDE7F6),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFB39DDB), style: BorderStyle.solid),
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.camera_alt, color: Color(0xFF4527A0), size: 28),
-                          SizedBox(height: 4),
-                          Text('2 field photos attached (GPS Verified)', style: TextStyle(fontSize: 12, color: Color(0xFF4527A0), fontWeight: FontWeight.w600)),
+                        children: const [
+                          Icon(Icons.camera_alt_outlined, color: Colors.black45, size: 32),
+                          SizedBox(height: 6),
+                          Text('1 geotagged photo attached (simulated)', style: TextStyle(fontSize: 12, color: Colors.black54)),
                         ],
                       ),
                     ),
@@ -229,50 +292,51 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // Action Buttons
           if (_isSubmitting)
             const Center(child: CircularProgressIndicator(color: Color(0xFF4527A0)))
           else ...[
-            ElevatedButton.icon(
-              onPressed: () => _submitCase(isDraft: false),
-              icon: const Icon(Icons.send),
-              label: const Text('SUBMIT EVIDENCE DOSSIER FOR REVIEW', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4527A0),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () => _submitCase(isDraft: false),
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('Submit Evidence Dossier for Review', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4527A0),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
+            const SizedBox(height: 10),
+            OutlinedButton(
               onPressed: () => _submitCase(isDraft: true),
-              icon: const Icon(Icons.save_alt),
-              label: const Text('SAVE AS OFFLINE DRAFT'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              child: const Text('Save Offline Draft'),
             ),
           ],
           const SizedBox(height: 16),
 
-          // Legal Disclaimer
+          // Mandatory PMFBY Disclaimers
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.amber.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade400),
             ),
             child: const Text(
-              'Notice: This prototype prepares a verified evidence packet for formal human review. Strictly NOT an official automatic PMFBY claim approval or insurer submission without authorized integration.',
-              style: TextStyle(fontSize: 12, color: Colors.black54, fontStyle: FontStyle.italic),
+              'Statutory PMFBY Notice: Rashkar is a decision-support and evidence gathering platform. Submission here compiles an evidentiary dossier under PMFBY Clause 11/12 guidelines. It does NOT constitute final official claim settlement, which is governed exclusively by designated insurance companies and government authorities.',
+              style: TextStyle(fontSize: 11, color: Color(0xFF5D4037)),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -283,7 +347,9 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
       return const Center(child: CircularProgressIndicator(color: Color(0xFF4527A0)));
     }
     if (_cases.isEmpty) {
-      return const Center(child: Text('No crop loss cases submitted yet.'));
+      return const Center(
+        child: Text('No loss cases recorded yet. Use the New Evidence tab to start.'),
+      );
     }
 
     return ListView.builder(
@@ -291,18 +357,10 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
       itemCount: _cases.length,
       itemBuilder: (context, idx) {
         final c = _cases[idx];
-        Color statusColor = Colors.orange;
-        String statusText = 'Under Review';
-        if (c.dossierStatus == 'draft_saved') {
-          statusColor = Colors.blueGrey;
-          statusText = 'Draft Saved';
-        } else if (c.dossierStatus == 'evidence_submitted') {
-          statusColor = Colors.indigo;
-          statusText = 'Evidence Submitted';
-        } else if (c.dossierStatus == 'review_completed') {
-          statusColor = Colors.green;
-          statusText = 'Review Completed';
-        }
+        final isDraft = c.dossierStatus == 'draft';
+        final eventDt = DateTime.tryParse(c.eventDate) ?? DateTime.now();
+        final hoursSince = DateTime.now().difference(eventDt).inHours;
+        final within72 = hoursSince <= 72;
 
         return Card(
           elevation: 2,
@@ -317,34 +375,44 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Case: ${c.caseId}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      c.caseId,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF4527A0)),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: isDraft ? Colors.grey.shade200 : const Color(0xFFEDE7F6),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        statusText,
-                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
+                        isDraft ? 'OFFLINE DRAFT' : c.dossierStatus.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDraft ? Colors.black54 : const Color(0xFF4527A0),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Crop: ${c.cropCode.toUpperCase()} · Loss Event: ${c.perilType.replaceAll("_", " ").toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                Text('Damage: ${c.damageEstimatePct.toInt()}% on ${c.affectedAreaAcres} acres (Date: ${c.eventDate})', style: const TextStyle(fontSize: 13, color: Colors.black87)),
-                const Divider(height: 18),
                 Text(
-                  'Weather Anomaly: ${c.weatherEvidenceSummary['anomaly_classification'] ?? "Recorded locally"}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20), fontWeight: FontWeight.w500),
+                  'Peril: ${c.perilType.replaceAll('_', ' ').toUpperCase()} · ${c.cropCode.toUpperCase()}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
-                if (c.reviewerDecision != null) ...[
-                  const SizedBox(height: 6),
-                  Text('Reviewer Decision: ${c.reviewerDecision} (${c.reviewerRationale})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                ]
+                Text(
+                  'Reported Event Date: ${c.eventDate} · Damage: ${c.damageEstimatePct.toInt()}%',
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '72h Window Status: ${hoursSince}h elapsed (${within72 ? "Compliant with 72h notice" : "Exceeds 72h window"})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: within72 ? Colors.green.shade800 : Colors.red.shade800,
+                  ),
+                ),
               ],
             ),
           ),

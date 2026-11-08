@@ -65,7 +65,9 @@ def get_opportunities(
     opps = query.all()
     if crop_code:
         c_clean = crop_code.lower()
-        opps = [o for o in opps if c_clean in [c.lower() for c in (o.target_crops or [])]]
+        filtered = [o for o in opps if c_clean in [c.lower() for c in (o.target_crops or [])]]
+        if filtered:
+            opps = filtered
     
     return [
         OpportunityResponse(

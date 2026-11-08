@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rashkar_farmer/main.dart';
 import 'package:rashkar_farmer/services/api_service.dart';
+import 'package:rashkar_farmer/services/app_state.dart';
 import 'package:rashkar_farmer/screens/home_screen.dart';
 import 'package:rashkar_farmer/screens/farm_registration_screen.dart';
 import 'package:rashkar_farmer/screens/extra_income_screen.dart';
@@ -13,7 +14,8 @@ void main() {
     ApiService.mockMode = true;
   });
 
-  testWidgets('Rashkar main app boots and renders navigation shell', (WidgetTester tester) async {
+  testWidgets('Rashkar main app boots and renders navigation shell in clean starting state', (WidgetTester tester) async {
+    AppState.instance.clearSession();
     await tester.pumpWidget(const RashkarFarmerApp());
     await tester.pumpAndSettle();
 
@@ -23,9 +25,12 @@ void main() {
     expect(find.text('Heat Safety'), findsWidgets);
     expect(find.text('Income'), findsOneWidget);
     expect(find.text('Ask Rashkar'), findsOneWidget);
+    expect(find.text('Welcome to Rashkar'), findsOneWidget);
+    expect(find.text('Register Your Farm'), findsOneWidget);
   });
 
-  testWidgets('Home screen displays 4 primary action buttons and Ask Rashkar banner', (WidgetTester tester) async {
+  testWidgets('Home screen displays 4 primary action buttons when demo farm is loaded', (WidgetTester tester) async {
+    await AppState.instance.loadDemoFarm();
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
     await tester.pumpAndSettle();
 
@@ -34,10 +39,10 @@ void main() {
     expect(find.text('Heat Safety'), findsOneWidget);
     expect(find.text('Extra Income'), findsOneWidget);
     expect(find.text('Crop Loss'), findsOneWidget);
-    expect(find.text('ASK RASHKAR ASSISTANT'), findsOneWidget);
+    expect(find.text('Ask Rashkar AI Assistant'), findsOneWidget);
   });
 
-  testWidgets('Farm registration screen displays 5-step guided flow', (WidgetTester tester) async {
+  testWidgets('Farm registration screen displays 5-step guided flow with dynamic catalog', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: FarmRegistrationScreen()));
     await tester.pumpAndSettle();
 
@@ -71,7 +76,7 @@ void main() {
     expect(find.text('PMFBY Crop Loss Evidence'), findsOneWidget);
     expect(find.text('New Evidence'), findsOneWidget);
     expect(find.text('Dossier Cases'), findsOneWidget);
-    expect(find.text('SAVE AS OFFLINE DRAFT'), findsOneWidget);
-    expect(find.text('SUBMIT EVIDENCE DOSSIER FOR REVIEW'), findsOneWidget);
+    expect(find.text('Save Offline Draft'), findsOneWidget);
+    expect(find.text('Submit Evidence Dossier for Review'), findsOneWidget);
   });
 }

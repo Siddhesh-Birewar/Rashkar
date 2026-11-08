@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 import 'my_crop_screen.dart';
 import 'heat_safety_screen.dart';
 import 'extra_income_screen.dart';
@@ -18,28 +19,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  FarmSummary? _summary;
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _fetchSummary();
+    AppState.instance.addListener(_onStateChange);
   }
 
-  Future<void> _fetchSummary() async {
-    setState(() => _isLoading = true);
-    final s = await ApiService.getFarmSummary();
-    if (mounted) {
-      setState(() {
-        _summary = s;
-        _isLoading = false;
-      });
-    }
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    super.dispose();
+  }
+
+  void _onStateChange() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _refresh() async {
+    await AppState.instance.refreshFarms();
   }
 
   @override
   Widget build(BuildContext context) {
+    final appState = AppState.instance;
+    final summary = appState.activeFarm;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       appBar: AppBar(
@@ -51,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 1.2),
             ),
             Text(
-              _summary != null ? _summary!.locationDisplay : 'Maharashtra',
+              summary != null ? summary.locationDisplay : 'Maharashtra, India',
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             )
           ],
@@ -59,84 +63,344 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
+          if (appState.allFarms.isNotEmpty)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.swap_horiz, color: Colors.white),
+              tooltip: 'Switch Farm',
+              onSelected: (value) async {
+                if (value == '__register__') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FarmRegistrationScreen()),
+                  );
+                } else if (value == '__clear__') {
+                  appState.clearSession();
+                } else {
+                  await appState.selectFarmById(value);
+                }
+              },
+              itemBuilder: (context) {
+                final items = <PopupMenuEntry<String>>[];
+                items.add(
+                  const PopupMenuItem<String>(
+                    enabled: false,
+                    child: Text('REGISTERED FARMS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                );
+                for (final f in appState.allFarms) {
+                  final isSelected = f.farmId == appState.activeFarmId;
+                  items.add(
+                    PopupMenuItem<String>(
+                      value: f.farmId,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.check_circle : Icons.circle_outlined,
+                            color: isSelected ? const Color(0xFF1B5E20) : Colors.grey,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${f.farmName} (${f.activeCropName ?? "Crop"})',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                items.add(const PopupMenuDivider());
+                items.add(
+                  const PopupMenuItem<String>(
+                    value: '__register__',
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_circle_outline, color: Color(0xFF1B5E20), size: 18),
+                        SizedBox(width: 8),
+                        Text('Register New Farm', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                );
+                items.add(
+                  const PopupMenuItem<String>(
+                    value: '__clear__',
+                    child: Row(
+                      children: [
+                        Icon(Icons.restart_alt, color: Colors.black54, size: 18),
+                        SizedBox(width: 8),
+                        Text('Start Fresh / Select Screen'),
+                      ],
+                    ),
+                  ),
+                );
+                return items;
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.add_location_alt_outlined),
-            tooltip: 'Add / Register Farm',
+            tooltip: 'Register New Farm',
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FarmRegistrationScreen()),
-              ).then((_) => _fetchSummary());
+              );
             },
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchSummary,
+            tooltip: 'Refresh',
+            onPressed: _refresh,
           ),
         ],
       ),
-      body: _isLoading
+      body: appState.isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)))
-          : RefreshIndicator(
-              onRefresh: _fetchSummary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Greeting & farm identity
-                    _buildGreetingCard(),
-                    const SizedBox(height: 16),
-
-                    // Farm at a glance card
-                    _buildFarmGlanceCard(),
-                    const SizedBox(height: 16),
-
-                    // Today's Farm Conditions (Weather)
-                    _buildWeatherSummaryCard(),
-                    const SizedBox(height: 24),
-
-                    // WHAT WOULD YOU LIKE TO DO? (4 Large Buttons)
-                    const Text(
-                      'WHAT WOULD YOU LIKE TO DO?',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+          : summary == null
+              ? _buildCleanStartScreen()
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildGreetingCard(summary),
+                        const SizedBox(height: 16),
+                        _buildFarmGlanceCard(summary),
+                        const SizedBox(height: 16),
+                        _buildWeatherSummaryCard(summary),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'WHAT WOULD YOU LIKE TO DO?',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildFeatureGrid(),
+                        const SizedBox(height: 20),
+                        _buildAskRashkarBanner(),
+                        const SizedBox(height: 16),
+                        if (summary.activeAlerts.isNotEmpty) ...[
+                          const Text(
+                            "TODAY'S IMPORTANT ADVISORIES",
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+                          ),
+                          const SizedBox(height: 8),
+                          ...summary.activeAlerts.map((a) => _buildAlertItem(a)).toList(),
+                          const SizedBox(height: 16),
+                        ],
+                        Center(
+                          child: Text(
+                            'Data updated: ${summary.dataLastUpdated}',
+                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildFeatureGrid(),
-                    const SizedBox(height: 20),
-
-                    // ASK RASHKAR (Entry point)
-                    _buildAskRashkarBanner(),
-                    const SizedBox(height: 16),
-
-                    // Active Alerts (1 to 3 items)
-                    if (_summary != null && _summary!.activeAlerts.isNotEmpty) ...[
-                      const Text(
-                        'TODAY\'S IMPORTANT ADVISORIES',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-                      ),
-                      const SizedBox(height: 8),
-                      ..._summary!.activeAlerts.map((a) => _buildAlertItem(a)).toList(),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Footer data freshness
-                    Center(
-                      child: Text(
-                        'Data updated: ${_summary?.dataLastUpdated ?? "Recent"}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
-  Widget _buildGreetingCard() {
+  /// Clean starting state when no farm has been loaded or selected yet
+  Widget _buildCleanStartScreen() {
+    final appState = AppState.instance;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Hero Welcome Card
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            color: const Color(0xFFE8F5E9),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.agriculture, size: 56, color: Color(0xFF1B5E20)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Welcome to Rashkar',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B5E20),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Cloud-based Climate-Smart Agriculture Platform for Maharashtra',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'To get started with personalized yield intelligence, worker heat safety, crop stress advisories, and PMFBY loss evidence, set up your farm profile.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const FarmRegistrationScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1B5E20),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 2,
+                      ),
+                      icon: const Icon(Icons.add_location_alt, size: 22),
+                      label: const Text(
+                        'Register Your Farm',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Quick Demo option
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Color(0xFFFFF3E0),
+                    child: Icon(Icons.explore, color: Color(0xFFE65100)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Want to test immediately?',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        Text(
+                          'Load Baramati (Pune) Pilot Farm (Soybean, 2.5 acres)',
+                          style: TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () async {
+                      await appState.loadDemoFarm();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1B5E20),
+                      side: const BorderSide(color: Color(0xFF1B5E20)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Load Demo'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // If there are existing farms in the database, allow 1-tap select
+          if (appState.allFarms.isNotEmpty) ...[
+            const Text(
+              'OR SELECT A SAVED FARM',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+            ),
+            const SizedBox(height: 8),
+            ...appState.allFarms.map((farm) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFE8F5E9),
+                    child: Icon(Icons.location_on, color: Color(0xFF1B5E20)),
+                  ),
+                  title: Text(farm.farmName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${farm.activeCropName ?? "Crop"} · ${farm.locationDisplay}'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    appState.setActiveFarm(farm);
+                  },
+                ),
+              );
+            }).toList(),
+            const SizedBox(height: 20),
+          ],
+
+          // Coverage Highlights
+          const Text(
+            'DATA & MODEL FOUNDATION',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+          ),
+          const SizedBox(height: 8),
+          _buildFoundationTile(
+            Icons.map_outlined,
+            '36 Maharashtra Districts & 307 Talukas',
+            'Full official taluka centroid coordinates for high-precision local weather matching.',
+          ),
+          _buildFoundationTile(
+            Icons.bar_chart,
+            '17,916 APY Historical Yield Records',
+            'Authentic district-level historical crop yields for empirical risk scoring.',
+          ),
+          _buildFoundationTile(
+            Icons.cloud_outlined,
+            'IMD 0.25° Gridded Rainfall Normals',
+            '1991–2020 official IMD Pune daily normals driving moisture anomaly detection.',
+          ),
+          _buildFoundationTile(
+            Icons.thermostat,
+            'Worker & Crop Heat Intelligence',
+            'Liljegren et al. WBGT physics & ICAR-grounded crop stage thermal thresholds.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFoundationTile(IconData icon, String title, String subtitle) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: const Color(0xFF1B5E20), size: 24),
+        title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+      ),
+    );
+  }
+
+  Widget _buildGreetingCard(FarmSummary summary) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -144,12 +408,12 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good day, ${_summary?.farmerName ?? "Farmer"}!',
+              'Good day, ${summary.farmerName}!',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
             ),
-            const Text(
-              'Your farm at a glance',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
+            Text(
+              '${summary.farmName} · ${summary.locationDisplay}',
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
             ),
           ],
         ),
@@ -162,8 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFarmGlanceCard() {
-    final s = _summary!;
+  Widget _buildFarmGlanceCard(FarmSummary s) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -217,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       const Text('Growth Stage', style: TextStyle(fontSize: 12, color: Colors.black54)),
                       const SizedBox(height: 2),
-                      Text(s.estimatedStageName ?? 'Pod Development', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(s.estimatedStageName ?? 'Growth Stage', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                     ],
                   ),
                 ),
@@ -229,8 +492,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWeatherSummaryCard() {
-    final w = _summary!.weatherSummary;
+  Widget _buildWeatherSummaryCard(FarmSummary summary) {
+    final w = summary.weatherSummary;
     return Card(
       elevation: 1,
       color: const Color(0xFFF1F8E9),
@@ -253,6 +516,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Humidity ${w['relative_humidity_pct']}% · Wind ${w['wind_speed_kmh']} km/h',
                     style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    w['source'] ?? 'IMD Maharashtra Station',
+                    style: const TextStyle(fontSize: 11, color: Colors.black54),
                   ),
                 ],
               ),
@@ -358,10 +626,10 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: color.withOpacity(0.12),
               child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20)),
             ),
             const SizedBox(height: 2),
             Text(
@@ -375,85 +643,99 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAskRashkarBanner() {
-    return InkWell(
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const AskRashkarScreen()));
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AskRashkarScreen()));
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
           ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            const CircleAvatar(
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.chat_bubble_outline, color: Colors.white),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ASK RASHKAR ASSISTANT',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Ask questions about your crop or weather',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
+          child: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Colors.white24,
+                radius: 22,
+                child: Icon(Icons.chat_bubble_outline, color: Colors.white, size: 24),
               ),
-            ),
-            const Icon(Icons.arrow_forward, color: Colors.white),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Ask Rashkar AI Assistant',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Ask about crop care, heat stress or weather',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildAlertItem(Map<String, dynamic> alert) {
-    final isHigh = alert['urgency'] == 'high';
-    return Container(
+    final urgency = alert['urgency'] ?? 'medium';
+    final Color badgeColor = urgency == 'high' ? Colors.red.shade700 : const Color(0xFFE65100);
+
+    return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isHigh ? const Color(0xFFFFF3E0) : const Color(0xFFE8F5E9),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isHigh ? Colors.orange : Colors.green, width: 0.8),
+        side: BorderSide(color: badgeColor.withOpacity(0.3)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            isHigh ? Icons.warning_amber_rounded : Icons.info_outline,
-            color: isHigh ? Colors.deepOrange : Colors.green[800],
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  alert['title'] ?? '',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isHigh ? Colors.deepOrange[900] : Colors.green[900]),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  alert['message'] ?? '',
-                  style: const TextStyle(fontSize: 13, color: Colors.black87),
-                ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded, color: badgeColor, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    alert['title'] ?? 'Alert',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: badgeColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    alert['message'] ?? '',
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  if (alert['source'] != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Source: ${alert['source']}',
+                      style: const TextStyle(fontSize: 11, color: Colors.black45, fontStyle: FontStyle.italic),
+                    ),
+                  ]
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

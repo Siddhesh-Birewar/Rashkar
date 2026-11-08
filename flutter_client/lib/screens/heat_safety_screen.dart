@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class HeatSafetyScreen extends StatefulWidget {
   const HeatSafetyScreen({Key? key}) : super(key: key);
@@ -19,13 +20,35 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    AppState.instance.addListener(_onStateChange);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onStateChange() {
     _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final w = await ApiService.getWorkerHeatHazard(latitude: 18.151, longitude: 74.577);
-    final c = await ApiService.getCropHeatHazard(cropCode: 'soybean', stageCode: 'stage_pod_development');
+    final appState = AppState.instance;
+
+    final w = await ApiService.getWorkerHeatHazard(
+      latitude: appState.activeLatitude,
+      longitude: appState.activeLongitude,
+      taluka: appState.activeTaluka,
+    );
+    final c = await ApiService.getCropHeatHazard(
+      cropCode: appState.activeCropCode,
+      stageCode: 'stage_pod_development',
+    );
+
     if (mounted) {
       setState(() {
         _workerHeat = w;
@@ -37,12 +60,26 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final appState = AppState.instance;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8F6),
       appBar: AppBar(
-        title: const Text('Heat Safety Intelligence', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Heat Safety Intelligence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              '${appState.activeTaluka}, ${appState.activeDistrict} · ${appState.activeCropName}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFFD84315),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -69,11 +106,36 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
   // --- Pathway 1: Worker Heat Risk ---
   Widget _buildWorkerHeatTab() {
     final w = _workerHeat!;
+    final appState = AppState.instance;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Location Context Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, size: 16, color: Color(0xFFD84315)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Location: ${appState.activeTaluka}, ${appState.activeDistrict} (${appState.activeLatitude.toStringAsFixed(3)}°N, ${appState.activeLongitude.toStringAsFixed(3)}°E)',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFD84315)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // Plain Language Question
           const Text(
             'Is the weather suitable for outdoor farm work over the next few hours?',
@@ -176,7 +238,7 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
-              'Safety Notice: Heat stress proxies are calculated using gridded meteorological observations. This is not a physical wearable medical measurement. Always take rest and hydrate if you feel dizziness, nausea or fatigue.',
+              'Safety Notice: Heat stress proxies are calculated using meteorological observations and Liljegren et al. (2008) wet-bulb globe temperature formulas. This is an occupational screening advisory, not a clinical wearable monitor. Always rest and hydrate if fatigued.',
               style: TextStyle(fontSize: 12, color: Colors.black54, fontStyle: FontStyle.italic),
             ),
           ),
@@ -189,6 +251,8 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
   Widget _buildCropHeatTab() {
     final c = _cropHeat!;
     final isSafe = c.riskLevel == 'low';
+    final appState = AppState.instance;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -216,7 +280,7 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Crop: ${c.cropCode.toUpperCase()} (${c.stageCode.replaceAll("stage_", "").replaceAll("_", " ").toUpperCase()})',
+                      'Crop: ${appState.activeCropName.toUpperCase()} (${c.stageCode.replaceAll("stage_", "").replaceAll("_", " ").toUpperCase()})',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isSafe ? Colors.green[900] : Colors.red[900]),
                     ),
                     Container(
@@ -235,7 +299,7 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                 const SizedBox(height: 12),
                 Text(
                   isSafe
-                      ? 'Maximum forecasted temperature (${c.maxForecastTempC}°C) remains below the critical threshold (${c.criticalThresholdC}°C).'
+                      ? 'Maximum forecasted temperature (${c.maxForecastTempC}°C) remains below the critical physiological threshold (${c.criticalThresholdC}°C).'
                       : 'Temperatures exceed critical threshold (${c.criticalThresholdC}°C) for ${c.exceedanceHours} consecutive hours during sensitive flowering.',
                   style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
@@ -256,7 +320,10 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                   const SizedBox(height: 8),
                   Text('Critical Upper Limit: ${c.criticalThresholdC}°C', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFD84315))),
                   const SizedBox(height: 4),
-                  const Text('Physiological Risk: Flower abortion, poor pod set, and reduced pollen viability occur if temperatures stay above 38°C for >3 hours.', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                  Text(
+                    'Physiological Risk for ${appState.activeCropName}: Flower abortion, reduced pollen viability, or accelerated senescence occur when temperatures exceed ${c.criticalThresholdC}°C.',
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
                   const Divider(height: 20),
                   Text('Verified Source: ${c.citation}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                 ],

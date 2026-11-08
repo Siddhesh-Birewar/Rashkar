@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class FarmRegistrationScreen extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -14,45 +15,31 @@ class FarmRegistrationScreen extends StatefulWidget {
 class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
   int _currentStep = 0;
   bool _isSubmitting = false;
+  bool _isLoadingGeo = true;
 
-  // Step 1: Farmer details
-  final _farmerNameController = TextEditingController(text: 'Ramesh Patil');
-  final _phoneController = TextEditingController(text: '9876543210');
-  String _selectedDistrict = 'Pune';
-  String _selectedTaluka = 'Baramati';
-  final _villageController = TextEditingController(text: 'Malegaon Khurd');
+  // Step 1: Farmer details (Clean starting inputs)
+  final _farmerNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  String? _selectedDistrict;
+  String? _selectedTaluka;
+  final _villageController = TextEditingController();
 
   // Step 2: Farm details
-  final _farmNameController = TextEditingController(text: 'Patil Krishi Farm');
-  final _totalAreaController = TextEditingController(text: '4.5');
+  final _farmNameController = TextEditingController();
+  final _totalAreaController = TextEditingController();
   double _latitude = 18.151;
   double _longitude = 74.577;
 
   // Step 3: Crop details
-  String _selectedCropCode = 'soybean';
-  DateTime _sowingDate = DateTime.now().subtract(const Duration(days: 42));
-  final _plantedAreaController = TextEditingController(text: '3.0');
+  String? _selectedCropCode;
+  DateTime _sowingDate = DateTime.now().subtract(const Duration(days: 35));
+  final _plantedAreaController = TextEditingController();
   String _selectedIrrigation = 'rainfed';
 
-  // Taluka coordinates map for Pune pilot
-  final Map<String, Map<String, double>> _talukaCoords = {
-    'Baramati': {'lat': 18.151, 'lon': 74.577},
-    'Indapur': {'lat': 18.115, 'lon': 75.025},
-    'Maval': {'lat': 18.754, 'lon': 73.541},
-    'Mulshi': {'lat': 18.503, 'lon': 73.513},
-  };
-
-  final List<String> _districts = ['Pune', 'Satara', 'Solapur', 'Ahmednagar', 'Kolhapur'];
-  final List<String> _talukas = ['Baramati', 'Indapur', 'Maval', 'Mulshi'];
-
-  final List<Map<String, String>> _crops = [
-    {'code': 'soybean', 'name': 'Soybean (सोयाबीन)'},
-    {'code': 'cotton', 'name': 'Cotton (कापूस)'},
-    {'code': 'jowar', 'name': 'Jowar (ज्वारी)'},
-    {'code': 'gram', 'name': 'Gram / Chana (हरभरा)'},
-    {'code': 'wheat', 'name': 'Wheat (गहू)'},
-    {'code': 'sugarcane', 'name': 'Sugarcane (ऊस)'},
-  ];
+  // Dynamic catalogs loaded from backend
+  List<Map<String, dynamic>> _districts = [];
+  List<Map<String, dynamic>> _talukas = [];
+  List<Map<String, dynamic>> _crops = [];
 
   final List<Map<String, String>> _irrigationTypes = [
     {'code': 'rainfed', 'name': 'Rainfed (जिरायत)'},
@@ -65,44 +52,117 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    _updateCoordinates('Baramati');
+    _loadCatalogs();
   }
 
-  void _updateCoordinates(String taluka) {
-    if (_talukaCoords.containsKey(taluka)) {
-      _latitude = _talukaCoords[taluka]!['lat']!;
-      _longitude = _talukaCoords[taluka]!['lon']!;
+  Future<void> _loadCatalogs() async {
+    setState(() => _isLoadingGeo = true);
+    final dists = await ApiService.getDistricts();
+    final crops = await ApiService.getCrops();
+
+    String? defaultDist;
+    if (dists.isNotEmpty) {
+      defaultDist = dists.firstWhere((d) => d['district_name'] == 'Pune', orElse: () => dists.first)['district_name'];
+    }
+
+    List<Map<String, dynamic>> tals = [];
+    if (defaultDist != null) {
+      tals = await ApiService.getTalukas(district: defaultDist);
+    }
+
+    if (mounted) {
+      setState(() {
+        _districts = dists;
+        _crops = crops;
+        _selectedDistrict = defaultDist;
+        _talukas = tals;
+        if (tals.isNotEmpty) {
+          _selectedTaluka = tals.first['taluka_name'];
+          _latitude = (tals.first['latitude'] as num).toDouble();
+          _longitude = (tals.first['longitude'] as num).toDouble();
+        }
+        if (crops.isNotEmpty) {
+          _selectedCropCode = crops.first['crop_code'];
+        }
+        _isLoadingGeo = false;
+      });
     }
   }
 
+  Future<void> _onDistrictChanged(String? newDist) async {
+    if (newDist == null || newDist == _selectedDistrict) return;
+    setState(() {
+      _selectedDistrict = newDist;
+      _selectedTaluka = null;
+    });
+
+    final tals = await ApiService.getTalukas(district: newDist);
+    if (mounted) {
+      setState(() {
+        _talukas = tals;
+        if (tals.isNotEmpty) {
+          _selectedTaluka = tals.first['taluka_name'];
+          _latitude = (tals.first['latitude'] as num).toDouble();
+          _longitude = (tals.first['longitude'] as num).toDouble();
+        }
+      });
+    }
+  }
+
+  void _onTalukaChanged(String? newTaluka) {
+    if (newTaluka == null) return;
+    final match = _talukas.firstWhere((t) => t['taluka_name'] == newTaluka, orElse: () => {});
+    setState(() {
+      _selectedTaluka = newTaluka;
+      if (match.containsKey('latitude')) {
+        _latitude = (match['latitude'] as num).toDouble();
+        _longitude = (match['longitude'] as num).toDouble();
+      }
+    });
+  }
+
   Future<void> _handleCompleteRegistration() async {
+    final name = _farmerNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your farmer name in Step 1.')),
+      );
+      setState(() => _currentStep = 0);
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    final totalArea = double.tryParse(_totalAreaController.text) ?? 4.5;
-    final plantedArea = double.tryParse(_plantedAreaController.text) ?? 3.0;
+    final totalArea = double.tryParse(_totalAreaController.text) ?? 3.0;
+    final plantedArea = double.tryParse(_plantedAreaController.text) ?? (totalArea * 0.8);
     final sowingDateStr =
         '${_sowingDate.year}-${_sowingDate.month.toString().padLeft(2, '0')}-${_sowingDate.day.toString().padLeft(2, '0')}';
 
     try {
-      await ApiService.guidedRegisterFarm(
-        farmerName: _farmerNameController.text.trim().isEmpty ? 'Farmer' : _farmerNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        taluka: _selectedTaluka,
-        district: _selectedDistrict,
-        village: _villageController.text.trim(),
-        farmName: _farmNameController.text.trim(),
+      final summary = await ApiService.guidedRegisterFarm(
+        farmerName: name,
+        phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        taluka: _selectedTaluka ?? 'Baramati',
+        district: _selectedDistrict ?? 'Pune',
+        village: _villageController.text.trim().isNotEmpty ? _villageController.text.trim() : 'Gram',
+        farmName: _farmNameController.text.trim().isNotEmpty ? _farmNameController.text.trim() : '$name\'s Farm',
         totalAreaAcres: totalArea,
-        cropCode: _selectedCropCode,
+        cropCode: _selectedCropCode ?? 'soybean',
         sowingDate: sowingDateStr,
         irrigationType: _selectedIrrigation,
         plantedAreaAcres: plantedArea,
+        latitude: _latitude,
+        longitude: _longitude,
       );
+
+      // Update active app state so all screens reflect this new farm
+      AppState.instance.setActiveFarm(summary);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Farm registered successfully! CropNet soil profile attached.'),
-            backgroundColor: Color(0xFF1B5E20),
+          SnackBar(
+            content: Text('Farm registered in ${_selectedTaluka ?? "Baramati"}, ${_selectedDistrict ?? "Pune"}! All tabs updated.'),
+            backgroundColor: const Color(0xFF1B5E20),
           ),
         );
         widget.onComplete?.call();
@@ -111,7 +171,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error registering farm: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Registration error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -123,6 +183,26 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingGeo) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Farm Setup Guide'),
+          backgroundColor: const Color(0xFF1B5E20),
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF1B5E20)),
+              SizedBox(height: 16),
+              Text('Loading Maharashtra district and crop catalogues...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Farm Setup Guide', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -193,7 +273,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
           // Step 1: Farmer Details
           Step(
             title: const Text('Farmer Details', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Name and village location'),
+            subtitle: const Text('Full name and Maharashtra location'),
             isActive: _currentStep >= 0,
             state: _currentStep > 0 ? StepState.complete : StepState.indexed,
             content: Column(
@@ -202,6 +282,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                   controller: _farmerNameController,
                   decoration: InputDecoration(
                     labelText: 'Full Name *',
+                    hintText: 'Enter your name (e.g. Dattatraya Shinde)',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.person_outline),
                   ),
@@ -211,7 +292,8 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Mobile Number',
+                    labelText: 'Mobile Number (Optional)',
+                    hintText: 'e.g. 9822012345',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.phone_outlined),
                   ),
@@ -223,11 +305,14 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedDistrict,
                         decoration: InputDecoration(
-                          labelText: 'District',
+                          labelText: 'District (36 Total) *',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                        onChanged: (val) => setState(() => _selectedDistrict = val!),
+                        items: _districts.map((d) {
+                          final name = d['district_name'].toString();
+                          return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
+                        }).toList(),
+                        onChanged: _onDistrictChanged,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -235,18 +320,14 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedTaluka,
                         decoration: InputDecoration(
-                          labelText: 'Taluka',
+                          labelText: 'Taluka *',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        items: _talukas.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _selectedTaluka = val;
-                              _updateCoordinates(val);
-                            });
-                          }
-                        },
+                        items: _talukas.map((t) {
+                          final name = t['taluka_name'].toString();
+                          return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
+                        }).toList(),
+                        onChanged: _onTalukaChanged,
                       ),
                     ),
                   ],
@@ -256,6 +337,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                   controller: _villageController,
                   decoration: InputDecoration(
                     labelText: 'Village Name',
+                    hintText: 'e.g. Bawada, Malegaon, Nimgaon',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.location_city_outlined),
                   ),
@@ -275,8 +357,8 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                 TextFormField(
                   controller: _farmNameController,
                   decoration: InputDecoration(
-                    labelText: 'Farm Name',
-                    hintText: 'e.g. Patil Krishi Farm',
+                    labelText: 'Farm Name (Optional)',
+                    hintText: 'e.g. Shinde Krishi Sheti',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.terrain_outlined),
                   ),
@@ -287,6 +369,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Total Farm Land (Acres) *',
+                    hintText: 'e.g. 4.5',
                     suffixText: 'Acres',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.aspect_ratio),
@@ -306,7 +389,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Estimated Center: ${_latitude.toStringAsFixed(3)}°N, ${_longitude.toStringAsFixed(3)}°E\n(Derived from $_selectedTaluka pilot taluka centroid)',
+                          'Centroid: ${_latitude.toStringAsFixed(4)}°N, ${_longitude.toStringAsFixed(4)}°E\n(Official centroid from Maharashtra GIS catalog for ${_selectedTaluka ?? "selected taluka"})',
                           style: const TextStyle(fontSize: 12, color: Colors.black87),
                         ),
                       ),
@@ -320,20 +403,29 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
           // Step 3: Crop Details
           Step(
             title: const Text('Active Crop & Season', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Crop type, sowing date, irrigation'),
+            subtitle: const Text('Select from 38 Maharashtra canonical crops'),
             isActive: _currentStep >= 2,
             state: _currentStep > 2 ? StepState.complete : StepState.indexed,
             content: Column(
               children: [
                 DropdownButtonFormField<String>(
                   value: _selectedCropCode,
+                  isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: 'Active Crop *',
+                    labelText: 'Active Crop (38 Canonical Crops) *',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.grass),
                   ),
-                  items: _crops.map((c) => DropdownMenuItem(value: c['code'], child: Text(c['name']!))).toList(),
-                  onChanged: (val) => setState(() => _selectedCropCode = val!),
+                  items: _crops.map((c) {
+                    final code = c['crop_code'].toString();
+                    final en = c['common_name_en'] ?? code;
+                    final mr = c['common_name_mr'] != null ? ' (${c['common_name_mr']})' : '';
+                    return DropdownMenuItem(
+                      value: code,
+                      child: Text('$en$mr', overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedCropCode = val),
                 ),
                 const SizedBox(height: 12),
                 ListTile(
@@ -369,6 +461,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Planted Area for this Crop (Acres)',
+                    hintText: 'e.g. 3.0',
                     suffixText: 'Acres',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     prefixIcon: const Icon(Icons.pie_chart_outline),
@@ -392,7 +485,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
           // Step 4: Soil Information
           Step(
             title: const Text('Soil Baseline (CropNet)', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Auto-matched soil profile & provenance'),
+            subtitle: const Text('Matched soil profile for selected region'),
             isActive: _currentStep >= 3,
             state: _currentStep > 3 ? StepState.complete : StepState.indexed,
             content: Container(
@@ -410,19 +503,19 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                       const Icon(Icons.layers, color: Color(0xFF2E7D32)),
                       const SizedBox(width: 8),
                       Text(
-                        '$_selectedTaluka Soil Association',
+                        '${_selectedTaluka ?? "Local"} Regional Soil Baseline',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text('Soil Type: Medium to Deep Black Soil (Vertisol / Inceptisol)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('Soil Order: Medium to Deep Black Soil (Vertisol / Inceptisol)', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  const Text('Texture: Clay loam (Clay 48%, Silt 28%, Sand 24%)', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                  const Text('Texture: Clay Loam (Clay 48-52%, Sand 18-24%, Silt 28%)', style: TextStyle(fontSize: 13, color: Colors.black87)),
                   const SizedBox(height: 4),
-                  const Text('Organic Carbon: 0.65% (Medium)', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                  const Text('Organic Carbon: ~0.65% (Medium fertility baseline)', style: TextStyle(fontSize: 13, color: Colors.black87)),
                   const SizedBox(height: 4),
-                  const Text('pH: 7.8 (Slightly Alkaline) · EC: 0.28 dS/m (Normal)', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                  const Text('pH: 7.6 - 7.9 (Normal to slightly alkaline Deccan plateau)', style: TextStyle(fontSize: 13, color: Colors.black87)),
                   const Divider(height: 20),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,7 +524,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Source: CropNet Maharashtra gridded baseline. If you possess an official Soil Health Card, you can upload lab-tested values in settings.',
+                          'Source: CropNet Maharashtra gridded baseline. Lab test values can be uploaded later if you have a Soil Health Card.',
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontStyle: FontStyle.italic),
                         ),
                       ),
@@ -445,7 +538,7 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
           // Step 5: Finish & Confirmation
           Step(
             title: const Text('Review & Activate', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Confirm farm details'),
+            subtitle: const Text('Confirm details and enter farm'),
             isActive: _currentStep >= 4,
             state: StepState.indexed,
             content: Container(
@@ -460,16 +553,16 @@ class _FarmRegistrationScreenState extends State<FarmRegistrationScreen> {
                 children: [
                   const Text('Registration Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
                   const SizedBox(height: 12),
-                  _buildSummaryRow('Farmer', _farmerNameController.text),
-                  _buildSummaryRow('Location', '$_selectedTaluka, $_selectedDistrict'),
-                  _buildSummaryRow('Farm Name', _farmNameController.text),
-                  _buildSummaryRow('Total Area', '${_totalAreaController.text} Acres'),
-                  _buildSummaryRow('Active Crop', _selectedCropCode.toUpperCase()),
+                  _buildSummaryRow('Farmer', _farmerNameController.text.isEmpty ? 'Not specified' : _farmerNameController.text),
+                  _buildSummaryRow('Location', '${_selectedTaluka ?? ""}, ${_selectedDistrict ?? ""}'),
+                  _buildSummaryRow('Farm Name', _farmNameController.text.isEmpty ? 'My Farm' : _farmNameController.text),
+                  _buildSummaryRow('Total Area', '${_totalAreaController.text.isEmpty ? "3.0" : _totalAreaController.text} Acres'),
+                  _buildSummaryRow('Active Crop', (_selectedCropCode ?? 'SOYBEAN').toUpperCase()),
                   _buildSummaryRow('Sowing Date', '${_sowingDate.day}/${_sowingDate.month}/${_sowingDate.year}'),
                   _buildSummaryRow('Irrigation', _selectedIrrigation),
                   const Divider(height: 20),
                   const Text(
-                    'Ready to activate farm intelligence and start receiving localized yield, weather, and heat-safety advisories.',
+                    'Ready to activate farm intelligence and start receiving localized yield, weather, and heat-safety advisories for your region.',
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
                 ],
