@@ -214,9 +214,26 @@ def test_calculate_sar_rsc_negative_inputs_rejected():
     assert any("negative concentration" in note for note in indices.calculation_notes)
 
 
-def test_rsc_carbonate_ph_heuristics_and_provenance():
-    """Verify that CO3 is preserved as LAB_MEASURED when supplied, or INFERRED_PH_HEURISTIC when pH < 8.3."""
-    # Case A: CO3 explicitly supplied by lab
+def test_rsc_carbonate_strict_non_inference_default():
+    """Verify that by default, missing CO3 is strictly NOT inferred and RSC is marked INCOMPLETE_INPUTS."""
+    # CO3 missing from laboratory report
+    measurements = {
+        "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
+        "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
+        "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
+        "ph": {"original_value": 7.5, "original_unit": "pH"},
+    }
+    res = calculate_sar_and_rsc(measurements)  # default allow_carbonate_inference=False
+    assert res.rsc is None
+    assert res.rsc_status == "INCOMPLETE_INPUTS"
+    assert res.inputs_used.get("CO3_provenance") == "NOT_PROVIDED"
+    assert res.inputs_used.get("CO3_meq_l") is None  # Must NOT silently become 0.0!
+    assert any("automatic inference is disabled" in note for note in res.calculation_notes)
+
+
+def test_rsc_carbonate_provenance_and_explicit_opt_in():
+    """Verify that CO3 is preserved as LAB_MEASURED when supplied, or INFERRED_APHA_2320B when explicitly enabled."""
+    # Case A: CO3 explicitly supplied by lab (never overwritten)
     m_supplied = {
         "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
         "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
@@ -224,35 +241,39 @@ def test_rsc_carbonate_ph_heuristics_and_provenance():
         "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
         "ph": {"original_value": 7.8, "original_unit": "pH"},
     }
-    res_a = calculate_sar_and_rsc(m_supplied)
+    res_a = calculate_sar_and_rsc(m_supplied, allow_carbonate_inference=True)
     assert res_a.rsc_status == "AVAILABLE"
     assert res_a.inputs_used.get("CO3_provenance") == "LAB_MEASURED"
+    assert res_a.inputs_used.get("CO3_meq_l") == 0.2
+    assert res_a.rsc == round((0.2 + 4.0) - (2.0 + 1.0), 2)  # 1.20 meq/L
 
-    # Case B: CO3 missing but pH < 8.3 -> inferred as 0.0
+    # Case B: CO3 missing and allow_carbonate_inference=True with pH < 8.3 -> inferred per APHA 2320 B
     m_inferred = {
         "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
         "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
         "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
         "ph": {"original_value": 7.5, "original_unit": "pH"},
     }
-    res_b = calculate_sar_and_rsc(m_inferred)
+    res_b = calculate_sar_and_rsc(m_inferred, allow_carbonate_inference=True)
     assert res_b.rsc_status == "AVAILABLE"
-    assert res_b.inputs_used.get("CO3_provenance") == "INFERRED_PH_HEURISTIC"
+    assert res_b.inputs_used.get("CO3_provenance") == "INFERRED_APHA_2320B"
+    assert res_b.inputs_used.get("CO3_meq_l") == 0.0
     assert res_b.rsc == round((0.0 + 4.0) - (2.0 + 1.0), 2)  # 1.0 meq/L
 
-    # Case C: CO3 missing and pH >= 8.3 -> cannot infer, marked INCOMPLETE_INPUTS
+    # Case C: CO3 missing, allow_carbonate_inference=True, but pH >= 8.3 -> cannot infer, marked INCOMPLETE_INPUTS
     m_alkaline = {
         "calcium": {"normalized_value": 2.0, "normalized_unit": "meq/L"},
         "magnesium": {"normalized_value": 1.0, "normalized_unit": "meq/L"},
         "bicarbonate": {"normalized_value": 4.0, "normalized_unit": "meq/L"},
         "ph": {"original_value": 8.7, "original_unit": "pH"},
     }
-    res_c = calculate_sar_and_rsc(m_alkaline)
+    res_c = calculate_sar_and_rsc(m_alkaline, allow_carbonate_inference=True)
     assert res_c.rsc_status == "INCOMPLETE_INPUTS"
+    assert res_c.inputs_used.get("CO3_provenance") == "NOT_PROVIDED"
 
 
 # ===========================================================================
-# 3. UNIT TESTS: INSTITUTIONAL RULE EVALUATION
+# 3. UNIT TESTS: INSTITUTIONAL RULE EVALUATION (IS 11624:2019 & CSSRI 1/98)
 # ===========================================================================
 
 def test_water_evaluator_institutional_rules():
@@ -265,30 +286,131 @@ def test_water_evaluator_institutional_rules():
         "bicarbonate": {"normalized_value": 6.5, "normalized_unit": "meq/L"},
         "boron": {"normalized_value": 1.2, "normalized_unit": "mg/L"},
         "chloride": {"normalized_value": 6.0, "normalized_unit": "meq/L"},
+        "fluoride": {"normalized_value": 0.8, "normalized_unit": "mg/L"},
     }
-    response = WaterQualityEvaluator.evaluate(measurements, farm_id=str(TEST_FARM_ID))
+    response = WaterQualityEvaluator.evaluate(
+        measurements,
+        farm_id=str(TEST_FARM_ID),
+        soil_clay_percent=35.0,
+        annual_rainfall_mm=600.0,
+    )
 
     # SAR = 12.0 / sqrt((2.0 + 1.0) / 2) = 12.0 / sqrt(1.5) = 12.0 / 1.2247 = 9.80 (< 10 -> Low)
-    # RSC = (0.0 + 6.5) - (2.0 + 1.0) = 3.50 (> 2.5 -> Hazardous/Unsuitable)
+    # RSC = (0.0 + 6.5) - (2.0 + 1.0) = 3.50 (2.5 - 4.0 -> Marginally Alkali)
     eval_map = {e.parameter_key: e for e in response.evaluations}
 
-    # EC rule
+    # EC rule (IS 11624:2019 Clause 5.1.1)
     assert "electrical_conductivity" in eval_map
     assert eval_map["electrical_conductivity"].hazard_level == "MEDIUM"
-    assert "BIS IS 11624" in eval_map["electrical_conductivity"].applicable_standard
+    assert "BIS IS 11624:2019" in eval_map["electrical_conductivity"].applicable_standard
+    assert eval_map["electrical_conductivity"].rule_id == "BIS-11624-2019-CL-5.1.1-EC"
 
-    # RSC rule
+    # SAR rule (IS 11624:2019 Clause 5.1.3)
+    assert "sar" in eval_map
+    assert eval_map["sar"].hazard_level == "LOW"
+    assert eval_map["sar"].rule_id == "BIS-11624-2019-CL-5.1.3-SAR"
+
+    # RSC rule (CSSRI Tech Bull 1/98 & Clause 5.1.4)
     assert "rsc" in eval_map
     assert eval_map["rsc"].hazard_level == "HAZARDOUS"
-    assert "ICAR-CSSRI" in eval_map["rsc"].applicable_standard
+    assert "Technical Bulletin No. 1/98" in eval_map["rsc"].source_citation
+    assert eval_map["rsc"].rule_id == "CSSRI-TECH-BULL-1-98-RSC"
 
-    # Boron rule
+    # Table 1 Combined Classification: EC=2.4 (<4.0), SAR=9.8 (<10), RSC=3.5 (2.5-4.0) -> Marginally Alkali
+    assert "is11624_table1_combined_group" in eval_map
+    assert "Marginally Alkali" in eval_map["is11624_table1_combined_group"].hazard_title
+    assert eval_map["is11624_table1_combined_group"].rule_id == "BIS-11624-2019-TAB1-COMBINED"
+
+    # Table 2 Boron rule: 1.2 mg/L -> Class 2: Medium Boron (1.0 - 2.0 mg/L)
     assert "boron" in eval_map
     assert eval_map["boron"].hazard_level == "MARGINAL"
+    assert eval_map["boron"].rule_id == "BIS-11624-2019-TAB2-BORON"
 
-    # Contextual regional data
+    # Chloride rule (CSSRI Tech Bull 1/98): 6.0 meq/L -> Slight to Moderate Restriction
+    assert "chloride" in eval_map
+    assert eval_map["chloride"].hazard_level == "RESTRICTED"
+    assert eval_map["chloride"].rule_id == "CSSRI-TECH-BULL-1-98-CHLORIDE"
+
+    # Table 6 Trace Element: Fluoride 0.8 mg/L <= 1.0 mg/L -> Safe
+    assert "fluoride" in eval_map
+    assert eval_map["fluoride"].hazard_level == "SAFE"
+    assert eval_map["fluoride"].rule_id == "BIS-11624-2019-TAB6-FLUORIDE"
+
+    # Tables 3-5 Soil Texture & Rainfall Suitability (clay=35%, rainfall=600mm)
+    assert "soil_texture_rainfall_suitability" in eval_map
+    assert eval_map["soil_texture_rainfall_suitability"].hazard_level == "HIGH"  # EC 2.4 > limit 2.0
+
+    # Regional CGWB context
     assert response.regional_cgwb_context is not None
     assert response.regional_cgwb_context["classification_scope"] == "REGIONAL_CONTEXT_ONLY"
+
+
+def test_water_evaluator_unverified_when_context_missing():
+    """Verify that when soil clay and rainfall context are omitted, Table 3-5 is marked UNVERIFIED."""
+    measurements = {
+        "electrical_conductivity": {"normalized_value": 1.2, "normalized_unit": "dS/m"},
+    }
+    response = WaterQualityEvaluator.evaluate(
+        measurements,
+        farm_id=str(TEST_FARM_ID),
+        # Omit soil_clay_percent and annual_rainfall_mm
+    )
+    eval_map = {e.parameter_key: e for e in response.evaluations}
+
+    # Table 1 combined should be UNVERIFIED due to missing SAR and RSC
+    assert "is11624_table1_combined_group" in eval_map
+    assert eval_map["is11624_table1_combined_group"].hazard_level == "UNVERIFIED"
+
+    # Tables 3-5 conditional should be UNVERIFIED
+    assert "soil_texture_rainfall_suitability" in eval_map
+    assert eval_map["soil_texture_rainfall_suitability"].hazard_level == "UNVERIFIED"
+    assert "Conditional Suitability" in eval_map["soil_texture_rainfall_suitability"].hazard_title
+
+
+def test_is11624_table1_combined_classification_matrix():
+    """Verify all 7 IS 11624:2019 Table 1 poor-quality groundwater categories."""
+    cases = [
+        # (EC, SAR, RSC, expected_group, expected_hazard)
+        (1.2, 5.0, 1.0, "Good Water", "SAFE"),
+        (2.8, 6.0, 1.5, "Marginally Saline", "MARGINAL"),
+        (5.2, 8.0, 2.0, "Saline Water", "HIGH"),
+        (5.5, 14.0, 1.8, "High-SAR Saline", "HAZARDOUS"),
+        (2.5, 7.0, 3.2, "Marginally Alkali", "MARGINAL"),
+        (3.0, 6.0, 4.8, "Alkali Water", "HIGH"),
+        (4.5, 15.0, 5.2, "High-SAR Alkali", "HAZARDOUS"),
+    ]
+    for ec, sar, rsc, exp_group, exp_hazard in cases:
+        measurements = {
+            "electrical_conductivity": {"normalized_value": ec, "normalized_unit": "dS/m"},
+            "sar": {"original_value": sar},
+            "rsc": {"original_value": rsc},
+        }
+        res = WaterQualityEvaluator.evaluate(measurements, farm_id=str(TEST_FARM_ID))
+        eval_map = {e.parameter_key: e for e in response.evaluations} if False else {e.parameter_key: e for e in res.evaluations}
+        item = eval_map["is11624_table1_combined_group"]
+        assert exp_group in item.hazard_title, f"Expected {exp_group} for EC={ec}, SAR={sar}, RSC={rsc}, got {item.hazard_title}"
+        assert item.hazard_level == exp_hazard
+
+
+def test_is11624_table6_trace_elements():
+    """Verify Table 6 trace element limits (e.g. Iron 5.0 mg/L, Zinc 2.0 mg/L, Lead 5.0 mg/L)."""
+    measurements = {
+        "iron": {"normalized_value": 7.5, "normalized_unit": "mg/L"},     # > 5.0 -> HAZARDOUS
+        "zinc": {"normalized_value": 1.2, "normalized_unit": "mg/L"},     # <= 2.0 -> SAFE
+        "lead": {"normalized_value": 0.05, "normalized_unit": "mg/L"},    # <= 5.0 -> SAFE
+        "cadmium": {"normalized_value": 0.02, "normalized_unit": "mg/L"}, # > 0.01 -> HAZARDOUS
+    }
+    res = WaterQualityEvaluator.evaluate(measurements, farm_id=str(TEST_FARM_ID))
+    eval_map = {e.parameter_key: e for e in res.evaluations}
+
+    assert eval_map["iron"].hazard_level == "HAZARDOUS"
+    assert "Exceeds Permissible Limit" in eval_map["iron"].hazard_title
+
+    assert eval_map["zinc"].hazard_level == "SAFE"
+    assert "Within Permissible Limit" in eval_map["zinc"].hazard_title
+
+    assert eval_map["lead"].hazard_level == "SAFE"
+    assert eval_map["cadmium"].hazard_level == "HAZARDOUS"
 
 
 # ===========================================================================

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 CDSE_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
 CDSE_CATALOG_URL = "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel2/search.json"
+CDSE_ODATA_URL = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 
 # SCL (Scene Classification Layer) Masking Classes
 # Masked: 0 (No data), 1 (Saturated/Defective), 3 (Cloud shadow), 7 (Unclassified),
@@ -37,28 +38,86 @@ SCL_MASKED_CLASSES = {0, 1, 3, 7, 8, 9, 10, 11}
 SCL_VALID_CLASSES = {4, 5, 6}
 
 
+def calibrate_dn_to_reflectance(
+    value: Optional[float],
+    metadata: Optional[Dict[str, Any]] = None,
+    processing_baseline: Optional[str] = None,
+    is_calibrated_reflectance: bool = False,
+    allow_negative_reflectance: bool = True,
+) -> Optional[float]:
+    """
+    Calibrates Sentinel-2 Level-2A surface pixel values to BOA surface reflectance.
+
+    Handles:
+    1. Provider format: If `is_calibrated_reflectance` is True or indicated in metadata,
+       returns value directly without applying offset or scaling twice.
+    2. DN = 0: Strictly treated as NO_DATA (masked out, returns None).
+    3. Metadata-driven calibration:
+       - Extracts `BOA_ADD_OFFSET` and `QUANTIFICATION_VALUE` directly from product metadata.
+       - If not explicitly provided in metadata, determines offset from `processing_baseline`:
+         * PB 04.00 and later (PB N0400, N0500, N0510, N0511, etc.): offset = -1000.0 DN
+         * Legacy PB < 04.00 (N0214, N0300, etc.): offset = 0.0 DN
+       - Quantification value defaults to 10000.0 DN per ESA Level-2A Product Specification.
+    4. Negative reflectance handling:
+       Over dark surfaces or atmospheric over-correction, L2A BOA reflectance can be slightly
+       negative (down to -0.10). If allow_negative_reflectance=True, preserves negative values.
+       If False, clamps to 0.0.
+    """
+    if value is None:
+        return None
+
+    meta = metadata or {}
+
+    # 1. Provider already returned calibrated reflectance in [0.0, 1.0]
+    if is_calibrated_reflectance or meta.get("is_calibrated_reflectance") is True:
+        return round(float(value), 4)
+
+    # 2. In Sentinel-2 L2A raster products, DN = 0 is strictly NO_DATA
+    if value == 0 or value == 0.0:
+        return None
+
+    # 3. Dynamic metadata extraction
+    quant_val = float(meta.get("QUANTIFICATION_VALUE", meta.get("quantification_value", 10000.0)))
+    if quant_val <= 0:
+        quant_val = 10000.0
+
+    if "BOA_ADD_OFFSET" in meta:
+        offset = float(meta["BOA_ADD_OFFSET"])
+    elif "boa_add_offset" in meta:
+        offset = float(meta["boa_add_offset"])
+    else:
+        # Determine from processing baseline string
+        pb = processing_baseline or meta.get("processing_baseline") or "N0500"
+        # Extract numeric components e.g. "N0400" -> 400, "05.10" -> 510, "05.11" -> 511, "N0214" -> 214
+        pb_clean = pb.upper().replace("N", "").replace(".", "").strip()
+        try:
+            pb_int = int(pb_clean[:4]) if len(pb_clean) >= 4 else int(pb_clean)
+        except (ValueError, TypeError):
+            pb_int = 500
+
+        # Processing Baseline >= 04.00 (i.e. >= 400) introduced -1000 DN offset
+        offset = -1000.0 if pb_int >= 400 else 0.0
+
+    reflectance = (float(value) + offset) / quant_val
+
+    if not allow_negative_reflectance:
+        return round(max(0.0, reflectance), 4)
+    else:
+        # Physical boundary: Sentinel-2 BOA reflectance physically cannot be < -0.10
+        return round(max(-0.10, reflectance), 4)
+
+
 def convert_raw_dn_to_reflectance(dn: float, processing_baseline: str = "N0500") -> float:
     """
     Converts raw Sentinel-2 Level-2A Digital Numbers (DN) to BOA Surface Reflectance.
-    
-    Processing Baseline Rule:
-    - For Processing Baseline 04.00+ (PB N0400, N0500 onwards, introduced Jan 2022):
-      ESA added a radiometric offset to avoid truncating negative reflectances:
-      BOA_ADD_OFFSET = -1000 DN.
-      Reflectance = (DN + BOA_ADD_OFFSET) / 10000.0 = (DN - 1000.0) / 10000.0.
-    - For legacy Baselines (PB < 04.00, e.g. N0214, N0300):
-      BOA_ADD_OFFSET = 0 DN.
-      Reflectance = DN / 10000.0.
+    Maintained for backwards-compatibility.
     """
-    pb_str = (processing_baseline or "").upper().replace("N", "")
-    try:
-        pb_num = int(pb_str[:4]) if len(pb_str) >= 4 else 500
-    except ValueError:
-        pb_num = 500
-
-    offset = -1000.0 if pb_num >= 400 else 0.0
-    reflectance = (dn + offset) / 10000.0
-    return max(0.0, reflectance)
+    res = calibrate_dn_to_reflectance(
+        value=dn,
+        processing_baseline=processing_baseline,
+        allow_negative_reflectance=False,
+    )
+    return res if res is not None else 0.0
 
 
 class CopernicusClient:
@@ -137,6 +196,31 @@ class CopernicusClient:
                     return features
         except Exception as e:
             logger.warning("CDSE catalogue search error: %s", e)
+        return []
+
+    def search_odata_scenes(
+        self,
+        tile_id: str = "T43QDB",
+        top: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Queries Copernicus Data Space Ecosystem (CDSE) public OData catalog
+        for Sentinel-2 Level-2A products covering the specified MGRS tile.
+        Publicly accessible without OAuth2 client credentials.
+        """
+        try:
+            filter_query = f"Collection/Name eq 'SENTINEL-2' and contains(Name,'MSIL2A') and contains(Name,'{tile_id}')"
+            params = {
+                "$filter": filter_query,
+                "$orderby": "ContentDate/Start desc",
+                "$top": top,
+            }
+            with httpx.Client(timeout=20.0) as client:
+                resp = client.get(CDSE_ODATA_URL, params=params)
+                if resp.status_code == 200:
+                    return resp.json().get("value", [])
+        except Exception as e:
+            logger.warning("CDSE OData catalogue search error: %s", e)
         return []
 
     def compute_polygon_indices(
@@ -261,6 +345,12 @@ class CopernicusClient:
             "farm_coverage_percent": coverage_pct,
             "cloud_masked_percent": cloud_pct,
             "spatial_resolution_meters": 10.0,
+            "b11_native_resolution_meters": 20.0,
+            "b08_native_resolution_meters": 10.0,
+            "target_grid_meters": 10.0,
+            "resampling_method": "bilinear",
+            "resampling_notes": "Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.",
+            "scl_resampling_method": "nearest_neighbour",
             "quality_status": quality,
             "quality_notes": notes,
             "is_small_farm_warning": is_small_farm,

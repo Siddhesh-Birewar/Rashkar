@@ -27,7 +27,21 @@ def upgrade() -> None:
     existing_tables = inspector.get_table_names()
 
     # 1. Water Sources Table
-    if "water_sources" not in existing_tables:
+    expected_ws_cols = {
+        "id", "farm_id", "source_type", "name", "location_description",
+        "latitude", "longitude", "seasonal_availability", "reliability",
+        "daily_available_hours", "irrigation_method", "measured_capacity_lph",
+        "capacity_provenance", "is_active", "created_at", "updated_at"
+    }
+    if "water_sources" in existing_tables:
+        existing_cols = {c["name"] for c in inspector.get_columns("water_sources")}
+        missing = expected_ws_cols - existing_cols
+        if missing:
+            raise RuntimeError(
+                f"Schema drift detected in table 'water_sources': missing expected columns {sorted(list(missing))}. "
+                "Migration cannot silently skip an incomplete schema."
+            )
+    else:
         op.create_table(
             "water_sources",
             sa.Column("id", sa.String(36), primary_key=True),
@@ -49,7 +63,23 @@ def upgrade() -> None:
         )
 
     # 2. Water Test Reports Table
-    if "water_test_reports" not in existing_tables:
+    expected_wtr_cols = {
+        "id", "user_id", "farm_id", "water_source_id", "original_filename",
+        "storage_path", "file_size_bytes", "mime_type", "file_hash_sha256",
+        "upload_timestamp", "laboratory_name", "lab_number", "report_date",
+        "sample_collection_date", "sampling_location", "extraction_status",
+        "extraction_error", "review_status", "reviewed_at", "confirmed_at",
+        "raw_extracted_payload", "created_at", "updated_at"
+    }
+    if "water_test_reports" in existing_tables:
+        existing_cols = {c["name"] for c in inspector.get_columns("water_test_reports")}
+        missing = expected_wtr_cols - existing_cols
+        if missing:
+            raise RuntimeError(
+                f"Schema drift detected in table 'water_test_reports': missing expected columns {sorted(list(missing))}. "
+                "Migration cannot silently skip an incomplete schema."
+            )
+    else:
         op.create_table(
             "water_test_reports",
             sa.Column("id", sa.String(36), primary_key=True),
@@ -78,7 +108,23 @@ def upgrade() -> None:
         )
 
     # 3. Water Measurements Table
-    if "water_measurements" not in existing_tables:
+    expected_wm_cols = {
+        "id", "report_id", "farm_id", "water_source_id", "parameter_key",
+        "original_parameter_name", "original_value", "original_value_text",
+        "original_unit", "normalized_value", "normalized_unit",
+        "analytical_method", "detection_limit", "provenance",
+        "verification_status", "farmer_corrected_value", "farmer_notes",
+        "created_at", "updated_at"
+    }
+    if "water_measurements" in existing_tables:
+        existing_cols = {c["name"] for c in inspector.get_columns("water_measurements")}
+        missing = expected_wm_cols - existing_cols
+        if missing:
+            raise RuntimeError(
+                f"Schema drift detected in table 'water_measurements': missing expected columns {sorted(list(missing))}. "
+                "Migration cannot silently skip an incomplete schema."
+            )
+    else:
         op.create_table(
             "water_measurements",
             sa.Column("id", sa.String(36), primary_key=True),
@@ -103,7 +149,23 @@ def upgrade() -> None:
         )
 
     # 4. Satellite Vegetation Observations Table
-    if "satellite_vegetation_observations" not in existing_tables:
+    expected_sat_cols = {
+        "id", "farm_id", "observation_date", "product_id", "tile_id",
+        "sensor", "processing_baseline", "mean_ndvi", "median_ndvi",
+        "min_ndvi", "max_ndvi", "std_ndvi", "mean_ndmi", "valid_pixel_count",
+        "total_pixel_count", "farm_coverage_percent", "cloud_masked_percent",
+        "spatial_resolution_meters", "quality_status", "quality_notes",
+        "is_small_farm_warning", "created_at"
+    }
+    if "satellite_vegetation_observations" in existing_tables:
+        existing_cols = {c["name"] for c in inspector.get_columns("satellite_vegetation_observations")}
+        missing = expected_sat_cols - existing_cols
+        if missing:
+            raise RuntimeError(
+                f"Schema drift detected in table 'satellite_vegetation_observations': missing expected columns {sorted(list(missing))}. "
+                "Migration cannot silently skip an incomplete schema."
+            )
+    else:
         op.create_table(
             "satellite_vegetation_observations",
             sa.Column("id", sa.String(36), primary_key=True),

@@ -19,7 +19,15 @@ target_metadata = Base.metadata
 
 
 def _get_target_url() -> str:
-    url = os.environ.get("DATABASE_URL") or getattr(settings, "SYNC_DATABASE_URL", None) or config.get_main_option("sqlalchemy.url")
+    if os.environ.get("DATABASE_URL"):
+        url = os.environ["DATABASE_URL"]
+    elif config.get_main_option("sqlalchemy.url") and config.get_main_option("sqlalchemy.url") != "sqlite:///./cropnet_dev.db":
+        url = config.get_main_option("sqlalchemy.url")
+    elif getattr(settings, "SYNC_DATABASE_URL", None):
+        url = settings.SYNC_DATABASE_URL
+    else:
+        url = config.get_main_option("sqlalchemy.url")
+
     if url and url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     if url and "@localhost:" in url:
@@ -50,7 +58,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():

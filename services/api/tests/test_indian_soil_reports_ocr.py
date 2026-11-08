@@ -80,13 +80,13 @@ def test_indian_soil_health_card_extraction(extractor):
     Verifies that macronutrients (N, P, K), secondary (S), micronutrients (Zn, Fe, Cu, Mn, B),
     and physical properties (pH, EC, OC) are accurately extracted.
     """
-    pdf_path = FIXTURES_DIR / "indian_soil_health_card_national.pdf"
+    pdf_path = FIXTURES_DIR / "synthetic_format_indian_soil_health_card.pdf"
     assert pdf_path.exists()
 
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
 
-    res = extractor.extract(pdf_bytes, "indian_soil_health_card_national.pdf")
+    res = extractor.extract(pdf_bytes, "synthetic_format_indian_soil_health_card.pdf")
     assert res.extraction_status == "EXTRACTION_COMPLETED"
 
     meas_map = {m.parameter_key: m for m in res.measurements}
@@ -147,11 +147,11 @@ def test_prevention_of_fertilizer_recommendation_leakage(extractor):
     listing recommended doses of Urea (110 kg/ha), SSP (125 kg/ha), and MOP (40 kg/ha).
     Ensure that NONE of these recommended doses are extracted as measured soil nutrients!
     """
-    pdf_path = FIXTURES_DIR / "indian_soil_health_card_national.pdf"
+    pdf_path = FIXTURES_DIR / "synthetic_format_indian_soil_health_card.pdf"
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
 
-    res = extractor.extract(pdf_bytes, "indian_soil_health_card_national.pdf")
+    res = extractor.extract(pdf_bytes, "synthetic_format_indian_soil_health_card.pdf")
 
     # None of the measured values should match 110, 125, or 40 from the fertilizer recommendation section
     reported_values = [m.original_value for m in res.measurements]
@@ -168,13 +168,13 @@ def test_maharashtra_mpkv_rahuri_marathi_report(extractor):
     """
     Test extraction of MPKV Rahuri state university soil testing report.
     """
-    pdf_path = FIXTURES_DIR / "maharashtra_mpkv_rahuri_marathi.pdf"
+    pdf_path = FIXTURES_DIR / "synthetic_format_maharashtra_mpkv_marathi.pdf"
     assert pdf_path.exists()
 
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
 
-    res = extractor.extract(pdf_bytes, "maharashtra_mpkv_rahuri_marathi.pdf")
+    res = extractor.extract(pdf_bytes, "synthetic_format_maharashtra_mpkv_marathi.pdf")
     assert res.extraction_status == "EXTRACTION_COMPLETED"
 
     meas_map = {m.parameter_key: m for m in res.measurements}
@@ -251,6 +251,56 @@ def test_marathi_bilingual_token_parsing_and_safeguards():
     assert 100.0 not in vals
     assert 150.0 not in vals
     assert 50.0 not in vals
+
+
+# ===========================================================================
+# 6. NUTRIENT SEMANTIC PRESERVATION TESTS
+# ===========================================================================
+
+def test_corpus_provenance_classification(ground_truth):
+    """
+    Verify that every document in the ground truth corpus is explicitly classified
+    into authentic public institutional documents vs synthetic benchmark fixtures,
+    and that synthetic benchmarks carry explicit limitation warnings.
+    """
+    assert "provenance_policy" in ground_truth
+    reports_map = {r["fixture_id"]: r for r in ground_truth["reports"]}
+
+    # Authentic Wisconsin document
+    assert "WI-UW-REGRESSION" in reports_map
+    uw = reports_map["WI-UW-REGRESSION"]
+    assert uw["provenance_type"] == "AUTHENTIC_PUBLIC_DOCUMENT"
+    assert "University of Wisconsin" in uw["provenance_description"]
+
+    # Synthetic format fixtures
+    synthetic_ids = ["IN-SHC-NATIONAL", "MH-MPKV-RAHURI", "MH-KVK-BARAMATI"]
+    for sid in synthetic_ids:
+        assert sid in reports_map, f"Fixture {sid} missing from corpus"
+        entry = reports_map[sid]
+        assert entry["provenance_type"] == "SYNTHETIC_BENCHMARK_FIXTURE"
+        assert "LIMITATION" in entry["provenance_description"]
+        assert entry["filename"].startswith("synthetic_format_")
+
+
+def test_kvk_baramati_bilingual_extraction(extractor):
+    """
+    Verify extraction of synthetic bilingual Marathi/English report (KVK Baramati).
+    """
+    pdf_path = FIXTURES_DIR / "synthetic_format_maharashtra_kvk_baramati.pdf"
+    assert pdf_path.exists()
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    res = extractor.extract(pdf_bytes, "synthetic_format_maharashtra_kvk_baramati.pdf")
+    assert res.extraction_status == "EXTRACTION_COMPLETED"
+    assert len(res.measurements) >= 6
+    meas_map = {m.parameter_key: m for m in res.measurements}
+    assert meas_map["soil_ph"].original_value == 7.65
+    assert meas_map["electrical_conductivity"].original_value == 0.38
+    assert meas_map["organic_carbon"].original_value == 0.52
+    assert meas_map["available_nitrogen"].original_value == 195.0
+    assert meas_map["available_phosphorus"].original_value == 16.4
+    assert meas_map["available_potassium"].original_value == 340.0
 
 
 # ===========================================================================

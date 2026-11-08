@@ -27,6 +27,7 @@ from cropnet.services.api.app.services.satellite.copernicus_client import (
     copernicus_client,
     SCL_MASKED_CLASSES,
     convert_raw_dn_to_reflectance,
+    calibrate_dn_to_reflectance,
 )
 from cropnet.services.api.app.api.v1.endpoints.farms import _FARM_STORAGE
 
@@ -153,17 +154,79 @@ def test_scl_masking_classes():
     assert 11 in SCL_MASKED_CLASSES # Snow/Ice
 
 
-def test_radiometric_offset_baseline_handling():
-    """Verify that PB 04.00+ applies BOA_ADD_OFFSET = -1000 DN while legacy Baselines do not."""
-    # PB N0500: BOA_ADD_OFFSET = -1000
-    # For DN = 2000: Reflectance = (2000 - 1000) / 10000 = 0.10
-    ref_n0500 = convert_raw_dn_to_reflectance(2000.0, processing_baseline="N0500")
-    assert pytest.approx(ref_n0500, 0.001) == 0.10
+def test_radiometric_offset_baseline_matrix():
+    """
+    Comprehensive test of Sentinel-2 radiometric calibration across processing baselines:
+    - Legacy Baselines (PB < 04.00, e.g. N0214, N0300) without offset
+    - PB 04.00 (N0400) with offset -1000 DN
+    - PB 05.00 (N0500) with offset -1000 DN
+    - PB 05.10 and PB 05.11 with offset -1000 DN
+    - DN = 0 treated strictly as NO_DATA (returns None)
+    - Negative reflectance preserved down to physical bounds
+    - Already-calibrated reflectance passed through directly without double-conversion
+    - Explicit product metadata overrides
+    """
+    # 1. Legacy baseline (N0214): offset = 0. DN=2000 -> 0.20
+    val = calibrate_dn_to_reflectance(2000.0, processing_baseline="N0214")
+    assert pytest.approx(val, 0.0001) == 0.20
 
-    # PB N0214: Legacy baseline, BOA_ADD_OFFSET = 0
-    # For DN = 2000: Reflectance = 2000 / 10000 = 0.20
-    ref_legacy = convert_raw_dn_to_reflectance(2000.0, processing_baseline="N0214")
-    assert pytest.approx(ref_legacy, 0.001) == 0.20
+    # 2. Legacy baseline (N0300): offset = 0. DN=2500 -> 0.25
+    val = calibrate_dn_to_reflectance(2500.0, processing_baseline="N0300")
+    assert pytest.approx(val, 0.0001) == 0.25
+
+    # 3. PB 04.00 (N0400): offset = -1000. DN=2000 -> (2000 - 1000)/10000 = 0.10
+    val = calibrate_dn_to_reflectance(2000.0, processing_baseline="N0400")
+    assert pytest.approx(val, 0.0001) == 0.10
+
+    # 4. PB 05.00 (N0500): offset = -1000. DN=3500 -> (3500 - 1000)/10000 = 0.25
+    val = calibrate_dn_to_reflectance(3500.0, processing_baseline="N0500")
+    assert pytest.approx(val, 0.0001) == 0.25
+
+    # 5. PB 05.10: offset = -1000. DN=4000 -> (4000 - 1000)/10000 = 0.30
+    val = calibrate_dn_to_reflectance(4000.0, processing_baseline="N0510")
+    assert pytest.approx(val, 0.0001) == 0.30
+
+    # 6. PB 05.11: offset = -1000. DN=1500 -> (1500 - 1000)/10000 = 0.05
+    val = calibrate_dn_to_reflectance(1500.0, processing_baseline="N0511")
+    assert pytest.approx(val, 0.0001) == 0.05
+
+    # 7. DN = 0 is strictly NO_DATA -> None
+    assert calibrate_dn_to_reflectance(0.0, processing_baseline="N0500") is None
+    assert calibrate_dn_to_reflectance(0, processing_baseline="N0214") is None
+
+    # 8. Negative reflectance handling: DN = 900 in PB 05.00 -> (900 - 1000)/10000 = -0.010
+    val_neg = calibrate_dn_to_reflectance(900.0, processing_baseline="N0500", allow_negative_reflectance=True)
+    assert pytest.approx(val_neg, 0.0001) == -0.010
+
+    # Clamped when requested:
+    val_clamped = calibrate_dn_to_reflectance(900.0, processing_baseline="N0500", allow_negative_reflectance=False)
+    assert val_clamped == 0.0
+
+    # 9. Provider already returned calibrated reflectance in [0.0, 1.0]
+    val_calibrated = calibrate_dn_to_reflectance(0.4215, is_calibrated_reflectance=True)
+    assert val_calibrated == 0.4215
+
+    # 10. Dynamic metadata dictionary with explicit BOA_ADD_OFFSET and QUANTIFICATION_VALUE
+    meta = {"BOA_ADD_OFFSET": -1000.0, "QUANTIFICATION_VALUE": 10000.0}
+    val_meta = calibrate_dn_to_reflectance(5000.0, metadata=meta)
+    assert pytest.approx(val_meta, 0.0001) == 0.40
+
+
+def test_spatial_resolution_truth_in_polygon_computation():
+    """Verify that NDMI records B11 20m native, B08 10m native, bilinear resampling, and SCL nearest-neighbour."""
+    poly = {
+        "type": "Polygon",
+        "coordinates": [[[74.5, 18.1], [74.52, 18.1], [74.52, 18.12], [74.5, 18.12], [74.5, 18.1]]]
+    }
+    result = copernicus_client.compute_polygon_indices(poly, farm_area_ha=2.5)
+
+    assert result["spatial_resolution_meters"] == 10.0
+    assert result["b11_native_resolution_meters"] == 20.0
+    assert result["b08_native_resolution_meters"] == 10.0
+    assert result["target_grid_meters"] == 10.0
+    assert result["resampling_method"] == "bilinear"
+    assert "Resampling does not create native 10m information" in result["resampling_notes"]
+    assert result["scl_resampling_method"] == "nearest_neighbour"
 
 
 def test_satellite_endpoint_ownership_enforcement(client):

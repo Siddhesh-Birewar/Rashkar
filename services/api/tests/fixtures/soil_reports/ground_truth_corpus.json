@@ -1,11 +1,14 @@
 {
   "description": "CropNet AI Soil Laboratory Test Report Golden Benchmark Corpus (Indian Formats & Wisconsin Regression)",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "provenance_policy": "Strict classification between authentic public institutional documents and synthetic format-derived test fixtures. Benchmarks on synthetic documents evaluate parser pattern matching only and must not be extrapolated to authentic degraded scans without empirical scan testing.",
   "reports": [
     {
       "fixture_id": "WI-UW-REGRESSION",
       "filename": "lag_sample.pdf",
       "document_type": "pdf_text_layer",
+      "provenance_type": "AUTHENTIC_PUBLIC_DOCUMENT",
+      "provenance_description": "Authentic public laboratory report issued by University of Wisconsin Soil & Plant Analysis Lab (UW SPAL). Contains structured 2-page horizontal sample layout.",
       "laboratory_name": "UW Soil & Plant Analysis Lab",
       "lab_number": "54321",
       "date_received": "2007-08-01",
@@ -38,8 +41,10 @@
     },
     {
       "fixture_id": "IN-SHC-NATIONAL",
-      "filename": "indian_soil_health_card_national.pdf",
+      "filename": "synthetic_format_indian_soil_health_card.pdf",
       "document_type": "pdf_text_layer",
+      "provenance_type": "SYNTHETIC_BENCHMARK_FIXTURE",
+      "provenance_description": "Synthetic format-derived test fixture created based on official Ministry of Agriculture Soil Health Card layout. Used to benchmark parser template matching and regex extraction for 12 canonical parameters and verify fertilizer dosage isolation. LIMITATION: Does not represent degraded scanner noise, skew, or handwriting from authentic field scans; accuracy on this benchmark must not be extrapolated to authentic degraded Marathi scans without testing against authentic scanned documents.",
       "laboratory_name": "District Soil Testing Laboratory, Pune",
       "lab_number": "MH-PUN-2024-8841",
       "report_date": "2024-04-15",
@@ -70,12 +75,14 @@
         "recommended_mop_kg_ha": 40.0,
         "must_leak_into_measurements": false
       },
-      "quality_notes": "Official 12-parameter Indian Soil Health Card format with separate fertilizer recommendation table."
+      "quality_notes": "Official 12-parameter Indian Soil Health Card format benchmark with separate fertilizer recommendation table."
     },
     {
       "fixture_id": "MH-MPKV-RAHURI",
-      "filename": "maharashtra_mpkv_rahuri_marathi.pdf",
+      "filename": "synthetic_format_maharashtra_mpkv_marathi.pdf",
       "document_type": "pdf_text_layer",
+      "provenance_type": "SYNTHETIC_BENCHMARK_FIXTURE",
+      "provenance_description": "Synthetic format-derived test fixture modeled after Mahatma Phule Krishi Vidyapeeth (MPKV) Rahuri report layout. Tests Marathi parameter recognition and fertilizer dose isolation. LIMITATION: Synthetic digital PDF; does not simulate physical mobile phone photos or faded dot-matrix lab printouts.",
       "laboratory_name": "Mahatma Phule Krishi Vidyapeeth, Rahuri",
       "lab_number": "MPKV-SL-2024-409",
       "report_date": "2024-02-18",
@@ -101,7 +108,30 @@
         "section_header": "खतांची मात्रा (Dose of Fertilizers)",
         "must_leak_into_measurements": false
       },
-      "quality_notes": "State Agricultural University soil report with Marathi parameters and separate fertilizer dosage recommendations."
+      "quality_notes": "State Agricultural University soil report benchmark with Marathi parameters and separate fertilizer dosage recommendations."
+    },
+    {
+      "fixture_id": "MH-KVK-BARAMATI",
+      "filename": "synthetic_format_maharashtra_kvk_baramati.pdf",
+      "document_type": "pdf_text_layer",
+      "provenance_type": "SYNTHETIC_BENCHMARK_FIXTURE",
+      "provenance_description": "Synthetic format-derived test fixture modeled after Krishi Vigyan Kendra (KVK) Baramati soil test layout. Tests bilingual Marathi/English headers and multi-nutrient table parsing. LIMITATION: Benchmark fixture for template regex verification, not real degraded paper scans.",
+      "laboratory_name": "Krishi Vigyan Kendra, Baramati",
+      "lab_number": "KVK-BMT-2024-1102",
+      "report_date": "2024-03-10",
+      "sample_collection_date": "2024-03-01",
+      "sample_depth_interval": "0-15 cm",
+      "depth_provenance": "LAB_REPORT",
+      "sample_count": 1,
+      "expected_parameters": {
+        "soil_ph": {"value": 7.65, "unit": "pH", "canonical_key": "soil_ph"},
+        "electrical_conductivity": {"value": 0.38, "unit": "dS/m", "canonical_key": "electrical_conductivity"},
+        "organic_carbon": {"value": 0.52, "unit": "%", "canonical_key": "organic_carbon"},
+        "available_nitrogen": {"value": 195.0, "unit": "kg/ha", "canonical_key": "available_nitrogen"},
+        "available_phosphorus": {"value": 16.4, "unit": "kg/ha", "canonical_key": "available_phosphorus"},
+        "available_potassium": {"value": 340.0, "unit": "kg/ha", "canonical_key": "available_potassium"}
+      },
+      "quality_notes": "Bilingual Marathi/English laboratory report benchmark from Baramati."
     }
   ]
 }

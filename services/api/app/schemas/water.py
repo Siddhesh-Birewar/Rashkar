@@ -79,6 +79,7 @@ class WaterQualityHazardLevel(str, Enum):
     MARGINAL = "MARGINAL"
     RESTRICTED = "RESTRICTED"
     HAZARDOUS = "HAZARDOUS"
+    UNVERIFIED = "UNVERIFIED"
 
 
 CANONICAL_WATER_PARAMETERS = {
@@ -153,6 +154,66 @@ CANONICAL_WATER_PARAMETERS = {
         "standard_unit": "mg/L",
         "category": "anion",
         "equivalent_weight": 62.00,
+    },
+    "fluoride": {
+        "display_name": "Fluoride (F-)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 19.00,
+    },
+    "iron": {
+        "display_name": "Iron (Fe)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 27.92,
+    },
+    "zinc": {
+        "display_name": "Zinc (Zn)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 32.69,
+    },
+    "copper": {
+        "display_name": "Copper (Cu)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 31.77,
+    },
+    "manganese": {
+        "display_name": "Manganese (Mn)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 27.47,
+    },
+    "arsenic": {
+        "display_name": "Arsenic (As)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 24.97,
+    },
+    "lead": {
+        "display_name": "Lead (Pb)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 103.60,
+    },
+    "cadmium": {
+        "display_name": "Cadmium (Cd)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 56.20,
+    },
+    "chromium": {
+        "display_name": "Chromium (Cr)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 17.33,
+    },
+    "nickel": {
+        "display_name": "Nickel (Ni)",
+        "standard_unit": "mg/L",
+        "category": "trace_element",
+        "equivalent_weight": 29.35,
     },
     "sar": {
         "display_name": "Sodium Adsorption Ratio (SAR)",
@@ -316,13 +377,13 @@ class WaterReportConfirmResponse(BaseModel):
 class WaterRuleEvaluationItem(BaseModel):
     parameter_key: str
     parameter_name: str
-    observed_value: float
-    observed_unit: str
+    observed_value: Optional[float] = None
+    observed_unit: Optional[str] = None
     hazard_level: WaterQualityHazardLevel
     hazard_title: str
     rule_id: str
     source_citation: str
-    applicable_standard: str  # e.g., "BIS IS 11624:1986", "ICAR-CSSRI Karnal Guidelines"
+    applicable_standard: str  # e.g., "BIS IS 11624:2019", "ICAR-CSSRI Karnal Guidelines"
     management_guidance: str
     scope_and_limitations: str
 

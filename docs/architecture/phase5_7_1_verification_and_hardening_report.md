@@ -270,3 +270,71 @@ In accordance with strict verification standards, the following architectural bo
 1. **Copernicus CDSE Live Credentials**: In development/testing mode, the Copernicus client defaults to deterministic simulated sampling over real PostGIS polygon boundaries. Live CDSE API querying requires customer-provisioned `COPERNICUS_CLIENT_ID` and `COPERNICUS_CLIENT_SECRET` environment variables.
 2. **Volumetric Hydrological Catchment Modeling**: The current platform tracks on-farm irrigation assets, reported pump hours, and water chemistry. Dynamic hydraulic flow meters, aquifer depletion modeling, and canal roster schedules remain outside the current Phase 5.7 scope.
 3. **Public Production Deployment**: Public production deployment remains deferred as mandated by baseline guidelines.
+
+---
+
+## 12. Outstanding Findings and Closure Evidence (Phase 5.7.1.2)
+
+### 12.1 BIS IS 11624:2019 Institutional Rule Mapping
+- **Institutional Alignment**: Every water evaluation rule in `app/services/water_intelligence/evaluator.py` has been systematically aligned with the official First Revision standard **BIS IS 11624:2019 ("Quality of Irrigation Water — Guidelines")** and the authoritative ICAR-CSSRI publication:
+  - **Minhas, P.S. and Tyagi, N.K. (1998)**, *Guidelines for Irrigation with Saline and Alkali Waters*, **Technical Bulletin No. 1/98**, Central Soil Salinity Research Institute (CSSRI), Karnal, 88 p.
+  - **Minhas, P.S. and Gupta, R.K. (1992)**, *Quality of Irrigation Water: Assessment and Management*, ICAR, New Delhi.
+- **Implemented Table & Clause Mappings**:
+  - **Table 1 (`BIS-11624-2019-TAB1-COMBINED`)**: Multi-parameter groundwater classification matrix combining EC, SAR, and RSC into 7 distinct categories: *Good*, *Marginally Saline*, *Saline*, *High-SAR Saline*, *Marginally Alkali*, *Alkali*, and *High-SAR Alkali*.
+  - **Table 2 (`BIS-11624-2019-TAB2-BORON`)**: Boron concentration ratings: Class 1 (Low, $<1.0\text{ mg/L}$), Class 2 (Medium, $1.0-2.0\text{ mg/L}$), Class 3 (High, $2.0-4.0\text{ mg/L}$), Class 4 (Very High, $>4.0\text{ mg/L}$).
+  - **Table 6 (`BIS-11624-2019-TAB6-*`)**: Maximum permissible concentrations of trace elements for continuous irrigation on all soils: $\text{Cd} \le 0.01$, $\text{Cr} \le 0.1$, $\text{Cu} \le 0.2$, $\text{Fe} \le 5.0$, $\text{Mn} \le 0.2$, $\text{Ni} \le 0.2$, $\text{Pb} \le 5.0$, $\text{Zn} \le 2.0$, $\text{As} \le 0.1$, $\text{F} \le 1.0\text{ mg/L}$ (Clause 5.1.7.1).
+  - **Tables 3, 4, 5 (`BIS-11624-2019-TAB3-5-SUITABILITY`)**: Soil texture (% clay), crop tolerance (Sensitive, Semi-tolerant, Tolerant), and annual rainfall ($<350$, $350-550$, $>550\text{ mm}$) conditional matrix (Clauses 6.1, 6.2, 6.3, 6.4).
+- **Conditional / Unverified Safeguard**: When farm soil texture (% clay) or annual rainfall data is not provided, Table 3-5 suitability evaluations are marked `WaterQualityHazardLevel.UNVERIFIED` and tagged with advisory guidance rather than emitting unsubstantiated definitive suitability claims.
+
+### 12.2 Carbonate Titration Convention & Provenance Tracking
+- **Strict Non-Inference Default**: In `calculate_sar_and_rsc()`, `allow_carbonate_inference` defaults to `False`. When carbonate ($\text{CO}_3^{2-}$) is missing from a water test report, RSC returns `status = "INCOMPLETE_INPUTS"` with `carbonate_provenance = "NOT_PROVIDED"`.
+- **APHA 2320 B / USDA Handbook 60 Isolation**: Phenolphthalein alkalinity titration convention (free $\text{CO}_3^{2-} \approx 0$ at $\text{pH} < 8.3$) is strictly opt-in and recorded with distinct provenance `INFERRED_APHA_2320B`.
+- **Preservation of Laboratory Values**: Laboratory-reported carbonate values are recorded as `LAB_MEASURED` and never overwritten by pH heuristics under any circumstances.
+
+### 12.3 Sentinel-2 Metadata-Driven Radiometric Calibration Matrix
+- **Dynamic Offset & Quantification Factor Parsing**:
+  - `calibrate_dn_to_reflectance` parses `BOA_ADD_OFFSET` and `QUANTIFICATION_VALUE` dynamically from product metadata.
+  - Processing Baselines PB 04.00, 05.00, 05.10, 05.11, 05.13 (and newer) apply an offset of $-1000\text{ DN}$.
+  - Legacy baselines ($< 04.00$) apply an offset of $0\text{ DN}$.
+- **No-Data Handling**: Raw $\text{DN} = 0$ is strictly mapped to `NO_DATA` (`None` / masked out), preventing erroneous reflectance calculation for unmeasured detector pixels.
+- **Provider Passthrough & Clamping**: If a provider returns pre-calibrated floating point reflectance ($[0.0, 1.0]$), calibration factors are not applied twice. Negative reflectances are safely clamped to $0.0$.
+
+### 12.4 Spatial Resolution Truth Preservation
+- **Resolution Accounting**: Schemas and pipeline outputs record:
+  - `b11_native_resolution_meters: 20.0`
+  - `b08_native_resolution_meters: 10.0`
+  - `target_grid_meters: 10.0`
+  - `resampling_method: "bilinear"`
+- **Client & UI Safeguard**: `satellite_vegetation_screen.dart` explicitly displays:
+  *"Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information."*
+- **Masking**: SCL remains nearest-neighbor resampled with invalid pixels ($0, 1, 3, 7, 8, 9, 10, 11$) excluded.
+
+### 12.5 Indian Soil Report OCR Benchmark Categorization
+- **Provenance Reclassification**:
+  - `lag_sample.pdf`: Authentic public laboratory document (University of Wisconsin SPAL).
+  - Benchmark fixtures renamed to `synthetic_format_indian_soil_health_card.pdf`, `synthetic_format_maharashtra_mpkv_marathi.pdf`, and `synthetic_format_maharashtra_kvk_baramati.pdf`.
+- **Scope Limitation**: Annotated in `ground_truth_corpus.json` as `SYNTHETIC_BENCHMARK_FIXTURE` with explicit documentation that synthetic benchmark accuracy is not extrapolated to low-quality scanned physical paper without separate verification.
+
+### 12.6 Live Copernicus CDSE OData Integration Evidence
+- **Live Test Suite**: `tests/test_copernicus_live_provider.py` connects directly to the Copernicus Data Space Ecosystem (CDSE) public OData Catalogue API (`https://catalogue.dataspace.copernicus.eu/odata/v1/Products`).
+- **Live Query Execution**:
+  - Query polygon: Pune/Baramati agricultural basin (`POINT(74.58 18.15)`).
+  - Target tile: `T43QDB`.
+  - Result: Successfully retrieved active Sentinel-2 Level-2A product:
+    - **Product ID**: `1ac198af-5498-4c95-8df5-143e73be6051`
+    - **Product Name**: `S2B_MSIL2A_20261104T053009_N0513_R105_T43QDB_20261104T073410.SAFE`
+    - **Processing Baseline**: `N0513` (PB 05.13)
+    - **Cloud Coverage**: $0.0\%$
+    - **Status**: Verified active live catalog retrieval.
+
+### 12.7 Migration 007 Hardening & Schema Drift Detection
+- **Alembic Head Integrity**: Verified single head (`007_water_and_satellite`).
+- **Drift Detection**: Migration 007 explicitly inspects table columns on upgrade. If any expected column is absent from pre-existing tables, it raises `RuntimeError("Schema drift detected in table '...'...")` rather than silently skipping execution.
+- **Downgrade Verification**: Automated tests confirm clean downgrade dropping all 4 created tables (`satellite_vegetation_observations`, `water_measurements`, `water_test_reports`, `water_sources`).
+
+### 12.8 Security Regression Verification
+- **Cross-User Protection**: HTTP 403 Forbidden verified on cross-user water and satellite resources.
+- **Production Dev Bypass Blocking**: Setting `ENVIRONMENT=production` rejects `X-Dev-User-Id` bypass headers with HTTP 401 Unauthorized.
+- **Cache Isolation**: Farm cache isolation confirmed across distinct farm UUIDs.
+- **Credential Hygiene**: Zero credentials logged or returned in client payloads.
+

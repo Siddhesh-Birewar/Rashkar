@@ -253,7 +253,7 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
                                             ),
                                             const SizedBox(height: 4),
                                             const Text(
-                                              'B08 (NIR) vs B11 (SWIR) resampled at 10m',
+                                              'Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.',
                                               style: TextStyle(fontSize: 11, color: Colors.black54),
                                             ),
                                           ],
@@ -408,8 +408,9 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
                               SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'SCIENTIFIC SAFEGUARD NOTICE: Sentinel-2 Level-2A NDVI and NDMI reflect surface '
-                                  'canopy spectral reflectance at 10-meter spatial resolution. '
+                                  'SCIENTIFIC SAFEGUARD NOTICE: Sentinel-2 Level-2A NDVI (native 10m B08/B04) and NDMI '
+                                  '(native 20m SWIR B11 resampled to 10m grid) reflect surface canopy spectral reflectance. '
+                                  'Resampling 20m SWIR does not synthesize native 10m detail. '
                                   'They serve as indirect indicators of vegetative vigor and moisture status. '
                                   'They MUST NEVER be used as direct diagnoses of specific plant diseases, pest infestations, '
                                   'nitrogen deficiencies, or absolute crop yield predictions without field ground-truthing.',
