@@ -110,14 +110,15 @@ def download_agera5_daily(year="2023"):
         print(f"[CDS] AgERA5 file already exists: {output_nc}")
         return output_nc
 
-    print(f"[CDS] Requesting AgERA5 daily indicators for Pune ({year})...")
+    print(f"[CDS] Requesting AgERA5 v2 daily indicators for Pune ({year})...")
     client.retrieve(
         "sis-agrometeorological-indicators",
         {
+            "version": "2_0",
             "variable": "2m_temperature",
             "statistic": ["24_hour_mean", "24_hour_maximum", "24_hour_minimum"],
-            "year": year,
-            "month": ["06", "07", "08", "09"],  # Kharif monsoon season
+            "year": [str(year)],
+            "month": ["07"],  # Peak vegetative / flowering month
             "day": [f"{d:02d}" for d in range(1, 32)],
             "area": PUNE_BBOX,
             "format": "zip"
