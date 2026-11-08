@@ -104,10 +104,11 @@ class WeatherCollector(BaseDomainCollector):
         except Exception as e:
             logger.debug("Live climate summary collection failed: %s", e)
 
-        # 3. Safeguard against synthetic data:
+        # 3. Safeguard against synthetic data and preserve existing DB observations:
+        # If not force_refreshing and genuine DB records exist, use genuine DB snapshot.
         # If external provider returned a simulated fixture and genuine DB snapshot exists,
         # use the genuine DB snapshot. If no DB records exist, reject simulated fixture.
-        if current_obs and ("(Simulated)" in getattr(current_obs, "source", "") or "Calibrated" in getattr(current_obs, "source", "")):
+        if (not force_refresh and db_current) or (current_obs and ("(Simulated)" in getattr(current_obs, "source", "") or "Calibrated" in getattr(current_obs, "source", ""))):
             if db_current:
                 from cropnet.services.api.app.schemas.weather import CurrentWeatherObservation
                 temp = float(db_current.temperature if db_current.temperature is not None else 25.0)

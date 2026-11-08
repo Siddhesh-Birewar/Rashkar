@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:cropnet_mobile/core/router/advisory_screen.dart';
 import 'package:cropnet_mobile/core/router/app_router.dart';
 import 'package:cropnet_mobile/core/router/farm_resolution.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
@@ -173,9 +174,10 @@ void main() {
       await tester.pumpWidget(CropNetApp(routerConfig: router));
       await tester.pumpAndSettle();
 
-      expect(find.text('AI Dialogue & Advisory'), findsOneWidget);
-      expect(find.textContaining('Qwen3:8B Agronomic Dialogue'), findsOneWidget);
-      expect(find.textContaining('Namaste! Welcome to CropNet AI Agronomic Advisory'), findsOneWidget);
+      expect(find.byType(AdvisoryScreen), findsOneWidget);
+      expect(find.textContaining('CropNet AI'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('Deterministic ICAR & MPKV Decision Engine'), findsOneWidget);
+      expect(find.textContaining('Namaste! Welcome to CropNet AI Agricultural Advisory'), findsOneWidget);
 
       // Advance fake clock past ApiClient timeout so no pending timers remain
       await tester.pump(const Duration(seconds: 31));
@@ -281,7 +283,7 @@ void main() {
       // Switch to Advisory branch
       await tester.tap(find.text('Advisory').first);
       await tester.pumpAndSettle();
-      expect(find.text('AI Dialogue & Advisory'), findsOneWidget);
+      expect(find.byType(AdvisoryScreen), findsOneWidget);
 
       // Switch to History branch
       await tester.tap(find.text('History').first);

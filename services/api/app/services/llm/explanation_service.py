@@ -461,7 +461,6 @@ class AgriculturalExplanationService:
             val_result = self.validate_explanation_guardrails(
                 combined_prose, decision, language=lang, user_message=req.query, farm_context=farm_ctx
             )
-            )
 
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection on generated explanation: {val_result.violations}")
@@ -511,7 +510,6 @@ class AgriculturalExplanationService:
             # Fallback to plain prose validation (for test mocks that mock plain prose)
             val_result = self.validate_explanation_guardrails(
                 raw_content, decision, language=lang, user_message=req.query, farm_context=farm_ctx
-            )
             )
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection on generated prose: {val_result.violations}")
