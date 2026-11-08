@@ -200,7 +200,10 @@ async def list_observations(
 
     observations = db.query(SatelliteVegetationObservationModel).filter(
         SatelliteVegetationObservationModel.farm_id == str(farm_id)
-    ).order_by(SatelliteVegetationObservationModel.observation_date.desc()).all()
+    ).order_by(
+        SatelliteVegetationObservationModel.observation_date.desc(),
+        SatelliteVegetationObservationModel.created_at.desc()
+    ).all()
 
     return observations
 
@@ -216,7 +219,10 @@ async def get_latest_observation(
 
     obs = db.query(SatelliteVegetationObservationModel).filter(
         SatelliteVegetationObservationModel.farm_id == str(farm_id)
-    ).order_by(SatelliteVegetationObservationModel.observation_date.desc()).first()
+    ).order_by(
+        SatelliteVegetationObservationModel.observation_date.desc(),
+        SatelliteVegetationObservationModel.created_at.desc()
+    ).first()
 
     if not obs:
         raise HTTPException(status_code=404, detail="No satellite observations found for this farm.")

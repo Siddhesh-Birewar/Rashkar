@@ -93,7 +93,8 @@ class OllamaClient:
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
+        format: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Synchronous chat completion with local Ollama.
@@ -103,7 +104,7 @@ class OllamaClient:
         target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
         req_timeout = timeout or self.timeout_seconds
 
-        payload = {
+        payload: Dict[str, Any] = {
             "model": target_model,
             "messages": messages,
             "stream": False,
@@ -112,6 +113,8 @@ class OllamaClient:
                 "num_predict": target_max_tokens
             }
         }
+        if format is not None:
+            payload["format"] = format
 
         start_t = time.time()
         timeout_config = httpx.Timeout(
@@ -186,7 +189,8 @@ class OllamaClient:
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
+        format: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Asynchronous chat completion with local Ollama.
@@ -196,7 +200,7 @@ class OllamaClient:
         target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
         req_timeout = timeout or self.timeout_seconds
 
-        payload = {
+        payload: Dict[str, Any] = {
             "model": target_model,
             "messages": messages,
             "stream": False,
@@ -205,6 +209,8 @@ class OllamaClient:
                 "num_predict": target_max_tokens
             }
         }
+        if format is not None:
+            payload["format"] = format
 
         start_t = time.time()
         timeout_config = httpx.Timeout(

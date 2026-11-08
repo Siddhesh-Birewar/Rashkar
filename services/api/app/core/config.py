@@ -95,9 +95,9 @@ class Settings(BaseSettings):
     # Local LLM Runtime (Ollama / Qwen3:8B)
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "qwen3:8b"
-    OLLAMA_TIMEOUT_SECONDS: int = 25
-    OLLAMA_TEMPERATURE: float = 0.2
-    OLLAMA_MAX_TOKENS: int = 350
+    OLLAMA_TIMEOUT_SECONDS: int = 40
+    OLLAMA_TEMPERATURE: float = 0.1
+    OLLAMA_MAX_TOKENS: int = 600
     OLLAMA_ENABLED: bool = True
 
     model_config = SettingsConfigDict(

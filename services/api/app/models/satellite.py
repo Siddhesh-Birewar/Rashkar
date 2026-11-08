@@ -122,17 +122,17 @@ class SatelliteVegetationObservationModel(Base):
     def vegetation_mean_ndvi(self):
         import re
         if not self.quality_notes:
-            return self.mean_ndvi
+            return None
         m = re.search(r"veg_ndvi:\s*([\d\.\-]+)", self.quality_notes)
-        return float(m.group(1)) if m else self.mean_ndvi
+        return float(m.group(1)) if m else None
 
     @property
     def vegetation_mean_ndmi(self):
         import re
         if not self.quality_notes:
-            return self.mean_ndmi
+            return None
         m = re.search(r"veg_ndmi:\s*([\d\.\-]+)", self.quality_notes)
-        return float(m.group(1)) if m else self.mean_ndmi
+        return float(m.group(1)) if m else None
 
     @property
     def bare_soil_mean_ndvi(self):

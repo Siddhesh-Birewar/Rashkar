@@ -40,6 +40,21 @@ class TemplateFallbackGenerator:
     }
 
     @classmethod
+    def _sanitize_enums(cls, text: str) -> str:
+        replacements = {
+            "REGIONAL_SCREENING_ONLY": "regional screening",
+            "CONDITIONALLY_SUITABLE_PENDING_DATA": "conditionally suitable pending field data",
+            "UNSUITABLE_VERIFIED_CONSTRAINT": "unsuitable due to agronomic constraint",
+            "REQUIRES_REGIONAL_VALIDATION": "requires regional agroecological validation",
+            "DECOUPLED_FRAMEWORKS": "decoupled frameworks",
+            "VERIFIED_SUITABLE": "verified suitable",
+            "DISQUALIFIED": "disqualified",
+        }
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        return text
+
+    @classmethod
     def format_irrigation_guidance(cls, guidance: Any, language: str = "en") -> str:
         """
         Convert structured irrigation guidance objects or dictionaries into fluent,
@@ -190,7 +205,7 @@ class TemplateFallbackGenerator:
         if resp.follow_up_questions:
             lines.append("Next Steps: Please answer the diagnostic questions below so CropNet can re-evaluate your field's suitability.")
 
-        return "\n".join(lines)
+        return cls._sanitize_enums("\n".join(lines))
 
     @classmethod
     def _generate_marathi(
@@ -265,7 +280,7 @@ class TemplateFallbackGenerator:
         if resp.follow_up_questions:
             lines.append("पुढील पावले: आपल्या शेतानुसार अचूक सल्ला मिळवण्यासाठी कृपया खाली विचारलेल्या प्रश्नांची उत्तरे द्यावीत.")
 
-        return "\n".join(lines)
+        return cls._sanitize_enums("\n".join(lines))
 
     @classmethod
     def generate_structured_card(

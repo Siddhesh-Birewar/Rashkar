@@ -123,42 +123,42 @@ class DecisionAggregator:
         if lang == "mr":
             if decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
                 reasons = " ".join(limiting_factors)
-                return f"{crop_name} हे पीक आपल्या शेतातील परिस्थितीनुसार अयोग्य (UNSUITABLE) ठरते. कारणे: {reasons}"
+                return f"{crop_name} हे पीक आपल्या शेतातील परिस्थितीनुसार अयोग्य ठरते. कारणे: {reasons}"
             elif decision_state == DecisionState.REQUIRES_REGIONAL_VALIDATION:
                 return (
-                    f"{taluka} तालुक्यात {crop_name} पिकासाठी प्रादेशिक क्षेत्रीय पडताळणी आवश्यक आहे (REQUIRES_REGIONAL_VALIDATION). "
+                    f"{taluka} तालुक्यात {crop_name} पिकासाठी प्रादेशिक क्षेत्रीय पडताळणी आवश्यक आहे. "
                     "पश्चिम घाट परिसरातील जास्त पाऊस आणि आर्द्रतेमुळे स्थानिक शेतपातळीवर रोगांचा धोका तपासणे गरजेचे आहे."
                 )
             elif decision_state == DecisionState.CONDITIONALLY_SUITABLE_PENDING_DATA:
                 return (
-                    f"{crop_name} पीक प्राथमिक निकषांनुसार योग्य वाटत असले, तरी काही महत्त्वाची माहिती प्रलंबित आहे (CONDITIONALLY_SUITABLE). "
+                    f"{crop_name} पीक प्राथमिक निकषांनुसार योग्य वाटत असले, तरी काही महत्त्वाची माहिती प्रलंबित आहे. "
                     "कृपया जमिनीची खोली, निचरा किंवा क्षारता (EC) तपासून खात्री करावी."
                 )
             elif decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
                 return (
-                    f"{taluka} तालुक्यासाठी {crop_name} पिकाची शिफारस प्रादेशिक छाननीवर (REGIONAL_SCREENING) आधारित आहे. "
+                    f"{taluka} तालुक्यासाठी {crop_name} पिकाची शिफारस प्रादेशिक छाननीवर आधारित आहे. "
                     "मध्यम ते भारी काळ्या जमिनीसाठी ही सर्वसाधारण शिफारस असून, स्वतःच्या शेताची माती व पाणी तपासणी करूनच लागवड करावी."
                 )
             else:
-                return f"{crop_name} पीक आपल्या शेतासाठी पूर्णतः अनुकूल व प्रमाणित (VERIFIED_SUITABLE) आढळले आहे."
+                return f"{crop_name} पीक आपल्या शेतासाठी पूर्णतः अनुकूल व प्रमाणित आढळले आहे."
         else:
             if decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
                 reasons = " ".join(limiting_factors)
-                return f"{crop_name} is disqualified as UNSUITABLE under your farm conditions. Limiting factors: {reasons}"
+                return f"{crop_name} is disqualified as unsuitable under your farm conditions. Limiting factors: {reasons}"
             elif decision_state == DecisionState.REQUIRES_REGIONAL_VALIDATION:
                 return (
-                    f"{crop_name} in {taluka} is classified as REQUIRES_REGIONAL_VALIDATION. "
+                    f"{crop_name} in {taluka} requires regional validation. "
                     "Western Ghat transition agroecology requires localized field verification due to humidity and disease risks."
                 )
             elif decision_state == DecisionState.CONDITIONALLY_SUITABLE_PENDING_DATA:
                 return (
-                    f"{crop_name} is CONDITIONALLY_SUITABLE pending diagnostic verification. "
+                    f"{crop_name} is conditionally suitable pending diagnostic verification. "
                     "Critical diagnostic variables (such as EC, water table, or subsoil depth) must be confirmed."
                 )
             elif decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
                 return (
-                    f"{crop_name} in {taluka} meets REGIONAL_SCREENING_ONLY criteria based on macro agroecological recommendations (MPKV 2023). "
+                    f"{crop_name} in {taluka} meets regional suitability criteria based on macro agroecological recommendations (MPKV 2023). "
                     "This is an eligibility baseline, not a farm-level verification. Field-level soil and irrigation testing is required."
                 )
             else:
-                return f"{crop_name} is evaluated as VERIFIED_SUITABLE across verified soil, climate, and water requirements."
+                return f"{crop_name} is evaluated as verified suitable across verified soil, climate, and water requirements."

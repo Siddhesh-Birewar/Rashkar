@@ -140,8 +140,13 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
     }
 
     final obs = _latest!;
-    final canopyNdvi = obs.vegetationMeanNdvi ?? obs.meanNdvi;
+    final hasPureCanopy = obs.vegetationMeanNdvi != null;
+    final canopyNdvi = hasPureCanopy ? obs.vegetationMeanNdvi : obs.meanNdvi;
     final canopyNdmi = obs.vegetationMeanNdmi ?? obs.meanNdmi;
+    final ndviTitle = hasPureCanopy ? 'Canopy NDVI' : 'Mixed-Surface NDVI';
+    final ndviSubtitle = hasPureCanopy ? 'Photosynthetic Vigor (Class 4)' : 'Mixed Surface Composite';
+    final ndmiTitle = obs.vegetationMeanNdmi != null ? 'Canopy NDMI' : 'Mixed-Surface NDMI';
+    final ndmiSubtitle = obs.vegetationMeanNdmi != null ? 'Canopy Moisture Reflectance' : 'Mixed Surface Reflectance';
     final vegPct = obs.vegetationCoveragePercent?.toStringAsFixed(1);
 
     return Card(
@@ -220,7 +225,7 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Canopy NDVI', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          Text(ndviTitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -244,7 +249,7 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
                             ],
                           ),
                           const SizedBox(height: 2),
-                          const Text('Photosynthetic Vigor', style: TextStyle(fontSize: 10, color: Colors.black45)),
+                          Text(ndviSubtitle, style: const TextStyle(fontSize: 10, color: Colors.black45)),
                         ],
                       ),
                     ),
@@ -263,7 +268,7 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Canopy NDMI', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          Text(ndmiTitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -287,7 +292,7 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
                             ],
                           ),
                           const SizedBox(height: 2),
-                          const Text('Moisture Reflectance', style: TextStyle(fontSize: 10, color: Colors.black45)),
+                          Text(ndmiSubtitle, style: const TextStyle(fontSize: 10, color: Colors.black45)),
                         ],
                       ),
                     ),

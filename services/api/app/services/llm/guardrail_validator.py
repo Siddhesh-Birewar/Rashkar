@@ -62,10 +62,11 @@ class GuardrailValidator:
     def _collect_authorized_numbers(
         cls,
         resp: FarmEvaluationResponse,
-        user_message: Optional[str] = None
+        user_message: Optional[str] = None,
+        farm_context: Optional[Dict[str, Any]] = None
     ) -> Set[float]:
         """
-        Collect all valid numbers present in the decision payload and user message:
+        Collect all valid numbers present in the decision payload, farm context, and user message:
         outcomes, limiting factors, uncertainty notes, applied rules, and follow-ups.
         """
         text_corpus = []
@@ -88,6 +89,8 @@ class GuardrailValidator:
         add_item(resp.taluka_resolved)
         if getattr(resp, "farm_context", None):
             add_item(resp.farm_context.model_dump())
+        if farm_context:
+            add_item(farm_context)
         if user_message:
             add_item(user_message)
 
@@ -127,10 +130,11 @@ class GuardrailValidator:
         generated_text: str,
         resp: FarmEvaluationResponse,
         language: str = "en",
-        user_message: Optional[str] = None
+        user_message: Optional[str] = None,
+        farm_context: Optional[Dict[str, Any]] = None
     ) -> GuardrailValidationResult:
         """
-        Validate generated explanation against original decision payload.
+        Validate generated explanation against original decision payload and verified farm context.
         Returns GuardrailValidationResult.
         """
         violations: List[str] = []
@@ -198,7 +202,7 @@ class GuardrailValidator:
                     violations.append("Abstention Failure: Out-of-catalogue crop query did not clearly explain CropNet's abstention policy.")
 
         # 4. Numerical Grounding Check
-        authorized_numbers = cls._collect_authorized_numbers(resp, user_message=user_message)
+        authorized_numbers = cls._collect_authorized_numbers(resp, user_message=user_message, farm_context=farm_context)
         generated_numbers = cls._extract_all_numbers_from_text(cleaned_text)
 
         unauthorized_numbers = []
