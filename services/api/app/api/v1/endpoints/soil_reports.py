@@ -30,6 +30,7 @@ try:
     from cropnet.services.api.app.services.soil_report_storage import soil_report_storage
     from cropnet.services.api.app.services.soil_ocr.extractor import DocumentExtractionPipeline
     from cropnet.services.api.app.services.soil_ocr.models import ReportExtractionStatus
+    from cropnet.services.api.app.services.soil_ocr.safeguards import AGRONOMIC_BOUNDARIES
     from cropnet.services.api.app.schemas.soil_reports import (
         ExtractionStatus,
         ReviewStatus,
@@ -604,9 +605,24 @@ async def confirm_soil_report(
     measurements = query.all()
     now = datetime.utcnow()
 
+    confirmed_count = 0
     for m in measurements:
+        val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        bounds = AGRONOMIC_BOUNDARIES.get(m.parameter_key)
+        if bounds and val is not None:
+            min_v, max_v = bounds
+            if val < min_v or val > max_v:
+                logger.warning("Rejecting measurement %s with value %s outside valid range [%s, %s]", m.parameter_key, val, min_v, max_v)
+                m.verification_status = MeasurementVerificationStatus.REJECTED_BY_FARMER.value
+                m.farmer_notes = f"Automatically rejected: value {val} is outside plausible agronomic range ({min_v}–{max_v})."
+                m.updated_at = now
+                continue
+
         m.verification_status = MeasurementVerificationStatus.FARMER_CONFIRMED.value
         m.updated_at = now
+        confirmed_count += 1
 
     report.review_status = ReviewStatus.CONFIRMED.value
     report.extraction_status = ExtractionStatus.CONFIRMED.value
@@ -626,7 +642,7 @@ async def confirm_soil_report(
         report_id=report_id,
         status="confirmed",
         review_status=ReviewStatus.CONFIRMED,
-        confirmed_measurement_count=len(measurements),
+        confirmed_measurement_count=confirmed_count,
         confirmed_at=now
     )
 

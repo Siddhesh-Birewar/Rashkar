@@ -92,11 +92,17 @@ def evaluate_farm_intelligence(
                     )
 
                 if payload.soil_ph is None and "soil_ph" in latest_meas:
-                    updates["soil_ph"] = _val("soil_ph")
+                    ph_candidate = _val("soil_ph")
+                    if ph_candidate is not None and 3.0 <= ph_candidate <= 11.0:
+                        updates["soil_ph"] = ph_candidate
                 if payload.soil_organic_carbon_pct is None and "organic_carbon" in latest_meas:
-                    updates["soil_organic_carbon_pct"] = _val("organic_carbon")
+                    soc_candidate = _val("organic_carbon")
+                    if soc_candidate is not None and 0.0 <= soc_candidate <= 15.0:
+                        updates["soil_organic_carbon_pct"] = soc_candidate
                 if payload.electrical_conductivity_ds_m is None and "electrical_conductivity" in latest_meas:
-                    updates["electrical_conductivity_ds_m"] = _val("electrical_conductivity")
+                    ec_candidate = _val("electrical_conductivity")
+                    if ec_candidate is not None and 0.0 <= ec_candidate <= 30.0:
+                        updates["electrical_conductivity_ds_m"] = ec_candidate
                 if payload.available_nitrogen_kg_ha is None and "available_nitrogen" in latest_meas:
                     updates["available_nitrogen_kg_ha"] = _val("available_nitrogen")
                 if payload.available_phosphorus_kg_ha is None and "available_phosphorus" in latest_meas:

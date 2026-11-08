@@ -614,26 +614,44 @@ def _fuse_confirmed_laboratory_measurements(
             scientific_note=full_note
         )
 
-    # 1. Precedence: soil_ph
+    # 1. Precedence: soil_ph (Strict agronomic bounds: 3.0 to 11.0)
     if "soil_ph" in latest_by_param:
         m = latest_by_param["soil_ph"]
-        if profile.ph and profile.ph.verification_status != VerificationStatus.LABORATORY_VERIFIED:
-            profile.additional_parameters["isric_ph"] = profile.ph
-        profile.ph = _make_lab_obs("ph", m, "Soil pH (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+        val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        if val is not None and 3.0 <= val <= 11.0:
+            if profile.ph and profile.ph.verification_status != VerificationStatus.LABORATORY_VERIFIED:
+                profile.additional_parameters["isric_ph"] = profile.ph
+            profile.ph = _make_lab_obs("ph", m, "Soil pH (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+        else:
+            logger.warning("Skipping scientifically invalid laboratory soil_ph: %s (must be 3.0-11.0)", val)
 
-    # 2. Precedence: organic_carbon
+    # 2. Precedence: organic_carbon (Strict agronomic bounds: 0.0 to 15.0%)
     if "organic_carbon" in latest_by_param:
         m = latest_by_param["organic_carbon"]
-        if profile.organic_carbon and profile.organic_carbon.verification_status != VerificationStatus.LABORATORY_VERIFIED:
-            profile.additional_parameters["isric_soc"] = profile.organic_carbon
-        profile.organic_carbon = _make_lab_obs("soc", m, "Soil Organic Carbon (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+        val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        if val is not None and 0.0 <= val <= 15.0:
+            if profile.organic_carbon and profile.organic_carbon.verification_status != VerificationStatus.LABORATORY_VERIFIED:
+                profile.additional_parameters["isric_soc"] = profile.organic_carbon
+            profile.organic_carbon = _make_lab_obs("soc", m, "Soil Organic Carbon (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
+        else:
+            logger.warning("Skipping scientifically invalid laboratory organic_carbon: %s", val)
 
-    # 3. Precedence: electrical_conductivity
+    # 3. Precedence: electrical_conductivity (Strict agronomic bounds: 0.0 to 30.0 dS/m)
     if "electrical_conductivity" in latest_by_param:
         m = latest_by_param["electrical_conductivity"]
-        profile.additional_parameters["electrical_conductivity"] = _make_lab_obs(
-            "electrical_conductivity", m, "Electrical Conductivity (Laboratory Measured)", "Farmer-confirmed laboratory measurement."
+        val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
         )
+        if val is not None and 0.0 <= val <= 30.0:
+            profile.additional_parameters["electrical_conductivity"] = _make_lab_obs(
+                "electrical_conductivity", m, "Electrical Conductivity (Laboratory Measured)", "Farmer-confirmed laboratory measurement."
+            )
+        else:
+            logger.warning("Skipping scientifically invalid laboratory electrical_conductivity: %s", val)
 
     # 4. Precedence: available_nitrogen
     if "available_nitrogen" in latest_by_param:

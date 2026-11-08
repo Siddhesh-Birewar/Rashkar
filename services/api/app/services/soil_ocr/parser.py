@@ -32,8 +32,8 @@ PARAMETER_PATTERNS = [
     # Organic Carbon (SOC)
     ("organic_carbon", re.compile(r"\b(organic\s*carbon|s\.?o\.?c\.?\b|o\.?c\.?\b|सेंद्रिय\s*कर्ब)", re.IGNORECASE)),
     
-    # Soil pH (exclude Phosphorus matches)
-    ("soil_ph", re.compile(r"(?:\bsoil\s*p[hH]\b|\bp[hH]\b(?!\s*osphorus|\s*os\b|\s*hate)|\bp[hH]\s*\(1:2\.?5?\)|\bसामू\b)", re.IGNORECASE)),
+    # Soil pH (exclude Phosphorus and telephone/contact patterns)
+    ("soil_ph", re.compile(r"(?:\bsoil\s*p[hH]\b|(?<!\bphone\s)(?<!\btel\s)(?<!\bmob\s)(?<!\boff\s)(?<!\bcall\s)(?<!\bcontact\s)\bp[hH]\b(?!\.|\s*no\b|\s*num\b|\s*#|\s*:\s*\d{3,}|\s*-\s*\d{3,}|\s*\d{3,}|\s*osphorus|\s*os\b|\s*hate)|\bp[hH]\s*\(1:2\.?5?\)|\bसामू\b)", re.IGNORECASE)),
     
     # Electrical Conductivity (EC)
     ("electrical_conductivity", re.compile(r"\b(electrical\s*conductivity|e\.?c\.?\b|conductivity|विद्युत\s*वाहकता|\bईसी\b)", re.IGNORECASE)),
@@ -42,13 +42,13 @@ PARAMETER_PATTERNS = [
     ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|p206|p2o|उपलब्ध\s*स्फुरद|\bस्फुरद\b)\b", re.IGNORECASE)),
 
     # Elemental / Reported Phosphorus [P]
-    ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?|\b\[P\]|\(P\)|\bP\b(?!\s*h\b|\s*H\b|\s*[oO]\b|\s*value|\s*level|\s*scale|\s*2o5|\s*205|\s*206))\b", re.IGNORECASE)),
+    ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?|\b\[P\]|\(P\)|\bP\s*\(available\)|\bP\s*level|\bP\s*content|\bP\s*value|\bP\s*ppm|\bP\s*kg\/ha)\b", re.IGNORECASE)),
     
     # Available Potassium (K2O / Avail K) - note K20 is OCR confusion
     ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश|\bपालाश\b)\b", re.IGNORECASE)),
 
     # Elemental / Reported Potassium [K]
-    ("potassium", re.compile(r"\b(potassium(?:\s*\[K\]|\s*\(K\))?|\b\[K\]|\(K\)|\bK\b(?!\s*g\b|\s*m\b|\s*[oO]\b|\s*cal|\s*2o|\s*20))\b", re.IGNORECASE)),
+    ("potassium", re.compile(r"\b(potassium(?:\s*\[K\]|\s*\(K\))?|\b\[K\]|\(K\)|\bK\s*\(available\)|\bK\s*level|\bK\s*content|\bK\s*value|\bK\s*ppm|\bK\s*kg\/ha)\b", re.IGNORECASE)),
     
     # Sulphur / Sulfur
     ("sulphur", re.compile(r"\b(sulphur|sulfur|avail(?:able|\.)?\s*s\b|available\s*sulphur|available\s*sulfur|\bs\b\s*\(available\)|\bso4\b|गंधक|सल्फर)", re.IGNORECASE)),
@@ -66,13 +66,13 @@ PARAMETER_PATTERNS = [
     ("copper", re.compile(r"\b(copper|avail(?:able|\.)?\s*cu\b|available\s*copper|\bcu\b|तांबे)", re.IGNORECASE)),
     
     # Boron
-    ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|available\s*boron|\bb\b(?!\s*arcode)|बोरॉन|बोरोन)", re.IGNORECASE)),
+    ("boron", re.compile(r"\b(boron|avail(?:able|\.)?\s*b\b|available\s*boron|\[B\]|\(B\)|\bB\s*\(available\)|\bB\s*level|\bB\s*content|\bB\s*value|\bB\s*ppm|बोरॉन|बोरोन)\b", re.IGNORECASE)),
 ]
 
 # Column definitions for horizontal/columnar multi-parameter tables
 PARAMETER_COL_DEFS = [
     ("sample_col", re.compile(r"\b(sample(?:\s*no|\s*id|\s*#)?)\b", re.IGNORECASE)),
-    ("soil_ph", re.compile(r"\b(p[hH](?:\s*\(1:2\.?5?\))?)\b(?!\s*os|\s*hate)", re.IGNORECASE)),
+    ("soil_ph", re.compile(r"\b(p[hH](?:\s*\(1:2\.?5?\))?)\b(?!\.|\s*no\b|\s*num\b|\s*#|\s*:\s*\d{3,}|\s*-\s*\d{3,}|\s*\d{3,}|\s*os|\s*hate)", re.IGNORECASE)),
     ("available_phosphorus", re.compile(r"\b(available\s*phosphorus|avail(?:able|\.)?\s*p\b|p2o5|p205|उपलब्ध\s*स्फुरद)\b", re.IGNORECASE)),
     ("phosphorus", re.compile(r"\b(phosphorus(?:\s*\[P\]|\s*\(P\))?)\b", re.IGNORECASE)),
     ("available_potassium", re.compile(r"\b(available\s*potassium|avail(?:able|\.)?\s*k\b|k2o|k20|उपलब्ध\s*पालाश)\b", re.IGNORECASE)),

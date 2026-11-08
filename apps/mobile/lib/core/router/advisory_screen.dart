@@ -160,11 +160,20 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
     try {
       final profile = await _soilRepo.getFarmSoilProfile(farmId);
       if (mounted && profile.ph?.value != null) {
-        setState(() {
-          _soilPh = profile.ph!.value!;
-          _isLabVerifiedSoil = profile.ph!.verificationStatus == VerificationStatus.laboratoryVerified;
-        });
-        _resetConversation();
+        final phVal = profile.ph!.value!;
+        if (phVal >= 3.0 && phVal <= 11.0) {
+          setState(() {
+            _soilPh = phVal;
+            _isLabVerifiedSoil = profile.ph!.verificationStatus == VerificationStatus.laboratoryVerified;
+          });
+          _resetConversation();
+        } else {
+          setState(() {
+            _soilPh = null;
+            _isLabVerifiedSoil = false;
+          });
+          _resetConversation();
+        }
       }
     } catch (_) {
       // Retain null if soil profile is not yet available
@@ -270,13 +279,18 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
       _errorMessage = null;
     });
 
+    double? safePh = _soilPh;
+    if (safePh != null && (safePh < 3.0 || safePh > 11.0)) {
+      safePh = null;
+    }
+
     final contextInput = FarmContextInput(
       farmId: currentFarm.id,
       taluka: _selectedTaluka ?? currentFarm.taluka,
       district: _selectedDistrict ?? currentFarm.district,
       latitude: currentFarm.centroid.latitude,
       longitude: currentFarm.centroid.longitude,
-      soilPh: _soilPh,
+      soilPh: safePh,
       irrigationAvailable: _irrigationAvailable ?? (currentFarm.irrigationType != 'rainfed'),
       irrigationSource: _irrigationSource ?? currentFarm.waterSource,
       targetSeason: _selectedSeason,
@@ -350,8 +364,14 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String userFriendlyError = e.toString().replaceAll('Exception: ', '');
+        if (userFriendlyError.contains('soil_ph') || userFriendlyError.contains('less than or equal to 11')) {
+          userFriendlyError = _selectedLanguage == 'mr'
+              ? 'मातीचे सामू (pH) मूल्य अवैध आहे. कृपया शेताचे माती प्रोफाइल किंवा अहवाल तपासा.'
+              : 'Invalid soil pH measurement detected. Please check your farm soil profile.';
+        }
         setState(() {
-          _errorMessage = 'API Connection Error: ${e.toString()}';
+          _errorMessage = userFriendlyError;
         });
       }
     } finally {
