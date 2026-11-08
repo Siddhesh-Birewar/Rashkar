@@ -1,0 +1,82 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Large Data & Media Files (WORM Storage)
+data/01_raw_immutable/*
+!data/01_raw_immutable/.gitkeep
+data/02_processed/*
+!data/02_processed/.gitkeep
+data/03_features/*
+!data/03_features/.gitkeep
+data/04_labels/*
+!data/04_labels/.gitkeep
+*.nc
+*.parquet
+*.tif
+*.tiff
+*.zip
+*.tar.gz
+*.csv.gz
+
+# Flutter / Dart
+flutter_client/.dart_tool/
+flutter_client/.flutter-plugins
+flutter_client/.flutter-plugins-dependencies
+flutter_client/.packages
+flutter_client/build/
+flutter_client/.pub-cache/
+flutter_client/.pub/

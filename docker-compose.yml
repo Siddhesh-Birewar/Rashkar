@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: rashkar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rashkar_admin
+      POSTGRES_PASSWORD: rashkar_secure_password
+      POSTGRES_DB: rashkar_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rashkar_admin -d rashkar_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: rashkar_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rashkar_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: rashkar_admin
+      POSTGRES_PASSWORD: rashkar_secure_password
+      POSTGRES_DB: rashkar_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rashkar_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      POSTGRES_SERVER: db
+      REDIS_HOST: redis
+    volumes:
+      - .:/app
+    command: celery -A backend.app.core.celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:
