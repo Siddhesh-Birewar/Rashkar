@@ -104,120 +104,587 @@ class RiskDimensionItem {
   }
 }
 
+class SoilSuitabilityAnalysis {
+  final String soilTexture;
+  final double soilPh;
+  final String phStatus;
+  final double organicCarbonPct;
+  final double cationExchangeCapacity;
+  final double availableWaterCapacityMmM;
+  final double effectiveRootingDepthCm;
+  final double climateNormalRainfallMm;
+  final String suitabilityVerdict;
+  final String dataProvenance;
+
+  SoilSuitabilityAnalysis({
+    required this.soilTexture,
+    required this.soilPh,
+    required this.phStatus,
+    required this.organicCarbonPct,
+    required this.cationExchangeCapacity,
+    required this.availableWaterCapacityMmM,
+    required this.effectiveRootingDepthCm,
+    required this.climateNormalRainfallMm,
+    required this.suitabilityVerdict,
+    required this.dataProvenance,
+  });
+
+  factory SoilSuitabilityAnalysis.fromJson(Map<String, dynamic> json) {
+    return SoilSuitabilityAnalysis(
+      soilTexture: json['soil_texture'] ?? 'Medium Black Vertisol',
+      soilPh: (json['soil_ph'] as num?)?.toDouble() ?? 7.8,
+      phStatus: json['ph_status'] ?? 'Optimal',
+      organicCarbonPct: (json['organic_carbon_pct'] as num?)?.toDouble() ?? 0.65,
+      cationExchangeCapacity: (json['cation_exchange_capacity'] as num?)?.toDouble() ?? 38.5,
+      availableWaterCapacityMmM: (json['available_water_capacity_mm_m'] as num?)?.toDouble() ?? 145.0,
+      effectiveRootingDepthCm: (json['effective_rooting_depth_cm'] as num?)?.toDouble() ?? 90.0,
+      climateNormalRainfallMm: (json['climate_normal_rainfall_mm'] as num?)?.toDouble() ?? 680.0,
+      suitabilityVerdict: json['suitability_verdict'] ?? 'Suitable',
+      dataProvenance: json['data_provenance'] ?? 'CropNet Soil Adapter',
+    );
+  }
+}
+
+class ActionableRecommendationItem {
+  final String recommendationId;
+  final String title;
+  final String description;
+  final String whyRecommended;
+  final String supportingData;
+  final String evidenceSource;
+  final String urgency;
+  final String limitations;
+
+  ActionableRecommendationItem({
+    required this.recommendationId,
+    required this.title,
+    required this.description,
+    required this.whyRecommended,
+    required this.supportingData,
+    required this.evidenceSource,
+    required this.urgency,
+    required this.limitations,
+  });
+
+  factory ActionableRecommendationItem.fromJson(Map<String, dynamic> json) {
+    return ActionableRecommendationItem(
+      recommendationId: json['recommendation_id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      whyRecommended: json['why_recommended'] ?? '',
+      supportingData: json['supporting_data'] ?? '',
+      evidenceSource: json['evidence_source'] ?? '',
+      urgency: json['urgency'] ?? 'Preventative',
+      limitations: json['limitations'] ?? '',
+    );
+  }
+}
+
 class YieldAssessment {
   final String farmId;
+  final String farmName;
+  final String plotId;
   final String cropCode;
-  final String cropStageCode;
-  final String cropStageNameEn;
-  final String? cropStageNameMr;
-  final int das;
-  final List<RiskDimensionItem> risks;
+  final String cropName;
+  final String sowingDate;
+  final int daysAfterSowing;
+  final double totalAreaAcres;
+  final String irrigationType;
+  final String locationDisplay;
+  final String generatedAtUtc;
+  final String timezone;
   final Map<String, dynamic> baseline;
+  final SoilSuitabilityAnalysis? suitabilityAnalysis;
+  final List<RiskDimensionItem> risks;
+  final Map<String, dynamic> mlPredictionGate;
+  final List<ActionableRecommendationItem> recommendations;
+  final String farmerNarrativeExplanation;
+
+  // Compatibility getters
+  String get cropStageCode => cropCode;
+  String get cropStageNameEn => 'Stage (DAS $daysAfterSowing)';
+  String get cropStageNameMr => 'अवस्था';
+  int get das => daysAfterSowing;
 
   YieldAssessment({
     required this.farmId,
+    this.farmName = 'My Farm',
+    this.plotId = 'plot_1',
     required this.cropCode,
-    required this.cropStageCode,
-    required this.cropStageNameEn,
-    this.cropStageNameMr,
-    required this.das,
-    required this.risks,
+    this.cropName = 'Crop',
+    this.sowingDate = '',
+    required this.daysAfterSowing,
+    this.totalAreaAcres = 2.5,
+    this.irrigationType = 'Rainfed',
+    this.locationDisplay = 'Maharashtra',
+    this.generatedAtUtc = '',
+    this.timezone = 'Asia/Kolkata',
     required this.baseline,
+    this.suitabilityAnalysis,
+    required this.risks,
+    this.mlPredictionGate = const {},
+    this.recommendations = const [],
+    this.farmerNarrativeExplanation = '',
   });
 
   factory YieldAssessment.fromJson(Map<String, dynamic> json) {
     final stage = json['crop_stage'] ?? {};
     final rawRisks = json['risks'] as List? ?? [];
+    final rawRecs = json['recommendations'] as List? ?? [];
     return YieldAssessment(
       farmId: json['farm_id'] ?? '',
+      farmName: json['farm_name'] ?? 'My Farm',
+      plotId: json['plot_id'] ?? 'plot_1',
       cropCode: json['crop_code'] ?? 'soybean',
-      cropStageCode: stage['stage_code'] ?? 'VEGETATIVE',
-      cropStageNameEn: stage['stage_name_en'] ?? 'Vegetative',
-      cropStageNameMr: stage['stage_name_mr'] ?? stage['stage_name_en'],
-      das: stage['days_after_sowing'] ?? 45,
-      risks: rawRisks.map((r) => RiskDimensionItem.fromJson(r)).toList(),
+      cropName: json['crop_name'] ?? (json['crop_code'] != null ? json['crop_code'].toString().toUpperCase() : 'Crop'),
+      sowingDate: json['sowing_date'] ?? '',
+      daysAfterSowing: stage['days_after_sowing'] ?? json['days_after_sowing'] ?? 45,
+      totalAreaAcres: (json['total_area_acres'] as num?)?.toDouble() ?? 2.5,
+      irrigationType: json['irrigation_type'] ?? 'Rainfed',
+      locationDisplay: json['location_display'] ?? '',
+      generatedAtUtc: json['generated_at_utc'] ?? '',
+      timezone: json['timezone'] ?? 'Asia/Kolkata',
       baseline: json['yield_baseline'] ?? {},
+      suitabilityAnalysis: json['suitability_analysis'] != null
+          ? SoilSuitabilityAnalysis.fromJson(json['suitability_analysis'])
+          : null,
+      risks: rawRisks.map((r) => RiskDimensionItem.fromJson(r)).toList(),
+      mlPredictionGate: Map<String, dynamic>.from(json['ml_prediction_gate'] ?? {}),
+      recommendations: rawRecs.map((r) => ActionableRecommendationItem.fromJson(r)).toList(),
+      farmerNarrativeExplanation: json['farmer_narrative_explanation'] ?? '',
+    );
+  }
+}
+
+// ==================== WORKER HEAT MODELS ====================
+
+class WorkerHourlyProjection {
+  final int forecastHourOffset;
+  final String validTimeIst;
+  final double airTempC;
+  final double relativeHumidityPct;
+  final double windSpeedMs;
+  final double solarIrradianceWm2;
+  final double wbgtEstimatedC;
+  final double wbgtEffectiveC;
+  final String hazardLevel;
+  final bool exceedsScreeningThreshold;
+  final double thresholdLimitC;
+  final String trend;
+  final String workRestCycle;
+
+  WorkerHourlyProjection({
+    required this.forecastHourOffset,
+    required this.validTimeIst,
+    required this.airTempC,
+    required this.relativeHumidityPct,
+    required this.windSpeedMs,
+    required this.solarIrradianceWm2,
+    required this.wbgtEstimatedC,
+    required this.wbgtEffectiveC,
+    required this.hazardLevel,
+    required this.exceedsScreeningThreshold,
+    required this.thresholdLimitC,
+    required this.trend,
+    required this.workRestCycle,
+  });
+
+  factory WorkerHourlyProjection.fromJson(Map<String, dynamic> json) {
+    return WorkerHourlyProjection(
+      forecastHourOffset: json['forecast_hour_offset'] ?? 0,
+      validTimeIst: json['valid_time_ist'] ?? '',
+      airTempC: (json['air_temp_c'] as num?)?.toDouble() ?? 32.0,
+      relativeHumidityPct: (json['relative_humidity_pct'] as num?)?.toDouble() ?? 50.0,
+      windSpeedMs: (json['wind_speed_ms'] as num?)?.toDouble() ?? 1.5,
+      solarIrradianceWm2: (json['solar_irradiance_wm2'] as num?)?.toDouble() ?? 500.0,
+      wbgtEstimatedC: (json['wbgt_estimated_c'] as num?)?.toDouble() ?? 27.5,
+      wbgtEffectiveC: (json['wbgt_effective_c'] as num?)?.toDouble() ?? 27.5,
+      hazardLevel: json['hazard_level'] ?? 'LOW',
+      exceedsScreeningThreshold: json['exceeds_screening_threshold'] ?? false,
+      thresholdLimitC: (json['threshold_limit_c'] as num?)?.toDouble() ?? 28.0,
+      trend: json['trend'] ?? 'STEADY',
+      workRestCycle: json['work_rest_cycle'] ?? 'Continuous work',
     );
   }
 }
 
 class WorkerHeatResponse {
-  final String hazardLevel;
-  final double wbgtSunC;
-  final double wbgtShadeC;
-  final double airTempC;
-  final double rhPct;
-  final String advice;
-  final String methodology;
+  final String sessionId;
+  final String generatedAtIst;
+  final String farmLocationDisplay;
+  final String weatherSourceName;
+  final String weatherRetrievalTimeIst;
+  final String isObservedOrForecast;
+  final double currentAirTempC;
+  final double currentRelativeHumidityPct;
+  final double currentDewPointC;
+  final double currentWindSpeedMs;
+  final double currentWindSpeedKmh;
+  final double currentSolarRadiationWm2;
+  final double currentWbgtEstimatedC;
+  final String dataConfidence;
+
+  final String peakRiskHourIst;
+  final String peakRiskReason;
+  final List<WorkerHourlyProjection> hourlyProjections;
+
+  final String workloadCategory;
+  final String clothingType;
+  final double clothingCavC;
+  final bool isAcclimatised;
+  final String sunExposure;
+  final double exposureDurationHours;
+  final String currentHazardLevel;
+  final String maxHazardLevelInWindow;
+  final double maxWbgtEffectiveC;
+  final double screeningThresholdC;
+
+  final String categorySelectionReason;
+  final List<String> mainContributingFactors;
+  final String workloadInteractionExplanation;
+  final String methodologyReference;
+  final Map<String, dynamic> technicalDetails;
+
+  final String disclaimer;
+  final List<String> safetyCautions;
+  final Map<String, dynamic> hydrationGuidance;
+  final List<String> beforeWorkGuidance;
+  final List<String> duringWorkGuidance;
+  final List<String> highRiskActions;
+  final Map<String, dynamic> emergencyTriage;
+
+  // Compatibility getters
+  String get hazardLevel => currentHazardLevel.toLowerCase();
+  double get wbgtSunC => currentWbgtEstimatedC;
+  double get wbgtShadeC => (currentWbgtEstimatedC - 2.8 > 0 ? (currentWbgtEstimatedC - 2.8) : currentWbgtEstimatedC);
+  double get airTempC => currentAirTempC;
+  double get rhPct => currentRelativeHumidityPct;
+  String get advice => categorySelectionReason;
+  String get methodology => methodologyReference;
 
   WorkerHeatResponse({
-    required this.hazardLevel,
-    required this.wbgtSunC,
-    required this.wbgtShadeC,
-    required this.airTempC,
-    required this.rhPct,
-    required this.advice,
-    required this.methodology,
+    this.sessionId = '',
+    this.generatedAtIst = '',
+    this.farmLocationDisplay = '',
+    this.weatherSourceName = 'WMO Global NWP / IMD',
+    this.weatherRetrievalTimeIst = '',
+    this.isObservedOrForecast = 'Forecast (Operational WMO NWP)',
+    required this.currentAirTempC,
+    required this.currentRelativeHumidityPct,
+    this.currentDewPointC = 20.0,
+    this.currentWindSpeedMs = 1.8,
+    this.currentWindSpeedKmh = 6.5,
+    this.currentSolarRadiationWm2 = 600.0,
+    required this.currentWbgtEstimatedC,
+    this.dataConfidence = 'HIGH',
+    this.peakRiskHourIst = '',
+    this.peakRiskReason = '',
+    this.hourlyProjections = const [],
+    this.workloadCategory = 'moderate',
+    this.clothingType = 'standard_work_clothes',
+    this.clothingCavC = 0.0,
+    this.isAcclimatised = true,
+    this.sunExposure = 'direct_sun',
+    this.exposureDurationHours = 3.0,
+    required this.currentHazardLevel,
+    this.maxHazardLevelInWindow = 'MODERATE',
+    this.maxWbgtEffectiveC = 28.0,
+    this.screeningThresholdC = 28.0,
+    this.categorySelectionReason = '',
+    this.mainContributingFactors = const [],
+    this.workloadInteractionExplanation = '',
+    this.methodologyReference = 'Liljegren et al. (2008)',
+    this.technicalDetails = const {},
+    this.disclaimer = '',
+    this.safetyCautions = const [],
+    this.hydrationGuidance = const {},
+    this.beforeWorkGuidance = const [],
+    this.duringWorkGuidance = const [],
+    this.highRiskActions = const [],
+    this.emergencyTriage = const {},
   });
 
   factory WorkerHeatResponse.fromJson(Map<String, dynamic> json) {
-    final metrics = json['heat_metrics'] ?? {};
+    final rawProjections = json['hourly_projections'] as List? ?? [];
     return WorkerHeatResponse(
-      hazardLevel: json['hazard_level'] ?? 'moderate',
-      wbgtSunC: (metrics['estimated_wbgt_sun_c'] as num?)?.toDouble() ?? 28.5,
-      wbgtShadeC: (metrics['estimated_wbgt_shade_c'] as num?)?.toDouble() ?? 26.0,
-      airTempC: (metrics['air_temp_c'] as num?)?.toDouble() ?? 33.0,
-      rhPct: (metrics['relative_humidity_pct'] as num?)?.toDouble() ?? 55.0,
-      advice: json['plain_language_advice'] ?? 'Drink water frequently and take rest in shade during peak afternoon.',
-      methodology: json['methodology'] ?? 'Liljegren_et_al_2008_energy_balance',
+      sessionId: json['session_id'] ?? '',
+      generatedAtIst: json['generated_at_ist'] ?? '',
+      farmLocationDisplay: json['farm_location_display'] ?? '',
+      weatherSourceName: json['weather_source_name'] ?? 'Operational WMO NWP',
+      weatherRetrievalTimeIst: json['weather_retrieval_time_ist'] ?? '',
+      isObservedOrForecast: json['is_observed_or_forecast'] ?? 'Forecast (Operational WMO NWP)',
+      currentAirTempC: (json['current_air_temp_c'] as num?)?.toDouble() ?? 32.0,
+      currentRelativeHumidityPct: (json['current_relative_humidity_pct'] as num?)?.toDouble() ?? 50.0,
+      currentDewPointC: (json['current_dew_point_c'] as num?)?.toDouble() ?? 21.0,
+      currentWindSpeedMs: (json['current_wind_speed_ms'] as num?)?.toDouble() ?? 1.8,
+      currentWindSpeedKmh: (json['current_wind_speed_kmh'] as num?)?.toDouble() ?? 6.5,
+      currentSolarRadiationWm2: (json['current_solar_radiation_wm2'] as num?)?.toDouble() ?? 600.0,
+      currentWbgtEstimatedC: (json['current_wbgt_estimated_c'] as num?)?.toDouble() ?? 27.8,
+      dataConfidence: json['data_confidence'] ?? 'HIGH',
+      peakRiskHourIst: json['peak_risk_hour_ist'] ?? '',
+      peakRiskReason: json['peak_risk_reason'] ?? '',
+      hourlyProjections: rawProjections.map((p) => WorkerHourlyProjection.fromJson(p)).toList(),
+      workloadCategory: json['workload_category'] ?? 'moderate',
+      clothingType: json['clothing_type'] ?? 'standard_work_clothes',
+      clothingCavC: (json['clothing_cav_c'] as num?)?.toDouble() ?? 0.0,
+      isAcclimatised: json['is_acclimatised'] ?? true,
+      sunExposure: json['sun_exposure'] ?? 'direct_sun',
+      exposureDurationHours: (json['exposure_duration_hours'] as num?)?.toDouble() ?? 3.0,
+      currentHazardLevel: json['current_hazard_level'] ?? 'LOW',
+      maxHazardLevelInWindow: json['max_hazard_level_in_window'] ?? 'MODERATE',
+      maxWbgtEffectiveC: (json['max_wbgt_effective_c'] as num?)?.toDouble() ?? 28.0,
+      screeningThresholdC: (json['screening_threshold_c'] as num?)?.toDouble() ?? 28.0,
+      categorySelectionReason: json['category_selection_reason'] ?? '',
+      mainContributingFactors: List<String>.from(json['main_contributing_factors'] ?? []),
+      workloadInteractionExplanation: json['workload_interaction_explanation'] ?? '',
+      methodologyReference: json['methodology_reference'] ?? 'Liljegren et al. (2008)',
+      technicalDetails: Map<String, dynamic>.from(json['technical_details'] ?? {}),
+      disclaimer: json['disclaimer'] ?? '',
+      safetyCautions: List<String>.from(json['safety_cautions'] ?? []),
+      hydrationGuidance: Map<String, dynamic>.from(json['hydration_guidance'] ?? {}),
+      beforeWorkGuidance: List<String>.from(json['before_work_guidance'] ?? []),
+      duringWorkGuidance: List<String>.from(json['during_work_guidance'] ?? []),
+      highRiskActions: List<String>.from(json['high_risk_actions'] ?? []),
+      emergencyTriage: Map<String, dynamic>.from(json['emergency_triage'] ?? {}),
+    );
+  }
+}
+
+// ==================== CROP HEAT MODELS ====================
+
+class CropDailyOutlook {
+  final String date;
+  final String dayLabel;
+  final double tmaxC;
+  final double tminC;
+  final double hoursAboveCritical;
+  final String riskCategory;
+  final String explanation;
+
+  CropDailyOutlook({
+    required this.date,
+    required this.dayLabel,
+    required this.tmaxC,
+    required this.tminC,
+    required this.hoursAboveCritical,
+    required this.riskCategory,
+    required this.explanation,
+  });
+
+  factory CropDailyOutlook.fromJson(Map<String, dynamic> json) {
+    return CropDailyOutlook(
+      date: json['date'] ?? '',
+      dayLabel: json['day_label'] ?? '',
+      tmaxC: (json['tmax_c'] as num?)?.toDouble() ?? 35.0,
+      tminC: (json['tmin_c'] as num?)?.toDouble() ?? 23.0,
+      hoursAboveCritical: (json['hours_above_critical'] as num?)?.toDouble() ?? 0.0,
+      riskCategory: json['risk_category'] ?? 'LOW',
+      explanation: json['explanation'] ?? '',
+    );
+  }
+}
+
+class CropHeatIntervention {
+  final String interventionId;
+  final String titleEn;
+  final String titleMr;
+  final String descriptionEn;
+  final String descriptionMr;
+  final String whyAppropriate;
+  final String evidenceCitation;
+  final String category;
+
+  CropHeatIntervention({
+    required this.interventionId,
+    required this.titleEn,
+    required this.titleMr,
+    required this.descriptionEn,
+    required this.descriptionMr,
+    required this.whyAppropriate,
+    required this.evidenceCitation,
+    required this.category,
+  });
+
+  factory CropHeatIntervention.fromJson(Map<String, dynamic> json) {
+    return CropHeatIntervention(
+      interventionId: json['intervention_id'] ?? '',
+      titleEn: json['title_en'] ?? '',
+      titleMr: json['title_mr'] ?? '',
+      descriptionEn: json['description_en'] ?? '',
+      descriptionMr: json['description_mr'] ?? '',
+      whyAppropriate: json['why_appropriate'] ?? '',
+      evidenceCitation: json['evidence_citation'] ?? '',
+      category: json['category'] ?? 'VERIFIED_AGRONOMIC',
     );
   }
 }
 
 class CropHeatAssessment {
+  final String assessmentId;
+  final String farmId;
+  final String farmName;
+  final String plotName;
   final String cropCode;
-  final String stageCode;
-  final double maxForecastTempC;
-  final double criticalThresholdC;
-  final int exceedanceHours;
-  final String riskLevel;
-  final String citation;
+  final String cropCommonName;
+  final String cropVariety;
+  final String sowingDate;
+  final int daysAfterSowing;
+  final double cropAreaAcres;
+  final String irrigationStatus;
+  final String soilTexture;
+
+  final String growthStageCode;
+  final String growthStageNameEn;
+  final String growthStageNameMr;
+  final List<Map<String, dynamic>> supportedStages;
+  final String? farmerConfirmedStage;
+
+  final double baseTempC;
+  final double optimalTempMinC;
+  final double optimalTempMaxC;
+  final double criticalTmaxThresholdC;
+  final double criticalTminThresholdC;
+  final double tmaxForecastC;
+  final double tminForecastC;
+  final double hoursAboveCritical;
+  final int consecutiveHotDays;
+  final double daytimeExposureHours;
+  final bool warmNightRespirationHazard;
+  final double warmNightPenaltyScore;
+  final double cumulativeHeatUnitsGdd;
+  final String evidenceCitation;
+  final String evidenceStatus;
+
+  final List<CropDailyOutlook> dailyOutlook;
+  final String daytimeHeatStressLevel;
+  final String overallCropHeatRisk;
+  final String physiologicalMechanism;
+  final String stageBiologicalVulnerability;
+
+  final List<CropHeatIntervention> recommendedInterventions;
+  final List<Map<String, dynamic>> assessmentHistory;
+
+  // Compatibility getters
+  String get stageCode => growthStageCode;
+  double get maxForecastTempC => tmaxForecastC;
+  double get criticalThresholdC => criticalTmaxThresholdC;
+  int get exceedanceHours => hoursAboveCritical.round();
+  String get riskLevel => overallCropHeatRisk.toLowerCase();
+  String get citation => evidenceCitation;
 
   CropHeatAssessment({
+    this.assessmentId = '',
+    this.farmId = '',
+    this.farmName = '',
+    this.plotName = '',
     required this.cropCode,
-    required this.stageCode,
-    required this.maxForecastTempC,
-    required this.criticalThresholdC,
-    required this.exceedanceHours,
-    required this.riskLevel,
-    required this.citation,
+    this.cropCommonName = '',
+    this.cropVariety = '',
+    this.sowingDate = '',
+    this.daysAfterSowing = 45,
+    this.cropAreaAcres = 2.5,
+    this.irrigationStatus = 'Rainfed',
+    this.soilTexture = 'Medium Black Vertisol',
+    required this.growthStageCode,
+    this.growthStageNameEn = '',
+    this.growthStageNameMr = '',
+    this.supportedStages = const [],
+    this.farmerConfirmedStage,
+    this.baseTempC = 10.0,
+    this.optimalTempMinC = 24.0,
+    this.optimalTempMaxC = 30.0,
+    required this.criticalTmaxThresholdC,
+    this.criticalTminThresholdC = 22.0,
+    required this.tmaxForecastC,
+    this.tminForecastC = 23.0,
+    this.hoursAboveCritical = 0.0,
+    this.consecutiveHotDays = 0,
+    this.daytimeExposureHours = 0.0,
+    this.warmNightRespirationHazard = false,
+    this.warmNightPenaltyScore = 0.0,
+    this.cumulativeHeatUnitsGdd = 15.0,
+    required this.evidenceCitation,
+    this.evidenceStatus = 'VERIFIED_PUBLISHED',
+    this.dailyOutlook = const [],
+    this.daytimeHeatStressLevel = 'low',
+    required this.overallCropHeatRisk,
+    this.physiologicalMechanism = '',
+    this.stageBiologicalVulnerability = '',
+    this.recommendedInterventions = const [],
+    this.assessmentHistory = const [],
   });
 
   factory CropHeatAssessment.fromJson(Map<String, dynamic> json) {
+    final rawOutlook = json['daily_outlook'] as List? ?? [];
+    final rawInterventions = json['recommended_interventions'] as List? ?? [];
+    final rawStages = json['supported_stages'] as List? ?? [];
+    final rawHistory = json['assessment_history'] as List? ?? [];
+
     return CropHeatAssessment(
+      assessmentId: json['assessment_id'] ?? '',
+      farmId: json['farm_id'] ?? '',
+      farmName: json['farm_name'] ?? '',
+      plotName: json['plot_name'] ?? '',
       cropCode: json['crop_code'] ?? 'soybean',
-      stageCode: json['stage_code'] ?? 'flowering',
-      maxForecastTempC: (json['max_forecast_temp_c'] as num?)?.toDouble() ?? 36.5,
-      criticalThresholdC: (json['critical_threshold_c'] as num?)?.toDouble() ?? 38.0,
-      exceedanceHours: json['exceedance_hours'] ?? 0,
-      riskLevel: json['risk_level'] ?? 'low',
-      citation: json['evidence_citation'] ?? 'MPKV Rahuri Package of Practices',
+      cropCommonName: json['crop_common_name'] ?? json['crop_code'] ?? 'Crop',
+      cropVariety: json['crop_variety'] ?? 'State Recommended Variety',
+      sowingDate: json['sowing_date'] ?? '',
+      daysAfterSowing: json['days_after_sowing'] ?? 45,
+      cropAreaAcres: (json['crop_area_acres'] as num?)?.toDouble() ?? 2.5,
+      irrigationStatus: json['irrigation_status'] ?? 'Rainfed',
+      soilTexture: json['soil_texture'] ?? 'Medium Black Vertisol',
+      growthStageCode: json['growth_stage_code'] ?? json['stage_code'] ?? 'flowering',
+      growthStageNameEn: json['growth_stage_name_en'] ?? json['growth_stage_code'] ?? 'Flowering',
+      growthStageNameMr: json['growth_stage_name_mr'] ?? '',
+      supportedStages: List<Map<String, dynamic>>.from(rawStages),
+      farmerConfirmedStage: json['farmer_confirmed_stage'],
+      baseTempC: (json['base_temp_c'] as num?)?.toDouble() ?? 10.0,
+      optimalTempMinC: (json['optimal_temp_min_c'] as num?)?.toDouble() ?? 24.0,
+      optimalTempMaxC: (json['optimal_temp_max_c'] as num?)?.toDouble() ?? 30.0,
+      criticalTmaxThresholdC: (json['critical_tmax_threshold_c'] as num?)?.toDouble() ?? (json['critical_threshold_c'] as num?)?.toDouble() ?? 36.0,
+      criticalTminThresholdC: (json['critical_tmin_threshold_c'] as num?)?.toDouble() ?? 22.0,
+      tmaxForecastC: (json['tmax_forecast_c'] as num?)?.toDouble() ?? (json['max_forecast_temp_c'] as num?)?.toDouble() ?? 36.5,
+      tminForecastC: (json['tmin_forecast_c'] as num?)?.toDouble() ?? 23.0,
+      hoursAboveCritical: (json['hours_above_critical'] as num?)?.toDouble() ?? (json['exceedance_hours'] as num?)?.toDouble() ?? 0.0,
+      consecutiveHotDays: json['consecutive_hot_days'] ?? 0,
+      daytimeExposureHours: (json['daytime_exposure_hours'] as num?)?.toDouble() ?? 0.0,
+      warmNightRespirationHazard: json['warm_night_respiration_hazard'] ?? false,
+      warmNightPenaltyScore: (json['warm_night_penalty_score'] as num?)?.toDouble() ?? 0.0,
+      cumulativeHeatUnitsGdd: (json['cumulative_heat_units_gdd'] as num?)?.toDouble() ?? 15.0,
+      evidenceCitation: json['evidence_citation'] ?? '',
+      evidenceStatus: json['evidence_status'] ?? 'VERIFIED_PUBLISHED',
+      dailyOutlook: rawOutlook.map((o) => CropDailyOutlook.fromJson(o)).toList(),
+      daytimeHeatStressLevel: json['daytime_heat_stress_level'] ?? 'low',
+      overallCropHeatRisk: json['overall_crop_heat_risk'] ?? json['risk_level'] ?? 'low',
+      physiologicalMechanism: json['physiological_mechanism'] ?? '',
+      stageBiologicalVulnerability: json['stage_biological_vulnerability'] ?? '',
+      recommendedInterventions: rawInterventions.map((i) => CropHeatIntervention.fromJson(i)).toList(),
+      assessmentHistory: List<Map<String, dynamic>>.from(rawHistory),
     );
   }
 }
+
+// ==================== INCOME DIVERSIFICATION MODELS ====================
 
 class IncomeOpportunity {
   final String opportunityId;
   final String title;
   final String category;
+  final String tagline;
   final List<String> targetCrops;
   final List<String> requiredResources;
   final double minInvestmentInr;
   final double maxInvestmentInr;
+  final double requiredLandAcres;
+  final String waterRequirement;
+  final double dailyLaborHours;
   final int paybackPeriodMonths;
   final double potentialAnnualProfitInr;
   final String riskLevel;
   final String summary;
+  final String marketCommodity;
+  final String marketBenchmarkPrice;
+  final String marketSource;
   final List<String> keyAssumptions;
   final List<String> keyRisks;
   final String sourceAttribution;
@@ -226,14 +693,21 @@ class IncomeOpportunity {
     required this.opportunityId,
     required this.title,
     required this.category,
-    required this.targetCrops,
-    required this.requiredResources,
+    this.tagline = '',
+    this.targetCrops = const [],
+    this.requiredResources = const [],
     required this.minInvestmentInr,
     required this.maxInvestmentInr,
+    this.requiredLandAcres = 0.25,
+    this.waterRequirement = 'low',
+    this.dailyLaborHours = 2.0,
     required this.paybackPeriodMonths,
     required this.potentialAnnualProfitInr,
     required this.riskLevel,
     required this.summary,
+    this.marketCommodity = '',
+    this.marketBenchmarkPrice = '',
+    this.marketSource = '',
     required this.keyAssumptions,
     required this.keyRisks,
     required this.sourceAttribution,
@@ -244,14 +718,21 @@ class IncomeOpportunity {
       opportunityId: json['opportunity_id'] ?? '',
       title: json['title'] ?? '',
       category: json['category'] ?? '',
+      tagline: json['tagline'] ?? '',
       targetCrops: List<String>.from(json['target_crops'] ?? []),
       requiredResources: List<String>.from(json['required_resources'] ?? []),
       minInvestmentInr: (json['min_investment_inr'] as num?)?.toDouble() ?? 0.0,
       maxInvestmentInr: (json['max_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      requiredLandAcres: (json['required_land_acres'] as num?)?.toDouble() ?? 0.25,
+      waterRequirement: json['water_requirement'] ?? 'low',
+      dailyLaborHours: (json['daily_labor_hours'] as num?)?.toDouble() ?? 2.0,
       paybackPeriodMonths: json['payback_period_months'] ?? 6,
       potentialAnnualProfitInr: (json['potential_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
       riskLevel: json['risk_level'] ?? 'moderate',
       summary: json['summary'] ?? '',
+      marketCommodity: json['market_commodity'] ?? '',
+      marketBenchmarkPrice: json['market_benchmark_price'] ?? '',
+      marketSource: json['market_source'] ?? '',
       keyAssumptions: List<String>.from(json['key_assumptions'] ?? []),
       keyRisks: List<String>.from(json['key_risks'] ?? []),
       sourceAttribution: json['source_attribution'] ?? '',
@@ -259,25 +740,99 @@ class IncomeOpportunity {
   }
 }
 
+class ScoredOpportunityItem {
+  final IncomeOpportunity opportunity;
+  final int suitabilityScorePct;
+  final bool isSuitable;
+  final String suitabilityVerdict;
+  final List<String> reasonsWhySuitable;
+  final List<String> reasonsWhyUnsuitable;
+
+  ScoredOpportunityItem({
+    required this.opportunity,
+    required this.suitabilityScorePct,
+    required this.isSuitable,
+    required this.suitabilityVerdict,
+    required this.reasonsWhySuitable,
+    required this.reasonsWhyUnsuitable,
+  });
+
+  factory ScoredOpportunityItem.fromJson(Map<String, dynamic> json) {
+    return ScoredOpportunityItem(
+      opportunity: IncomeOpportunity.fromJson(json['opportunity'] ?? {}),
+      suitabilityScorePct: json['suitability_score_pct'] ?? 75,
+      isSuitable: json['is_suitable'] ?? true,
+      suitabilityVerdict: json['suitability_verdict'] ?? 'Suitable',
+      reasonsWhySuitable: List<String>.from(json['reasons_why_suitable'] ?? []),
+      reasonsWhyUnsuitable: List<String>.from(json['reasons_why_unsuitable'] ?? []),
+    );
+  }
+}
+
+class FinancialScenarioDetail {
+  final String name;
+  final String priceAssumption;
+  final String costAssumption;
+  final double grossAnnualRevenueInr;
+  final double annualOpexInr;
+  final double netAnnualProfitInr;
+  final double breakEvenMonths;
+  final List<double> monthlyNetCashFlowInr;
+
+  FinancialScenarioDetail({
+    required this.name,
+    required this.priceAssumption,
+    required this.costAssumption,
+    required this.grossAnnualRevenueInr,
+    required this.annualOpexInr,
+    required this.netAnnualProfitInr,
+    required this.breakEvenMonths,
+    required this.monthlyNetCashFlowInr,
+  });
+
+  factory FinancialScenarioDetail.fromJson(Map<String, dynamic> json) {
+    final rawFlows = json['monthly_net_cash_flow_inr'] as List? ?? [];
+    return FinancialScenarioDetail(
+      name: json['name'] ?? '',
+      priceAssumption: json['price_assumption'] ?? '',
+      costAssumption: json['cost_assumption'] ?? '',
+      grossAnnualRevenueInr: (json['gross_annual_revenue_inr'] as num?)?.toDouble() ?? 0.0,
+      annualOpexInr: (json['annual_opex_inr'] as num?)?.toDouble() ?? 0.0,
+      netAnnualProfitInr: (json['net_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      breakEvenMonths: (json['break_even_months'] as num?)?.toDouble() ?? 0.0,
+      monthlyNetCashFlowInr: rawFlows.map((f) => (f as num).toDouble()).toList(),
+    );
+  }
+}
+
 class IncomeScenario {
   final String opportunityId;
   final String opportunityTitle;
+  final String category;
   final double customBudgetInr;
   final double calculatedCapexInr;
-  final double calculatedOpexAnnualInr;
+  final double workingCapitalInr;
+  final double totalInitialOutlayInr;
   final double calculatedGrossRevenueInr;
+  final double calculatedOpexAnnualInr;
   final double calculatedNetProfitAnnualInr;
   final double calculatedBreakEvenMonths;
   final List<String> assumptionsApplied;
   final List<String> risksToMonitor;
   final String sourceAttribution;
   final String disclaimer;
+  final Map<String, FinancialScenarioDetail> scenarios;
+  final Map<String, dynamic> localMandiBenchmark;
+  final Map<String, dynamic> sensitivityAnalysis;
 
   IncomeScenario({
     required this.opportunityId,
     required this.opportunityTitle,
+    this.category = '',
     required this.customBudgetInr,
     required this.calculatedCapexInr,
+    this.workingCapitalInr = 0.0,
+    this.totalInitialOutlayInr = 0.0,
     required this.calculatedOpexAnnualInr,
     required this.calculatedGrossRevenueInr,
     required this.calculatedNetProfitAnnualInr,
@@ -286,25 +841,88 @@ class IncomeScenario {
     required this.risksToMonitor,
     required this.sourceAttribution,
     required this.disclaimer,
+    this.scenarios = const {},
+    this.localMandiBenchmark = const {},
+    this.sensitivityAnalysis = const {},
   });
 
   factory IncomeScenario.fromJson(Map<String, dynamic> json) {
+    final rawScenarios = json['scenarios'] as Map<String, dynamic>? ?? {};
+    final parsedScenarios = <String, FinancialScenarioDetail>{};
+    rawScenarios.forEach((key, val) {
+      if (val is Map<String, dynamic>) {
+        parsedScenarios[key] = FinancialScenarioDetail.fromJson(val);
+      }
+    });
+
     return IncomeScenario(
       opportunityId: json['opportunity_id'] ?? '',
       opportunityTitle: json['opportunity_title'] ?? '',
+      category: json['category'] ?? '',
       customBudgetInr: (json['custom_budget_inr'] as num?)?.toDouble() ?? 0.0,
       calculatedCapexInr: (json['calculated_capex_inr'] as num?)?.toDouble() ?? 0.0,
-      calculatedOpexAnnualInr: (json['calculated_opex_annual_inr'] as num?)?.toDouble() ?? 0.0,
+      workingCapitalInr: (json['working_capital_inr'] as num?)?.toDouble() ?? 0.0,
+      totalInitialOutlayInr: (json['total_initial_outlay_inr'] as num?)?.toDouble() ?? 0.0,
       calculatedGrossRevenueInr: (json['calculated_gross_revenue_inr'] as num?)?.toDouble() ?? 0.0,
+      calculatedOpexAnnualInr: (json['calculated_opex_annual_inr'] as num?)?.toDouble() ?? 0.0,
       calculatedNetProfitAnnualInr: (json['calculated_net_profit_annual_inr'] as num?)?.toDouble() ?? 0.0,
       calculatedBreakEvenMonths: (json['calculated_break_even_months'] as num?)?.toDouble() ?? 0.0,
       assumptionsApplied: List<String>.from(json['assumptions_applied'] ?? []),
       risksToMonitor: List<String>.from(json['risks_to_monitor'] ?? []),
       sourceAttribution: json['source_attribution'] ?? '',
       disclaimer: json['disclaimer'] ?? '',
+      scenarios: parsedScenarios,
+      localMandiBenchmark: Map<String, dynamic>.from(json['local_mandi_benchmark'] ?? {}),
+      sensitivityAnalysis: Map<String, dynamic>.from(json['sensitivity_analysis'] ?? {}),
     );
   }
 }
+
+class OpportunityComparisonItem {
+  final String opportunityId;
+  final String title;
+  final String category;
+  final double initialInvestmentInr;
+  final double netAnnualProfitInr;
+  final double paybackMonths;
+  final double landRequiredAcres;
+  final String waterNeeds;
+  final double dailyLaborHours;
+  final String riskLevel;
+  final String suitabilityVerdict;
+
+  OpportunityComparisonItem({
+    required this.opportunityId,
+    required this.title,
+    required this.category,
+    required this.initialInvestmentInr,
+    required this.netAnnualProfitInr,
+    required this.paybackMonths,
+    required this.landRequiredAcres,
+    required this.waterNeeds,
+    required this.dailyLaborHours,
+    required this.riskLevel,
+    required this.suitabilityVerdict,
+  });
+
+  factory OpportunityComparisonItem.fromJson(Map<String, dynamic> json) {
+    return OpportunityComparisonItem(
+      opportunityId: json['opportunity_id'] ?? '',
+      title: json['title'] ?? '',
+      category: json['category'] ?? '',
+      initialInvestmentInr: (json['initial_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      netAnnualProfitInr: (json['net_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      paybackMonths: (json['payback_months'] as num?)?.toDouble() ?? 0.0,
+      landRequiredAcres: (json['land_required_acres'] as num?)?.toDouble() ?? 0.0,
+      waterNeeds: json['water_needs'] ?? '',
+      dailyLaborHours: (json['daily_labor_hours'] as num?)?.toDouble() ?? 0.0,
+      riskLevel: json['risk_level'] ?? '',
+      suitabilityVerdict: json['suitability_verdict'] ?? '',
+    );
+  }
+}
+
+// ==================== PMFBY & CHAT MODELS ====================
 
 class CropLossCase {
   final String caseId;

@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     USE_CROPNET_MOCK: bool = True
 
     # Directories
+    BASE_DIR: Path = BASE_DIR
     DATA_DIR: Path = BASE_DIR / "data"
     RAW_DATA_DIR: Path = BASE_DIR / "data" / "01_raw_immutable"
     PROCESSED_DATA_DIR: Path = BASE_DIR / "data" / "02_processed"

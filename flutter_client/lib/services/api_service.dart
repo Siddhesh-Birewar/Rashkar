@@ -304,9 +304,7 @@ class ApiService {
     return YieldAssessment(
       farmId: farmId,
       cropCode: 'soybean',
-      cropStageCode: 'stage_pod_development',
-      cropStageNameEn: 'Vegetative / Pod Development',
-      das: 45,
+      daysAfterSowing: 45,
       risks: [
         RiskDimensionItem(
           riskDimension: 'weather_dry_spell',
@@ -344,6 +342,8 @@ class ApiService {
     String workload = 'moderate',
     bool isAcclimatised = true,
     String sunExposure = 'direct_sun',
+    String clothingType = 'standard_work_clothes',
+    double exposureDurationHours = 3.0,
   }) async {
     try {
       final uri = Uri.parse('$baseUrl/heat-risk/worker-hazard');
@@ -357,8 +357,10 @@ class ApiService {
           'workload_category': workload,
           'is_acclimatised': isAcclimatised,
           'sun_exposure': sunExposure,
+          'clothing_type': clothingType,
+          'exposure_duration_hours': exposureDurationHours,
         }),
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         return WorkerHeatResponse.fromJson(json.decode(response.body));
@@ -366,13 +368,11 @@ class ApiService {
     } catch (_) {}
 
     return WorkerHeatResponse(
-      hazardLevel: 'moderate',
-      wbgtSunC: 28.6,
-      wbgtShadeC: 25.4,
-      airTempC: 33.2,
-      rhPct: 56.0,
-      advice: 'Take regular 15-minute breaks in shade. Drink clean drinking water frequently. Avoid continuous heavy weeding between 12:30 PM and 3:30 PM in $taluka.',
-      methodology: 'Liljegren et al. (2008) Retrospective WBGT Engine',
+      currentHazardLevel: 'MODERATE',
+      currentAirTempC: 33.2,
+      currentRelativeHumidityPct: 56.0,
+      currentWbgtEstimatedC: 28.6,
+      categorySelectionReason: 'Approaching threshold under direct sunlight.',
     );
   }
 
@@ -382,19 +382,23 @@ class ApiService {
     String? cropCode,
     String? stageCode,
     double? forecastTmax,
+    double? forecastTmin,
   }) async {
     final effectiveFarmId = farmId ?? 'farm_demo_pune_01';
     try {
       final uri = Uri.parse('$baseUrl/heat-risk/crop-heat');
+      final payload = <String, dynamic>{
+        'farm_id': effectiveFarmId,
+      };
+      if (stageCode != null) payload['farmer_confirmed_stage'] = stageCode;
+      if (forecastTmax != null) payload['forecast_tmax_c'] = forecastTmax;
+      if (forecastTmin != null) payload['forecast_tmin_c'] = forecastTmin;
+
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'farm_id': effectiveFarmId,
-          'forecast_tmax_c': forecastTmax ?? 38.0,
-          'forecast_tmin_c': 24.0,
-        }),
-      ).timeout(const Duration(seconds: 4));
+        body: json.encode(payload),
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         return CropHeatAssessment.fromJson(json.decode(response.body));
@@ -402,22 +406,25 @@ class ApiService {
     } catch (_) {}
 
     return CropHeatAssessment(
-      cropCode: 'active_crop',
-      stageCode: 'Growth Stage',
-      maxForecastTempC: forecastTmax ?? 36.5,
-      criticalThresholdC: 38.0,
-      exceedanceHours: 0,
-      riskLevel: 'low',
-      citation: 'ICAR / MPKV Agronomic Package of Practices',
+      cropCode: cropCode ?? 'soybean',
+      growthStageCode: stageCode ?? 'Flowering',
+      criticalTmaxThresholdC: 36.0,
+      tmaxForecastC: forecastTmax ?? 36.5,
+      overallCropHeatRisk: 'moderate',
+      evidenceCitation: 'ICAR / MPKV Package of Practices',
     );
   }
 
   // --- 6. Income Diversification ---
-  static Future<List<IncomeOpportunity>> getIncomeOpportunities({String? cropCode}) async {
+  static Future<List<IncomeOpportunity>> getIncomeOpportunities({String? cropCode, String? category}) async {
     if (!mockMode) {
       try {
-        final uri = Uri.parse('$baseUrl/income/opportunities${cropCode != null ? '?crop_code=$cropCode' : ''}');
-        final response = await http.get(uri).timeout(const Duration(seconds: 4));
+        final queryParams = <String>[];
+        if (cropCode != null) queryParams.add('crop_code=$cropCode');
+        if (category != null && category != 'all') queryParams.add('category=$category');
+        final qStr = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+        final uri = Uri.parse('$baseUrl/income/opportunities$qStr');
+        final response = await http.get(uri).timeout(const Duration(seconds: 6));
 
         if (response.statusCode == 200) {
           final List list = json.decode(response.body);
@@ -435,13 +442,13 @@ class ApiService {
         requiredResources: ['crop_residue', 'cow_dung', 'water', 'shade_net'],
         minInvestmentInr: 18000.0,
         maxInvestmentInr: 35000.0,
-        paybackPeriodMonths: 4,
-        potentialAnnualProfitInr: 54000.0,
+        paybackPeriodMonths: 8,
+        potentialAnnualProfitInr: 48000.0,
         riskLevel: 'low',
-        summary: 'Convert harvested crop biomass into high-value organic vermicompost for self-farm nutrition and local nursery sales.',
-        keyAssumptions: ['Biomass availability: 2-3 tonnes/season', 'Cycle time: 60-75 days', 'Sales price: ₹6 to ₹8 per kg'],
-        keyRisks: ['Moisture management during peak summer heat', 'Termite infestation if bed is dry'],
-        sourceAttribution: 'KVK Baramati & ICAR-NIASM Baramati Agri-Allied Practice',
+        summary: 'Convert harvested crop biomass into high-value organic vermicompost.',
+        keyAssumptions: ['Cycle time: 60-70 days', 'Sales price: ₹7-10/kg'],
+        keyRisks: ['Summer drying', 'Ants/termites'],
+        sourceAttribution: 'MPKV Rahuri Organic Farming Project',
       ),
       IncomeOpportunity(
         opportunityId: 'OPP_OSMANABADI_GOAT_01',
@@ -449,39 +456,79 @@ class ApiService {
         category: 'livestock',
         targetCrops: ['soybean', 'jowar', 'bajra'],
         requiredResources: ['shed', 'fodder', 'fencing'],
-        minInvestmentInr: 85000.0,
-        maxInvestmentInr: 140000.0,
+        minInvestmentInr: 75000.0,
+        maxInvestmentInr: 120000.0,
         paybackPeriodMonths: 12,
         potentialAnnualProfitInr: 95000.0,
         riskLevel: 'moderate',
-        summary: 'Hardy drought-tolerant indigenous breed reared on farm-grown dry fodders and pulse husks with high meat market demand.',
-        keyAssumptions: ['Twinning rate: ~60-70%', 'Kid marketing at 8-10 months (25-30 kg)', 'Live weight price: ₹300-340/kg'],
-        keyRisks: ['PPR and enterotoxemia if vaccinations missed', 'Green fodder shortage in April-May'],
-        sourceAttribution: 'MPKV Rahuri Goat & Sheep Directorate / Pune District KVK',
+        summary: 'Hardy drought-tolerant indigenous breed reared on farm-grown dry fodders.',
+        keyAssumptions: ['Twinning rate: ~60-70%', 'Live weight price: ₹320-360/kg'],
+        keyRisks: ['PPR and ET infections', 'Summer fodder deficit'],
+        sourceAttribution: 'NABARD Maharashtra State Focus Paper FY26-27',
       ),
       IncomeOpportunity(
         opportunityId: 'OPP_SOLAR_DRYER_01',
-        title: 'Solar Conduction Dryer for Onion & Chillies',
+        title: 'Solar Conduction Dryer for Onion & Vegetables',
         category: 'value_addition',
         targetCrops: ['onion', 'tomato', 'chilli'],
         requiredResources: ['direct_sunlight', 'grading_area', 'packaging'],
         minInvestmentInr: 45000.0,
         maxInvestmentInr: 85000.0,
-        paybackPeriodMonths: 8,
-        potentialAnnualProfitInr: 65000.0,
-        riskLevel: 'moderate',
-        summary: 'Prevents distress sales during market gluts by dehydrating surplus produce into shelf-stable flakes and powders.',
-        keyAssumptions: ['Processing capacity: 15-20 kg/batch', 'Dehydration ratio: 8:1 for onions', 'Flake price: ₹220-280/kg'],
-        keyRisks: ['Unseasonal cloudy weather or rain', 'Moisture-proof packing requirements'],
-        sourceAttribution: 'ICAR-DOGR Rajgurunagar, Pune',
+        paybackPeriodMonths: 10,
+        potentialAnnualProfitInr: 62000.0,
+        riskLevel: 'low',
+        summary: 'Dehydrates seasonal surplus onion, garlic, tomatoes, and vegetables.',
+        keyAssumptions: ['Drying cycle: 5-7 hours', 'Zero electricity'],
+        keyRisks: ['Monsoon cloud cover', 'Packaging integrity'],
+        sourceAttribution: 'Science for Society (S4S Technologies) / UNIDO',
       )
     ];
+  }
+
+  static Future<List<ScoredOpportunityItem>> matchIncomeOpportunities({
+    required double availableInvestmentInr,
+    required double workingCapitalInr,
+    required double availableLandAcres,
+    required double unusedLandAcres,
+    required String waterAvailability,
+    required double familyLaborHoursDay,
+    required String existingLivestock,
+    required bool hasStorageOrShed,
+    required String riskTolerance,
+    required String categoryPreference,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/match-opportunities');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'available_investment_inr': availableInvestmentInr,
+          'working_capital_inr': workingCapitalInr,
+          'available_land_acres': availableLandAcres,
+          'unused_land_acres': unusedLandAcres,
+          'water_availability': waterAvailability,
+          'family_labor_hours_day': familyLaborHoursDay,
+          'existing_livestock': existingLivestock,
+          'has_storage_or_shed': hasStorageOrShed,
+          'risk_tolerance': riskTolerance,
+          'category_preference': categoryPreference,
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final List list = json.decode(response.body);
+        return list.map((item) => ScoredOpportunityItem.fromJson(item)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   static Future<IncomeScenario> calculateIncomeScenario({
     required String opportunityId,
     required double customBudgetInr,
     double labourHours = 2.0,
+    String waterAvailability = 'seasonal_canal',
   }) async {
     if (!mockMode) {
       try {
@@ -493,8 +540,9 @@ class ApiService {
             'opportunity_id': opportunityId,
             'custom_budget_inr': customBudgetInr,
             'available_labour_hours_day': labourHours,
+            'water_availability': waterAvailability,
           }),
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 6));
 
         if (response.statusCode == 200) {
           return IncomeScenario.fromJson(json.decode(response.body));
@@ -519,6 +567,29 @@ class ApiService {
       sourceAttribution: 'Maharashtra Agricultural University Enterprise Models',
       disclaimer: 'Projections are planning estimates. No revenue guarantees provided.',
     );
+  }
+
+  static Future<List<OpportunityComparisonItem>> compareOpportunities({
+    required List<String> opportunityIds,
+    double customBudgetInr = 60000.0,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/compare-opportunities');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'opportunity_ids': opportunityIds,
+          'custom_budget_inr': customBudgetInr,
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final List list = json.decode(response.body);
+        return list.map((item) => OpportunityComparisonItem.fromJson(item)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   // --- 7. PMFBY Crop Loss Evidence ---

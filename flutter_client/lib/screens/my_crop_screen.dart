@@ -3,6 +3,7 @@ import '../models/farm_models.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import 'farm_registration_screen.dart';
+import 'edit_profile_screen.dart';
 
 class MyCropScreen extends StatefulWidget {
   const MyCropScreen({Key? key}) : super(key: key);
@@ -54,6 +55,20 @@ class _MyCropScreenState extends State<MyCropScreen> {
     }
   }
 
+  Color _getRiskColor(String level) {
+    switch (level.toLowerCase()) {
+      case 'critical':
+        return const Color(0xFFC62828);
+      case 'high':
+        return const Color(0xFFE65100);
+      case 'moderate':
+        return const Color(0xFFF57F17);
+      case 'low':
+      default:
+        return const Color(0xFF2E7D32);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = AppState.instance;
@@ -65,7 +80,7 @@ class _MyCropScreenState extends State<MyCropScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('My Crop & Yield', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text('Yield Intelligence & Risk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             Text(
               hasFarm ? '${appState.activeCropName} · ${appState.activeTaluka}, ${appState.activeDistrict}' : 'Maharashtra',
               style: const TextStyle(fontSize: 12, color: Colors.white70),
@@ -89,70 +104,507 @@ class _MyCropScreenState extends State<MyCropScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Farm & Location Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF81C784)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 16, color: Color(0xFF1B5E20)),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Active Farm: ${appState.activeFarm?.farmName} · ${appState.activeTaluka}, ${appState.activeDistrict}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // 1. Farm & Crop Summary Card
+                          _buildFarmCropSummaryCard(),
                           const SizedBox(height: 16),
 
-                          // 1. Crop Status Summary Card
-                          _buildCropStatusCard(),
+                          // 2. Farmer Narrative Summary
+                          if (_assessment!.farmerNarrativeExplanation.isNotEmpty)
+                            _buildNarrativeCard(),
+                          if (_assessment!.farmerNarrativeExplanation.isNotEmpty)
+                            const SizedBox(height: 16),
+
+                          // 3. Historical Yield Baseline Analysis (APY 17,916 records)
+                          _buildHistoricalBaselineCard(),
                           const SizedBox(height: 16),
 
-                          // 2. Weather & Crop Stress Screening
-                          const Text(
-                            'CROP STRESS SCREENING',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 8),
-                          if (_assessment!.risks.isEmpty)
-                            const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Text('No active stress conditions detected today.'),
-                              ),
-                            )
-                          else
-                            ..._assessment!.risks.map((r) => _buildRiskCard(r)).toList(),
-                          const SizedBox(height: 20),
+                          // 4. Crop Suitability & Edaphic Profile (CropNet)
+                          if (_assessment!.suitabilityAnalysis != null)
+                            _buildSoilSuitabilityCard(_assessment!.suitabilityAnalysis!),
+                          if (_assessment!.suitabilityAnalysis != null)
+                            const SizedBox(height: 16),
 
-                          // 3. Historical Yield Baseline Context
-                          const Text(
-                            'DISTRICT HISTORICAL YIELD CONTEXT',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildYieldContextCard(),
-                          const SizedBox(height: 20),
+                          // 5. Multi-Dimensional Stress Screening (5 Dimensions)
+                          _buildStressScreeningSection(),
+                          const SizedBox(height: 16),
 
-                          // 4. Actionable Agronomic Recommendations (with "Why?" disclosure)
-                          const Text(
-                            'RECOMMENDED ACTIONS',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 8),
+                          // 6. ML Prediction Gate Safeguard Banner
+                          _buildMLGateBanner(),
+                          const SizedBox(height: 16),
+
+                          // 7. Actionable Agronomic Recommendations
                           _buildRecommendationsSection(),
                           const SizedBox(height: 24),
                         ],
                       ),
                     ),
+    );
+  }
+
+  // ==================== SECTION 1: Farm & Crop Summary ====================
+  Widget _buildFarmCropSummaryCard() {
+    final a = _assessment!;
+    final appState = AppState.instance;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${a.farmName} (${appState.activeTaluka}, ${appState.activeDistrict})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(farm: appState.activeFarm),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.edit, size: 14),
+                  label: const Text('Edit Farm', style: TextStyle(fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE8F5E9),
+                    foregroundColor: const Color(0xFF1B5E20),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                _buildSummaryItem('Active Crop', a.cropName),
+                _buildSummaryItem('Growth Stage', 'DAS ${a.daysAfterSowing}'),
+                _buildSummaryItem('Sowing Date', a.sowingDate.isNotEmpty ? a.sowingDate : 'Kharif Season'),
+                _buildSummaryItem('Area', '${a.totalAreaAcres} acres'),
+                _buildSummaryItem('Irrigation', a.irrigationType),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+      ],
+    );
+  }
+
+  // ==================== SECTION 2: Narrative Summary ====================
+  Widget _buildNarrativeCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF81C784)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.analytics_outlined, color: Color(0xFF1B5E20), size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Agronomic Situation Overview',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _assessment!.farmerNarrativeExplanation,
+                  style: const TextStyle(fontSize: 12, height: 1.4, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SECTION 3: Historical Baseline ====================
+  Widget _buildHistoricalBaselineCard() {
+    final b = _assessment!.baseline;
+    final appState = AppState.instance;
+
+    final mean = b['historical_mean_t_ha'] != null ? '${b['historical_mean_t_ha']} t/ha' : '1.45 t/ha';
+    final median = b['historical_median_t_ha'] != null ? '${b['historical_median_t_ha']} t/ha' : mean;
+    final p10 = b['historical_p10_t_ha'] != null ? '${b['historical_p10_t_ha']} t/ha' : '0.90 t/ha';
+    final p90 = b['historical_p90_t_ha'] != null ? '${b['historical_p90_t_ha']} t/ha' : '2.10 t/ha';
+    final count = b['sample_seasons_count'] ?? 24;
+    final period = b['data_period'] ?? '1997-2021';
+    final geoUnit = b['geographical_unit'] ?? '${appState.activeDistrict} District';
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history, color: Color(0xFF2E7D32)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Historical Yield Baseline ($geoUnit)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.blue.shade300),
+                  ),
+                  child: Text(
+                    'N = $count Seasons',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Official Ministry of Agriculture APY Canonical Dataset ($period)',
+              style: const TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+            const SizedBox(height: 14),
+
+            // Percentiles Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatBox('P10 (Drought/Worst)', p10, Colors.red.shade700),
+                _buildStatBox('Historical Mean', mean, const Color(0xFF2E7D32), isBold: true),
+                _buildStatBox('Median', median, Colors.teal.shade700),
+                _buildStatBox('P90 (Bumper Season)', p90, Colors.green.shade800),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                b['disclaimer'] ?? 'District-level statistical baseline derived from official APY records. Plot-level numerical prediction is disabled pending verified harvest labels.',
+                style: const TextStyle(fontSize: 10, color: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatBox(String label, String value, Color col, {bool isBold = false}) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: isBold ? 15 : 13, color: col)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 9, color: Colors.black54)),
+      ],
+    );
+  }
+
+  // ==================== SECTION 4: Soil Suitability ====================
+  Widget _buildSoilSuitabilityCard(SoilSuitabilityAnalysis soil) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.terrain, color: Colors.brown),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('CropNet Soil Suitability & Edaphic Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.green.shade400),
+                  ),
+                  child: Text(
+                    soil.phStatus,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                _buildSoilProperty('Texture', soil.soilTexture),
+                _buildSoilProperty('Soil pH', soil.soilPh.toStringAsFixed(1)),
+                _buildSoilProperty('Organic Carbon', '${soil.organicCarbonPct}%'),
+                _buildSoilProperty('CEC', '${soil.cationExchangeCapacity} cmol/kg'),
+                _buildSoilProperty('Available Water', '${soil.availableWaterCapacityMmM} mm/m'),
+                _buildSoilProperty('Rooting Depth', '${soil.effectiveRootingDepthCm} cm'),
+                _buildSoilProperty('IMD Normal Rain', '${soil.climateNormalRainfallMm} mm'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Provenance: ${soil.dataProvenance}',
+              style: const TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSoilProperty(String label, String value) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SECTION 5: Multi-Dimensional Stress ====================
+  Widget _buildStressScreeningSection() {
+    final risks = _assessment!.risks;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '5-DIMENSIONAL CROP STRESS SCREENING',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 0.8),
+        ),
+        const SizedBox(height: 8),
+        if (risks.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('All environmental dimensions operating within favorable ranges.'),
+            ),
+          )
+        else
+          ...risks.map((r) => _buildRiskDimensionCard(r)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildRiskDimensionCard(RiskDimensionItem r) {
+    final col = _getRiskColor(r.riskLevel);
+
+    String prettyDim = r.riskDimension.replaceAll('_', ' ').toUpperCase();
+    if (prettyDim.contains('DRY SPELL')) prettyDim = '1. MOISTURE DEFICIT / DRY SPELL';
+    if (prettyDim.contains('EXCESS')) prettyDim = '2. EXCESS RAINFALL / WATERLOGGING';
+    if (prettyDim.contains('SOIL')) prettyDim = '3. SOIL EDAPHIC CONSTRAINTS';
+    if (prettyDim.contains('HEAT')) prettyDim = '4. CROP CANOPY HEAT STRESS';
+    if (prettyDim.contains('PEST')) prettyDim = '5. BIOLOGICAL / PEST WATCH';
+
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: col.withOpacity(0.4), width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    prettyDim,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(6)),
+                  child: Text(
+                    r.riskLevel.toUpperCase(),
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ...r.drivers.map((d) => Padding(
+              padding: const EdgeInsets.only(bottom: 2.0),
+              child: Text('• $d', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== SECTION 6: ML Prediction Gate ====================
+  Widget _buildMLGateBanner() {
+    final gate = _assessment!.mlPredictionGate;
+    final status = gate['prediction_status'] ?? 'REQUIRES_FARM_HARVEST_LABELS';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE7F6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.deepPurple.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lock_clock, color: Colors.deepPurple),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'ML Prediction Safeguard: $status',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepPurple),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            gate['ethical_safeguard'] ?? 'Predicting exact farm-level harvest tonnage without verified ground-truth labels violates scientific rigor. Rashkar displays auditable district historical percentiles (P10 to P90) alongside real-time stress screening.',
+            style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SECTION 7: Recommendations ====================
+  Widget _buildRecommendationsSection() {
+    final recs = _assessment!.recommendations;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ACTIONABLE AGRONOMIC INTERVENTIONS',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 0.8),
+        ),
+        const SizedBox(height: 8),
+        if (recs.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('No urgent interventions recommended today. Continue standard package of practices.'),
+            ),
+          )
+        else
+          ...recs.map((rec) => _buildActionCard(rec)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(ActionableRecommendationItem rec) {
+    Color badgeCol = Colors.green;
+    if (rec.urgency.toLowerCase() == 'high') badgeCol = Colors.red;
+    if (rec.urgency.toLowerCase() == 'medium') badgeCol = Colors.orange;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(rec.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: badgeCol, borderRadius: BorderRadius.circular(6)),
+                child: Text(
+                  rec.urgency.toUpperCase(),
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(rec.description, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Why Recommended: ${rec.whyRecommended}', style: const TextStyle(fontSize: 11, color: Colors.brown)),
+                const SizedBox(height: 2),
+                Text('Evidence Source: ${rec.evidenceSource}', style: const TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -171,7 +623,7 @@ class _MyCropScreenState extends State<MyCropScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Register your farm or load a sample farm to see yield intelligence, phenological stages, and district historical yield baselines.',
+              'Register your farm or load a sample farm to see yield intelligence, soil suitability, and district historical baselines.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.black54),
             ),
@@ -191,247 +643,6 @@ class _MyCropScreenState extends State<MyCropScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () async {
-                await AppState.instance.loadDemoFarm();
-              },
-              child: const Text('Load Baramati Demo Farm'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCropStatusCard() {
-    final a = _assessment!;
-    final appState = AppState.instance;
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  appState.activeCropName.toUpperCase(),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Day ${a.das}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
-                  ),
-                )
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Current Stage: ${a.cropStageNameEn}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(
-              '${a.cropStageNameEn} is critical for yield determination in ${appState.activeDistrict}. Monitor soil moisture and temperature regularly.',
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRiskCard(RiskDimensionItem r) {
-    Color badgeColor = Colors.green;
-    String badgeText = 'Normal';
-    if (r.riskLevel == 'high') {
-      badgeColor = Colors.red;
-      badgeText = 'Elevated Risk';
-    } else if (r.riskLevel == 'moderate') {
-      badgeColor = Colors.orange;
-      badgeText = 'Moderate Stress';
-    }
-
-    String title = r.riskDimension.replaceAll('_', ' ').toUpperCase();
-    if (r.riskDimension.contains('dry_spell')) title = 'Drought / Dry Spell Stress';
-    if (r.riskDimension.contains('excess_rainfall')) title = 'Excess Rainfall / Waterlogging';
-    if (r.riskDimension.contains('heat')) title = 'Crop Heat Stress';
-
-    return Card(
-      elevation: 1,
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(badgeText, style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                )
-              ],
-            ),
-            const SizedBox(height: 6),
-            ...r.drivers.map((d) => Text('• $d', style: const TextStyle(fontSize: 13, color: Colors.black87))).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildYieldContextCard() {
-    final b = _assessment!.baseline;
-    final mean = b['historical_mean_t_ha'] ?? 1.62;
-    final unit = b['geographical_unit'] ?? '${AppState.instance.activeDistrict} District Baseline';
-    final disclaimer = b['disclaimer'] ?? 'Historical reference statistics only.';
-
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.analytics_outlined, color: Color(0xFF2E7D32)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'District Historical Average: $mean tonnes/ha',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text('Source: $unit (Official APY Yield Records)', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                disclaimer,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6D4C41), fontStyle: FontStyle.italic),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecommendationsSection() {
-    final allActions = _assessment!.risks.expand((r) => r.recommendedActions).toList();
-    if (allActions.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text('No urgent interventions required today. Continue regular crop monitoring.'),
-        ),
-      );
-    }
-
-    return Column(
-      children: allActions.map((action) => _ActionCard(action: action)).toList(),
-    );
-  }
-}
-
-class _ActionCard extends StatefulWidget {
-  final Map<String, dynamic> action;
-  const _ActionCard({Key? key, required this.action}) : super(key: key);
-
-  @override
-  State<_ActionCard> createState() => _ActionCardState();
-}
-
-class _ActionCardState extends State<_ActionCard> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final a = widget.action;
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              a['title_en'] ?? 'Advisory',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              a['description_en'] ?? '',
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() => _expanded = !_expanded);
-                  },
-                  icon: Icon(_expanded ? Icons.keyboard_arrow_up : Icons.help_outline, size: 18),
-                  label: Text(_expanded ? 'Hide Source' : 'Why this recommendation?'),
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF2E7D32)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text('Verified POP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
-                )
-              ],
-            ),
-            if (_expanded) ...[
-              const Divider(height: 16),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FBE7),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Scientific Evidence & Provenance:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(a['evidence_citation'] ?? 'MPKV Rahuri Agronomic Research Manual', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                  ],
-                ),
-              ),
-            ]
           ],
         ),
       ),

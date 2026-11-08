@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class CropHeatAssessmentRequest(BaseModel):
     farm_id: str = Field(..., description="Unique farm identifier")
     plot_id: Optional[str] = Field(None, description="Optional plot identifier")
+    farmer_confirmed_stage: Optional[str] = Field(None, description="Farmer confirmed/corrected growth stage")
     forecast_tmax_c: Optional[float] = Field(None, description="Forecasted maximum day temperature (°C)")
     forecast_tmin_c: Optional[float] = Field(None, description="Forecasted minimum night temperature (°C)")
     forecast_sun_hours: Optional[float] = Field(None, description="Forecasted hours of direct sunlight")
@@ -14,25 +15,70 @@ class CropHeatIntervention(BaseModel):
     title_mr: str
     description_en: str
     description_mr: str
+    why_appropriate: str
     evidence_citation: str
+    category: str = "VERIFIED_AGRONOMIC"  # VERIFIED_AGRONOMIC, PREVENTATIVE_MANAGEMENT, EXPERIMENTAL_SCREENING
+
+class DailyCropHeatOutlook(BaseModel):
+    date: str
+    day_label: str
+    tmax_c: float
+    tmin_c: float
+    hours_above_critical: float
+    risk_category: str
+    explanation: str
 
 class CropHeatAssessmentResponse(BaseModel):
     assessment_id: str
     farm_id: str
+    farm_name: str
+    plot_name: str
     crop_code: str
     crop_common_name: str
+    crop_variety: Optional[str] = "Local Recommended Variety"
+    sowing_date: str
+    days_after_sowing: int
+    crop_area_acres: float
+    irrigation_status: str
+    soil_texture: str
+    
+    # Section 1: Growth stage & overrides
     growth_stage_code: str
     growth_stage_name_en: str
     growth_stage_name_mr: str
-    generated_at_ist: str
-    tmax_forecast_c: float
-    tmin_forecast_c: float
+    supported_stages: List[Dict[str, Any]]
+    farmer_confirmed_stage: Optional[str] = None
+    
+    # Section 2: Crop Thermal Analysis
+    base_temp_c: float
+    optimal_temp_min_c: float
+    optimal_temp_max_c: float
     critical_tmax_threshold_c: float
     critical_tmin_threshold_c: float
-    daytime_heat_stress_level: str
+    tmax_forecast_c: float
+    tmin_forecast_c: float
+    hours_above_critical: float
+    consecutive_hot_days: int
+    daytime_exposure_hours: float
     warm_night_respiration_hazard: bool
+    warm_night_penalty_score: float
+    cumulative_heat_units_gdd: float
+    evidence_citation: str
+    evidence_status: str = "VERIFIED_PUBLISHED"
+    
+    # Section 3: Multi-day outlook
+    daily_outlook: List[DailyCropHeatOutlook]
+    
+    # Section 4: Agronomic risk explanation
+    generated_at_ist: str
+    daytime_heat_stress_level: str
     overall_crop_heat_risk: str
     physiological_mechanism: str
-    evidence_citation: str
+    stage_biological_vulnerability: str
+    
+    # Section 5: Field recommendations
     recommended_interventions: List[CropHeatIntervention]
-    audit_logged: bool
+    
+    # Section 6: Historical trends
+    assessment_history: List[Dict[str, Any]]
+    audit_logged: bool = True
