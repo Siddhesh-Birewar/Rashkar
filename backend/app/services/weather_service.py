@@ -132,9 +132,14 @@ class WeatherService:
                 if points:
                     return {
                         "status": "LIVE_VERIFIED",
-                        "provider": "Open-Meteo / WMO Operational NWP (0.1°)",
+                        "provider": "Open-Meteo Operational NWP (ECMWF IFS / DWD ICON)",
+                        "spatial_resolution": "0.1° (~11 km grid resolution)",
+                        "grid_coordinates": f"Lat {latitude:.4f}°N, Lon {longitude:.4f}°E",
+                        "issue_time_ist": now_t.strftime("%Y-%m-%d 00:00:00 IST"),
+                        "valid_time_ist": f"{points[0].valid_time_ist} to {points[-1].valid_time_ist}",
                         "retrieved_at_ist": now_t.strftime("%Y-%m-%d %H:%M:%S IST"),
                         "data_quality": "GOOD",
+                        "missing_variables": [],
                         "hourly_points": [p.model_dump() for p in points]
                     }
         except Exception:
@@ -174,7 +179,12 @@ class WeatherService:
         return {
             "status": "ESTIMATED_CALIBRATED",
             "provider": "IMD 0.25° Gridded Climatological Normal Calibration",
+            "spatial_resolution": "0.25° (~27 km grid resolution)",
+            "grid_coordinates": f"Lat {latitude:.4f}°N, Lon {longitude:.4f}°E",
+            "issue_time_ist": now_t.strftime("%Y-%m-%d 00:00:00 IST"),
+            "valid_time_ist": f"{points[0].valid_time_ist} to {points[-1].valid_time_ist}" if points else "Next 6 Hours",
             "retrieved_at_ist": now_t.strftime("%Y-%m-%d %H:%M:%S IST"),
             "data_quality": "LIMITED",
+            "missing_variables": ["realtime_telemetry_unavailable", "solar_radiation_calibrated_model"],
             "hourly_points": [p.model_dump() for p in points]
         }

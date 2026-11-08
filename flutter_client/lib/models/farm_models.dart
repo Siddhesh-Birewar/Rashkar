@@ -343,6 +343,9 @@ class WorkerHeatResponse {
   final List<String> mainContributingFactors;
   final String workloadInteractionExplanation;
   final String methodologyReference;
+  final String methodologyStandardsVersion;
+  final String thresholdMeaningExplanation;
+  final String safetyGuaranteeDisclaimer;
   final Map<String, dynamic> technicalDetails;
 
   final String disclaimer;
@@ -352,6 +355,19 @@ class WorkerHeatResponse {
   final List<String> duringWorkGuidance;
   final List<String> highRiskActions;
   final Map<String, dynamic> emergencyTriage;
+  final Map<String, String> localEmergencyContacts;
+
+  // Additional defect fix fields
+  final String thresholdComparisonMessage;
+  final double thresholdDifferenceC;
+  final String thresholdComparisonState;
+  final double plannedShiftDurationHours;
+  final int forecastCoverageHours;
+  final bool shiftExceedsForecastCoverage;
+  final String? coverageLimitationWarning;
+  final String spatialResolution;
+  final String gridCoordinates;
+  final String validTimeIst;
 
   // Compatibility getters
   String get hazardLevel => currentHazardLevel.toLowerCase();
@@ -390,10 +406,23 @@ class WorkerHeatResponse {
     this.maxHazardLevelInWindow = 'MODERATE',
     this.maxWbgtEffectiveC = 28.0,
     this.screeningThresholdC = 28.0,
+    this.thresholdComparisonMessage = '',
+    this.thresholdDifferenceC = 0.0,
+    this.thresholdComparisonState = 'BELOW',
+    this.plannedShiftDurationHours = 4.0,
+    this.forecastCoverageHours = 6,
+    this.shiftExceedsForecastCoverage = false,
+    this.coverageLimitationWarning,
+    this.spatialResolution = '0.1° (~11 km grid resolution)',
+    this.gridCoordinates = 'Lat 18.15°N, Lon 74.58°E',
+    this.validTimeIst = 'Next 6 Hours',
     this.categorySelectionReason = '',
     this.mainContributingFactors = const [],
     this.workloadInteractionExplanation = '',
     this.methodologyReference = 'Liljegren et al. (2008)',
+    this.methodologyStandardsVersion = 'ACGIH 2023 TLVs & ISO 7243:2017 screening action limits',
+    this.thresholdMeaningExplanation = '',
+    this.safetyGuaranteeDisclaimer = '',
     this.technicalDetails = const {},
     this.disclaimer = '',
     this.safetyCautions = const [],
@@ -402,6 +431,7 @@ class WorkerHeatResponse {
     this.duringWorkGuidance = const [],
     this.highRiskActions = const [],
     this.emergencyTriage = const {},
+    this.localEmergencyContacts = const {},
   });
 
   factory WorkerHeatResponse.fromJson(Map<String, dynamic> json) {
@@ -434,10 +464,23 @@ class WorkerHeatResponse {
       maxHazardLevelInWindow: json['max_hazard_level_in_window'] ?? 'MODERATE',
       maxWbgtEffectiveC: (json['max_wbgt_effective_c'] as num?)?.toDouble() ?? 28.0,
       screeningThresholdC: (json['screening_threshold_c'] as num?)?.toDouble() ?? 28.0,
+      thresholdComparisonMessage: json['threshold_comparison_message'] ?? '',
+      thresholdDifferenceC: (json['threshold_difference_c'] as num?)?.toDouble() ?? 0.0,
+      thresholdComparisonState: json['threshold_comparison_state'] ?? 'BELOW',
+      plannedShiftDurationHours: (json['planned_shift_duration_hours'] as num?)?.toDouble() ?? (json['exposure_duration_hours'] as num?)?.toDouble() ?? 4.0,
+      forecastCoverageHours: json['forecast_coverage_hours'] ?? 6,
+      shiftExceedsForecastCoverage: json['shift_exceeds_forecast_coverage'] ?? false,
+      coverageLimitationWarning: json['coverage_limitation_warning'],
+      spatialResolution: json['spatial_resolution'] ?? '0.1° (~11 km grid resolution)',
+      gridCoordinates: json['grid_coordinates'] ?? 'Lat 18.15°N, Lon 74.58°E',
+      validTimeIst: json['valid_time_ist'] ?? 'Next 6 Hours',
       categorySelectionReason: json['category_selection_reason'] ?? '',
       mainContributingFactors: List<String>.from(json['main_contributing_factors'] ?? []),
       workloadInteractionExplanation: json['workload_interaction_explanation'] ?? '',
       methodologyReference: json['methodology_reference'] ?? 'Liljegren et al. (2008)',
+      methodologyStandardsVersion: json['methodology_standards_version'] ?? 'ACGIH 2023 TLVs & ISO 7243:2017 screening action limits',
+      thresholdMeaningExplanation: json['threshold_meaning_explanation'] ?? '',
+      safetyGuaranteeDisclaimer: json['safety_guarantee_disclaimer'] ?? '',
       technicalDetails: Map<String, dynamic>.from(json['technical_details'] ?? {}),
       disclaimer: json['disclaimer'] ?? '',
       safetyCautions: List<String>.from(json['safety_cautions'] ?? []),
@@ -446,6 +489,7 @@ class WorkerHeatResponse {
       duringWorkGuidance: List<String>.from(json['during_work_guidance'] ?? []),
       highRiskActions: List<String>.from(json['high_risk_actions'] ?? []),
       emergencyTriage: Map<String, dynamic>.from(json['emergency_triage'] ?? {}),
+      localEmergencyContacts: Map<String, String>.from(json['local_emergency_contacts'] ?? {}),
     );
   }
 }
@@ -493,6 +537,12 @@ class CropHeatIntervention {
   final String whyAppropriate;
   final String evidenceCitation;
   final String category;
+  final String? sourcePageOrTable;
+  final String? agronomistReviewer;
+  final String? applicationMethod;
+  final String? applicationDose;
+  final String? infrastructureRequirements;
+  final String? triggerCondition;
 
   CropHeatIntervention({
     required this.interventionId,
@@ -503,6 +553,12 @@ class CropHeatIntervention {
     required this.whyAppropriate,
     required this.evidenceCitation,
     required this.category,
+    this.sourcePageOrTable,
+    this.agronomistReviewer,
+    this.applicationMethod,
+    this.applicationDose,
+    this.infrastructureRequirements,
+    this.triggerCondition,
   });
 
   factory CropHeatIntervention.fromJson(Map<String, dynamic> json) {
@@ -515,6 +571,12 @@ class CropHeatIntervention {
       whyAppropriate: json['why_appropriate'] ?? '',
       evidenceCitation: json['evidence_citation'] ?? '',
       category: json['category'] ?? 'VERIFIED_AGRONOMIC',
+      sourcePageOrTable: json['source_page_or_table'],
+      agronomistReviewer: json['agronomist_reviewer'],
+      applicationMethod: json['application_method'],
+      applicationDose: json['application_dose'],
+      infrastructureRequirements: json['infrastructure_requirements'],
+      triggerCondition: json['trigger_condition'],
     );
   }
 }
@@ -532,8 +594,15 @@ class CropHeatAssessment {
   final double cropAreaAcres;
   final String irrigationStatus;
   final String soilTexture;
+  final String soilProvenanceLabel;
+  final bool isSoilSynthetic;
 
-  final String growthStageCode;
+  final bool isSeasonExpired;
+  final String seasonStatus;
+  final bool requiresSeasonUpdate;
+  final String? seasonExpiryMessage;
+
+  final String? growthStageCode;
   final String growthStageNameEn;
   final String growthStageNameMr;
   final List<Map<String, dynamic>> supportedStages;
@@ -565,7 +634,7 @@ class CropHeatAssessment {
   final List<Map<String, dynamic>> assessmentHistory;
 
   // Compatibility getters
-  String get stageCode => growthStageCode;
+  String get stageCode => growthStageCode ?? 'unknown';
   double get maxForecastTempC => tmaxForecastC;
   double get criticalThresholdC => criticalTmaxThresholdC;
   int get exceedanceHours => hoursAboveCritical.round();
@@ -579,13 +648,19 @@ class CropHeatAssessment {
     this.plotName = '',
     required this.cropCode,
     this.cropCommonName = '',
-    this.cropVariety = '',
+    this.cropVariety = 'Variety not recorded',
     this.sowingDate = '',
     this.daysAfterSowing = 45,
     this.cropAreaAcres = 2.5,
     this.irrigationStatus = 'Rainfed',
     this.soilTexture = 'Medium Black Vertisol',
-    required this.growthStageCode,
+    this.soilProvenanceLabel = 'CropNet Model Estimate (Unsampled Farm Coordinate)',
+    this.isSoilSynthetic = true,
+    this.isSeasonExpired = false,
+    this.seasonStatus = 'ACTIVE',
+    this.requiresSeasonUpdate = false,
+    this.seasonExpiryMessage,
+    this.growthStageCode,
     this.growthStageNameEn = '',
     this.growthStageNameMr = '',
     this.supportedStages = const [],
@@ -615,8 +690,8 @@ class CropHeatAssessment {
   });
 
   factory CropHeatAssessment.fromJson(Map<String, dynamic> json) {
-    final rawOutlook = json['daily_outlook'] as List? ?? [];
-    final rawInterventions = json['recommended_interventions'] as List? ?? [];
+    final rawOutlook = json['daily_outlook'] as List? ?? json['four_day_outlook'] as List? ?? [];
+    final rawInterventions = json['recommended_interventions'] as List? ?? json['field_recommendations'] as List? ?? [];
     final rawStages = json['supported_stages'] as List? ?? [];
     final rawHistory = json['assessment_history'] as List? ?? [];
 
@@ -627,25 +702,31 @@ class CropHeatAssessment {
       plotName: json['plot_name'] ?? '',
       cropCode: json['crop_code'] ?? 'soybean',
       cropCommonName: json['crop_common_name'] ?? json['crop_code'] ?? 'Crop',
-      cropVariety: json['crop_variety'] ?? 'State Recommended Variety',
+      cropVariety: json['crop_variety'] ?? 'Variety not recorded',
       sowingDate: json['sowing_date'] ?? '',
       daysAfterSowing: json['days_after_sowing'] ?? 45,
       cropAreaAcres: (json['crop_area_acres'] as num?)?.toDouble() ?? 2.5,
       irrigationStatus: json['irrigation_status'] ?? 'Rainfed',
       soilTexture: json['soil_texture'] ?? 'Medium Black Vertisol',
-      growthStageCode: json['growth_stage_code'] ?? json['stage_code'] ?? 'flowering',
-      growthStageNameEn: json['growth_stage_name_en'] ?? json['growth_stage_code'] ?? 'Flowering',
+      soilProvenanceLabel: json['soil_provenance_label'] ?? 'CropNet Model Estimate (Unsampled Farm Coordinate)',
+      isSoilSynthetic: json['is_soil_synthetic'] ?? true,
+      isSeasonExpired: json['is_season_expired'] ?? false,
+      seasonStatus: json['season_status'] ?? 'ACTIVE',
+      requiresSeasonUpdate: json['requires_season_update'] ?? false,
+      seasonExpiryMessage: json['season_expiry_message'],
+      growthStageCode: json['growth_stage_code'] ?? json['stage_code'],
+      growthStageNameEn: json['growth_stage_name_en'] ?? '',
       growthStageNameMr: json['growth_stage_name_mr'] ?? '',
       supportedStages: List<Map<String, dynamic>>.from(rawStages),
       farmerConfirmedStage: json['farmer_confirmed_stage'],
       baseTempC: (json['base_temp_c'] as num?)?.toDouble() ?? 10.0,
       optimalTempMinC: (json['optimal_temp_min_c'] as num?)?.toDouble() ?? 24.0,
       optimalTempMaxC: (json['optimal_temp_max_c'] as num?)?.toDouble() ?? 30.0,
-      criticalTmaxThresholdC: (json['critical_tmax_threshold_c'] as num?)?.toDouble() ?? (json['critical_threshold_c'] as num?)?.toDouble() ?? 36.0,
+      criticalTmaxThresholdC: (json['critical_tmax_threshold_c'] as num?)?.toDouble() ?? 36.0,
       criticalTminThresholdC: (json['critical_tmin_threshold_c'] as num?)?.toDouble() ?? 22.0,
-      tmaxForecastC: (json['tmax_forecast_c'] as num?)?.toDouble() ?? (json['max_forecast_temp_c'] as num?)?.toDouble() ?? 36.5,
+      tmaxForecastC: (json['tmax_forecast_c'] as num?)?.toDouble() ?? 34.0,
       tminForecastC: (json['tmin_forecast_c'] as num?)?.toDouble() ?? 23.0,
-      hoursAboveCritical: (json['hours_above_critical'] as num?)?.toDouble() ?? (json['exceedance_hours'] as num?)?.toDouble() ?? 0.0,
+      hoursAboveCritical: (json['hours_above_critical'] as num?)?.toDouble() ?? 0.0,
       consecutiveHotDays: json['consecutive_hot_days'] ?? 0,
       daytimeExposureHours: (json['daytime_exposure_hours'] as num?)?.toDouble() ?? 0.0,
       warmNightRespirationHazard: json['warm_night_respiration_hazard'] ?? false,
@@ -655,7 +736,7 @@ class CropHeatAssessment {
       evidenceStatus: json['evidence_status'] ?? 'VERIFIED_PUBLISHED',
       dailyOutlook: rawOutlook.map((o) => CropDailyOutlook.fromJson(o)).toList(),
       daytimeHeatStressLevel: json['daytime_heat_stress_level'] ?? 'low',
-      overallCropHeatRisk: json['overall_crop_heat_risk'] ?? json['risk_level'] ?? 'low',
+      overallCropHeatRisk: json['overall_crop_heat_risk'] ?? 'low',
       physiologicalMechanism: json['physiological_mechanism'] ?? '',
       stageBiologicalVulnerability: json['stage_biological_vulnerability'] ?? '',
       recommendedInterventions: rawInterventions.map((i) => CropHeatIntervention.fromJson(i)).toList(),

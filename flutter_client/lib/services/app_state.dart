@@ -87,9 +87,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final summary = await ApiService.getFarmSummary(farmId: farmId);
-      if (summary != null) {
-        setActiveFarm(summary);
-      }
+      setActiveFarm(summary);
     } catch (_) {}
     _isLoading = false;
     notifyListeners();
@@ -100,9 +98,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final summary = await ApiService.getFarmSummary(farmId: 'farm_demo_pune_01');
-      if (summary != null) {
-        setActiveFarm(summary);
-      }
+      setActiveFarm(summary);
     } catch (_) {}
     _isLoading = false;
     notifyListeners();

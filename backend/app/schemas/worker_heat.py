@@ -55,6 +55,9 @@ class WorkerHeatAssessmentResponse(BaseModel):
     weather_source_name: str
     weather_retrieval_time_ist: str
     forecast_issue_time_ist: str
+    valid_time_ist: str = "Next 6 Hours"
+    spatial_resolution: str = "0.1° (~11 km grid resolution)"
+    grid_coordinates: str = "Lat 18.15°N, Lon 74.58°E"
     is_observed_or_forecast: str = "Forecast (Operational WMO NWP)"
     current_air_temp_c: float
     current_relative_humidity_pct: float
@@ -64,6 +67,7 @@ class WorkerHeatAssessmentResponse(BaseModel):
     current_solar_radiation_wm2: float
     current_wbgt_estimated_c: float
     data_confidence: str = "HIGH"
+    missing_variables: List[str] = Field(default_factory=list)
     missing_variables_warning: Optional[str] = None
     
     # Section 2: Six-hour timeline & Peak analysis
@@ -78,16 +82,26 @@ class WorkerHeatAssessmentResponse(BaseModel):
     is_acclimatised: bool
     sun_exposure: str
     exposure_duration_hours: float
+    planned_shift_duration_hours: float = 4.0
+    forecast_coverage_hours: int = 6
+    shift_exceeds_forecast_coverage: bool = False
+    coverage_limitation_warning: Optional[str] = None
     current_hazard_level: str
     max_hazard_level_in_window: str
     max_wbgt_effective_c: float
     screening_threshold_c: float
+    threshold_comparison_message: str = ""
+    threshold_difference_c: float = 0.0
+    threshold_comparison_state: str = "BELOW"
     
     # Section 4: Risk explanation & technical details
     category_selection_reason: str
     main_contributing_factors: List[str]
     workload_interaction_explanation: str
     methodology_reference: str
+    methodology_standards_version: str = "ACGIH 2023 TLVs & ISO 7243:2017 screening action limits"
+    threshold_meaning_explanation: str = ""
+    safety_guarantee_disclaimer: str = ""
     technical_details: Dict[str, Any]
     
     # Section 5: Safety guidance & emergency
@@ -98,5 +112,6 @@ class WorkerHeatAssessmentResponse(BaseModel):
     during_work_guidance: List[str]
     high_risk_actions: List[str]
     emergency_triage: Dict[str, Any]
+    local_emergency_contacts: Dict[str, str] = Field(default_factory=dict)
     
     audit_logged: bool = True

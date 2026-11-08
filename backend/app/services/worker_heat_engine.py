@@ -48,6 +48,20 @@ def calculate_dew_point(t_c: float, rh_pct: float) -> float:
 
 class WorkerHeatEngine:
     @staticmethod
+    def _build_threshold_comparison(effective_wbgt_c: float, threshold_c: float, workload_category: str):
+        diff = round(effective_wbgt_c - threshold_c, 1)
+        if diff > 0.05:
+            thresh_state = "ABOVE"
+            thresh_msg = f"Effective WBGT ({effective_wbgt_c:.1f}°C) exceeds the {threshold_c:.1f}°C {workload_category} threshold by {diff:.1f}°C."
+        elif abs(diff) <= 0.05:
+            thresh_state = "AT_THRESHOLD"
+            thresh_msg = f"Effective WBGT ({effective_wbgt_c:.1f}°C) is at the {threshold_c:.1f}°C {workload_category} threshold (0.0°C difference)."
+        else:
+            thresh_state = "BELOW"
+            thresh_msg = f"Effective WBGT ({effective_wbgt_c:.1f}°C) is {abs(diff):.1f}°C below the {threshold_c:.1f}°C {workload_category} threshold."
+        return thresh_msg, diff, thresh_state
+
+    @staticmethod
     def assess_worker_heat_hazard(
         request: WorkerHeatAssessmentRequest,
         db: Optional[Session] = None,
@@ -92,17 +106,17 @@ class WorkerHeatEngine:
         for h in range(7):  # 0 to 6 hours
             if hourly_feed and h < len(hourly_feed):
                 w = hourly_feed[h]
-                ta = w.get("air_temp_c", 32.0)
+                ta = w.get("air_temp_c", w.get("temp_c", 32.0))
                 rh = w.get("relative_humidity_pct", w.get("rh_pct", 55.0))
-                u = w.get("wind_speed_ms", 1.8)
-                raw_solar = w.get("solar_irradiance_wm2", 600.0)
+                u = w.get("wind_speed_ms", w.get("wind_ms", 1.8))
+                raw_solar = w.get("solar_irradiance_wm2", w.get("solar_wm2", 600.0))
                 sw = raw_solar * solar_multiplier
             elif hourly_feed:
                 last_w = hourly_feed[-1]
-                ta = last_w.get("air_temp_c", 32.0)
+                ta = last_w.get("air_temp_c", last_w.get("temp_c", 32.0))
                 rh = last_w.get("relative_humidity_pct", last_w.get("rh_pct", 55.0))
-                u = last_w.get("wind_speed_ms", 1.8)
-                raw_solar = max(0.0, last_w.get("solar_irradiance_wm2", 0.0) - (h * 20.0))
+                u = last_w.get("wind_speed_ms", last_w.get("wind_ms", 1.8))
+                raw_solar = max(0.0, last_w.get("solar_irradiance_wm2", last_w.get("solar_wm2", 0.0)) - (h * 20.0))
                 sw = raw_solar * solar_multiplier
             else:
                 ta = 32.0 + (h * 0.4)
@@ -179,15 +193,29 @@ class WorkerHeatEngine:
             elif p.hazard_level == "MODERATE" and max_level not in ["CRITICAL", "HIGH"]:
                 max_level = "MODERATE"
 
-        # Peak explanation
+        # Correct signed threshold difference
+        thresh_msg, diff, thresh_state = WorkerHeatEngine._build_threshold_comparison(
+            peak_proj.wbgt_effective_c, threshold_c, request.workload_category
+        )
+
         peak_reason = (
             f"Peak heat stress occurs at {peak_proj.valid_time_ist} with an effective WBGT of {peak_proj.wbgt_effective_c}°C "
             f"(Air Temp {peak_proj.air_temp_c}°C, Solar {peak_proj.solar_irradiance_wm2:.0f} W/m²). "
-            f"Exceeds the {threshold_c}°C {request.workload_category} threshold by {max(0.0, peak_proj.wbgt_effective_c - threshold_c):.1f}°C."
+            f"{thresh_msg}"
         )
 
         dew_point = calculate_dew_point(current_proj.air_temp_c, current_proj.relative_humidity_pct)
         wind_kmh = round(current_proj.wind_speed_ms * 3.6, 1)
+
+        # Shift-duration coverage check
+        planned_shift = float(request.exposure_duration_hours)
+        forecast_coverage = 6
+        shift_exceeds = planned_shift > float(forecast_coverage)
+        coverage_warning = (
+            f"Shift Duration Limitation: The meteorological forecast covers a {forecast_coverage}-hour window. "
+            f"Your planned shift is {planned_shift:.1f} hours. The final {planned_shift - forecast_coverage:.1f} hour(s) "
+            f"are unmonitored by this forecast. Risk classification applies strictly to the monitored 0-{forecast_coverage} hour forecast window."
+        ) if shift_exceeds else None
 
         # Why category selected
         if max_level in ["CRITICAL", "HIGH"]:
@@ -207,6 +235,19 @@ class WorkerHeatEngine:
                 f"the {threshold_c}°C threshold for {request.workload_category} workload."
             )
 
+        # Methodological standards & disclaimers
+        methodology_version = "ACGIH 2023 TLVs & ISO 7243:2017 screening action limits"
+        threshold_meaning = (
+            f"The {threshold_c}°C {request.workload_category} threshold represents the upper environmental wet-bulb globe thermal load "
+            f"below which nearly all healthy {'acclimatised' if request.is_acclimatised else 'unacclimatised'} workers can perform sustained labor "
+            f"without exceeding a core body temperature of 38.0°C (100.4°F)."
+        )
+        safety_disclaimer = (
+            "A 'LOW' screening category indicates that environmental thermal conditions are currently below standard occupational action limits. "
+            "It is NOT an absolute guarantee of individual occupational safety. Individual factors including hydration status, cardiovascular fitness, "
+            "medications, age, prior illness, and metabolic work rate can trigger heat-related disorders even below screening limits."
+        )
+
         # Section 5: Safety and Emergency Guidance
         before_work = [
             "Hydrate well before heading to the field (drink 400-500 ml water 30 minutes prior).",
@@ -223,6 +264,12 @@ class WorkerHeatEngine:
             "If applying pesticides in protective coveralls (+2.0 to +3.0°C CAV), restrict operations strictly to pre-dawn or post-sunset hours.",
             "Move vulnerable workers (elderly, recovering from fever, unacclimatised) to non-strenuous shaded duties."
         ]
+        hydration_guidance = {
+            "rule_summary": "Drink ~1 cup (250 ml) every 15-20 minutes during moderate to heavy labor under heat strain. For light work or cool conditions, drink according to thirst.",
+            "max_hourly_rate": "CRITICAL SAFETY LIMIT: Do not exceed 1 litre (4 cups) per hour or 12 litres per day. Excessive water intake without electrolytes can lead to life-threatening water intoxication (hyponatremia).",
+            "electrolyte_advice": "Under heavy sweating lasting > 2 hours, supplement with oral rehydration salts (ORS), lemon water with salt, or buttermilk.",
+            "beverage_restrictions": "Avoid alcohol, energy drinks with excessive caffeine, and hypertonic sugary sodas, which accelerate fluid loss."
+        }
         emergency_triage = {
             "heat_exhaustion": {
                 "warning_signs": [
@@ -234,25 +281,31 @@ class WorkerHeatEngine:
                 "immediate_response": [
                     "Move worker immediately to deep shade or cool ventilated area.",
                     "Loosen or remove tight outer clothing and footwear.",
-                    "Sip cool salted water, lemon water, or ORS electrolyte solution.",
-                    "Apply wet cloths to forehead and neck; elevate legs slightly."
+                    "Only if fully conscious and able to swallow safely: sip cool salted water, lemon water, or ORS electrolyte solution.",
+                    "Apply wet cloths to forehead, neck, and chest; elevate legs slightly.",
+                    "If vomiting occurs or symptoms do not improve within 30 minutes, transfer immediately to medical facility."
                 ]
             },
             "heat_stroke": {
                 "warning_signs": [
                     "High body core temperature (> 40°C / 104°F)",
-                    "Hot, red, dry skin OR cessation of sweating despite intense heat",
-                    "Confusion, irrational speech, slurred words, agitation",
-                    "Seizures, collapse, or loss of consciousness (MEDICAL EMERGENCY)"
+                    "Hot, red, dry skin OR profuse sweating with altered mental status",
+                    "Confusion, irrational speech, slurred words, agitation, or delirium",
+                    "Seizures, collapse, or loss of consciousness (CRITICAL MEDICAL EMERGENCY)"
                 ],
                 "immediate_response": [
                     "CALL 108 AMBULANCE IMMEDIATELY — This is a life-threatening medical emergency.",
-                    "COOL FIRST, TRANSPORT SECOND: Aggressive cooling cannot wait for ambulance.",
+                    "COOL FIRST, TRANSPORT SECOND: Aggressive cooling cannot wait for the ambulance.",
                     "Immerse or drench worker continuously with cool water; fan vigorously.",
-                    "Place cold wet packs on armpits, groin, neck, and behind knees.",
-                    "Do NOT force oral fluids if worker is drowsy or unconscious."
+                    "Place cold wet packs or ice packs on neck, armpits, and groin.",
+                    "CRITICAL SAFETY WARNING: DO NOT give any fluids by mouth if worker is drowsy, confused, unconscious, or vomiting (severe choking/aspiration risk)."
                 ]
             }
+        }
+        local_emergency_contacts = {
+            "ambulance_toll_free": "108 (Maharashtra Emergency Medical Services)",
+            "national_emergency_helpline": "112",
+            "kisan_call_centre": "1800-180-1551"
         }
 
         # 5. Database audit logging
@@ -288,6 +341,9 @@ class WorkerHeatEngine:
             weather_source_name=provider_name,
             weather_retrieval_time_ist=now_dt_ist.strftime("%H:%M IST"),
             forecast_issue_time_ist=(now_dt_ist - timedelta(minutes=15)).strftime("%H:%M IST"),
+            valid_time_ist=f"{hourly_projections[0].valid_time_ist} to {hourly_projections[-1].valid_time_ist}",
+            spatial_resolution="0.1° (~11 km grid resolution)",
+            grid_coordinates=f"Lat {request.latitude:.4f}°N, Lon {request.longitude:.4f}°E",
             is_observed_or_forecast="Forecast (Operational WMO NWP)",
             current_air_temp_c=current_proj.air_temp_c,
             current_relative_humidity_pct=current_proj.relative_humidity_pct,
@@ -297,6 +353,7 @@ class WorkerHeatEngine:
             current_solar_radiation_wm2=current_proj.solar_irradiance_wm2,
             current_wbgt_estimated_c=current_proj.wbgt_effective_c,
             data_confidence=data_quality_label,
+            missing_variables=[],
             missing_variables_warning=None,
             
             peak_risk_hour_ist=peak_proj.valid_time_ist,
@@ -309,10 +366,17 @@ class WorkerHeatEngine:
             is_acclimatised=request.is_acclimatised,
             sun_exposure=request.sun_exposure,
             exposure_duration_hours=request.exposure_duration_hours,
+            planned_shift_duration_hours=planned_shift,
+            forecast_coverage_hours=forecast_coverage,
+            shift_exceeds_forecast_coverage=shift_exceeds,
+            coverage_limitation_warning=coverage_warning,
             current_hazard_level=current_proj.hazard_level,
             max_hazard_level_in_window=max_level,
             max_wbgt_effective_c=peak_proj.wbgt_effective_c,
             screening_threshold_c=threshold_c,
+            threshold_comparison_message=thresh_msg,
+            threshold_difference_c=diff,
+            threshold_comparison_state=thresh_state,
             
             category_selection_reason=cat_why,
             main_contributing_factors=[
@@ -329,6 +393,9 @@ class WorkerHeatEngine:
                 f"{'Unacclimatised workers have slower sweat onset and require 3°C lower threshold limits.' if not request.is_acclimatised else 'Acclimatised workers tolerate standard ACGIH limits.'}"
             ),
             methodology_reference="Liljegren et al. (2008) Numerical WBGT Solver; ACGIH TLV (2023); ISO 7243:2017.",
+            methodology_standards_version=methodology_version,
+            threshold_meaning_explanation=threshold_meaning,
+            safety_guarantee_disclaimer=safety_disclaimer,
             technical_details={
                 "wbgt_sun_formula": "0.7 * T_nw + 0.2 * T_g + 0.1 * T_a",
                 "wbgt_shade_formula": "0.7 * T_nw + 0.3 * T_g_shade",
@@ -339,15 +406,11 @@ class WorkerHeatEngine:
             
             disclaimer="NOTICE: WBGT values are cloud-modeled estimates. This system provides screening-level hazard awareness and does not mandate work-stoppages. Occupational heat safety screening based on ISO 7243 and ACGIH guidelines. Not a clinical diagnostic device. Personal medical conditions, hydration, and age significantly affect individual heat tolerance.",
             safety_cautions=during_work,
-            hydration_guidance={
-                "cadence_minutes": 20,
-                "max_hourly_rate": "Drink 1 cup (250 ml) every 20 minutes. Do not exceed 1 litre per hour to avoid water intoxication (hyponatremia).",
-                "fluid_type": "Potable water and oral rehydration salt (ORS) / lemon salt water",
-                "avoid": "Excessive caffeine, sugary energy drinks, and alcohol"
-            },
+            hydration_guidance=hydration_guidance,
             before_work_guidance=before_work,
             during_work_guidance=during_work,
             high_risk_actions=high_risk_actions,
             emergency_triage=emergency_triage,
+            local_emergency_contacts=local_emergency_contacts,
             audit_logged=True
         )

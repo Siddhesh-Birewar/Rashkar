@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import 'edit_profile_screen.dart';
 
 class HeatSafetyScreen extends StatefulWidget {
   const HeatSafetyScreen({Key? key}) : super(key: key);
@@ -230,10 +231,10 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
-                    'Source: ${w.weatherSourceName} · Mode: ${w.isObservedOrForecast}',
-                    style: const TextStyle(fontSize: 11, color: Colors.black54),
+                    'Provider: ${w.weatherSourceName} · Res: ${w.spatialResolution}\nGrid: ${w.gridCoordinates} · Retrieved: ${w.weatherRetrievalTimeIst}\nValid: ${w.validTimeIst} · Status: ${w.isObservedOrForecast}',
+                    style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
                   ),
                   const Divider(height: 20),
                   // Environmental Metrics Grid
@@ -287,20 +288,97 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  if (w.peakRiskReason.isNotEmpty)
+                  const SizedBox(height: 12),
+                  // Precise Threshold Exceedance / Below messaging
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: w.thresholdComparisonState == 'ABOVE'
+                          ? Colors.red.shade50
+                          : w.thresholdComparisonState == 'AT_THRESHOLD'
+                              ? Colors.amber.shade50
+                              : const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: w.thresholdComparisonState == 'ABOVE'
+                            ? Colors.red.shade400
+                            : w.thresholdComparisonState == 'AT_THRESHOLD'
+                                ? Colors.amber.shade600
+                                : Colors.green.shade600,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              w.thresholdComparisonState == 'ABOVE'
+                                  ? Icons.warning_rounded
+                                  : w.thresholdComparisonState == 'AT_THRESHOLD'
+                                      ? Icons.info_outline
+                                      : Icons.check_circle_outline,
+                              size: 18,
+                              color: w.thresholdComparisonState == 'ABOVE'
+                                  ? Colors.red.shade800
+                                  : w.thresholdComparisonState == 'AT_THRESHOLD'
+                                      ? Colors.amber.shade900
+                                      : Colors.green.shade800,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              w.thresholdComparisonState == 'ABOVE'
+                                  ? 'THRESHOLD EXCEEDED'
+                                  : w.thresholdComparisonState == 'AT_THRESHOLD'
+                                      ? 'AT THRESHOLD LIMIT'
+                                      : 'BELOW SCREENING THRESHOLD',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: w.thresholdComparisonState == 'ABOVE'
+                                    ? Colors.red.shade800
+                                    : w.thresholdComparisonState == 'AT_THRESHOLD'
+                                        ? Colors.amber.shade900
+                                        : Colors.green.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          w.thresholdComparisonMessage.isNotEmpty ? w.thresholdComparisonMessage : w.peakRiskReason,
+                          style: const TextStyle(fontSize: 12, height: 1.3, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Shift Duration Coverage Limitation Warning
+                  if (w.shiftExceedsForecastCoverage && w.coverageLimitationWarning != null) ...[
+                    const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
+                        color: Colors.amber.shade100,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.shade300),
+                        border: Border.all(color: Colors.amber.shade700),
                       ),
-                      child: Text(
-                        w.peakRiskReason,
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.timelapse, size: 18, color: Colors.amber.shade900),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              w.coverageLimitationWarning!,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ],
                   const SizedBox(height: 14),
                   // Timeline Projections List
                   if (w.hourlyProjections.isNotEmpty)
@@ -544,6 +622,33 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                         style: const TextStyle(fontSize: 12, color: Colors.black87),
                       ),
                     ),
+                  if (w.methodologyStandardsVersion.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Standard: ${w.methodologyStandardsVersion}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFFD84315)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      w.thresholdMeaningExplanation,
+                      style: const TextStyle(fontSize: 11, color: Colors.black87),
+                    ),
+                  ],
+                  if (w.safetyGuaranteeDisclaimer.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Text(
+                        w.safetyGuaranteeDisclaimer,
+                        style: TextStyle(fontSize: 10, color: Colors.brown.shade800, height: 1.3),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -564,7 +669,7 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 10),
-                  // Hydration Limit Alert
+                  // Hydration Limit Alert (NIOSH Criteria)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -572,23 +677,27 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.cyan.shade300),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.local_drink, color: Colors.cyan, size: 28),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('NIOSH Hydration Protocol:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal)),
-                              const SizedBox(height: 2),
-                              Text(
-                                w.hydrationGuidance['max_hourly_rate'] ?? 'Drink 1 cup (250ml) every 20 minutes. Do not exceed 1 litre per hour.',
-                                style: const TextStyle(fontSize: 12, color: Colors.black87),
-                              ),
-                            ],
-                          ),
+                        const Text('NIOSH Expert Hydration Protocol:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal)),
+                        const SizedBox(height: 4),
+                        Text(
+                          w.hydrationGuidance['rule_summary'] ?? 'Drink ~1 cup (250 ml) every 15-20 minutes during moderate to heavy labor under heat strain. For light work, drink according to thirst.',
+                          style: const TextStyle(fontSize: 12, color: Colors.black87),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          w.hydrationGuidance['max_hourly_rate'] ?? 'Do not exceed 1 litre per hour to avoid water intoxication (hyponatremia).',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red),
+                        ),
+                        if (w.hydrationGuidance['electrolyte_advice'] != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            w.hydrationGuidance['electrolyte_advice'],
+                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -619,7 +728,7 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                               SizedBox(height: 4),
                               Text('• Heavy sweating\n• Cold, pale, clammy skin\n• Fast, weak pulse\n• Muscle cramps & nausea', style: TextStyle(fontSize: 11)),
                               SizedBox(height: 6),
-                              Text('ACTION:\nMove to deep shade, loosen clothing, sip salted water or ORS.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
+                              Text('ACTION:\nMove to shade, loosen clothes. ONLY if fully conscious & able to swallow safely: sip salted water or ORS.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown)),
                             ],
                           ),
                         ),
@@ -639,14 +748,34 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                             children: const [
                               Text('Heat Stroke (108)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red)),
                               SizedBox(height: 4),
-                              Text('• High body temp (>40°C)\n• Hot, red, dry skin\n• Confusion / slurred speech\n• Loss of consciousness', style: TextStyle(fontSize: 11)),
+                              Text('• High temp (>40°C)\n• Hot, red, dry skin\n• Confusion / delirium\n• Seizures or collapse', style: TextStyle(fontSize: 11)),
                               SizedBox(height: 6),
-                              Text('CRITICAL ACTION:\nCALL 108 IMMEDIATELY!\nCool first, transport second. Drench in cool water.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                              Text('CRITICAL ACTION:\nCALL 108 IMMEDIATELY!\nCool first, transport second. Drench in water.\nDO NOT give oral fluids if confused or unconscious (choking risk).', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
                             ],
                           ),
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Local Emergency Contacts
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Local Emergency Contacts:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.black87)),
+                        SizedBox(height: 4),
+                        Text('• National Ambulance Service: 108 (Toll-free across Maharashtra)', style: TextStyle(fontSize: 11)),
+                        Text('• Unified Emergency Helpline: 112', style: TextStyle(fontSize: 11)),
+                        Text('• Kisan Call Centre / Farmer Helpline: 1800-180-1551', style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -787,9 +916,71 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'DAS: ${c.daysAfterSowing} days · Area: ${c.cropAreaAcres} acres · Irrigation: ${c.irrigationStatus} · Soil: ${c.soilTexture}',
-                    style: const TextStyle(fontSize: 11, color: Colors.black54),
+                    'DAS: ${c.daysAfterSowing} days · Area: ${c.cropAreaAcres} acres · Irrigation: ${c.irrigationStatus}',
+                    style: const TextStyle(fontSize: 11, color: Colors.black87),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Soil: ${c.soilTexture} · ${c.soilProvenanceLabel}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: c.isSoilSynthetic ? Colors.blueGrey.shade700 : Colors.green.shade900,
+                    ),
+                  ),
+                  if (c.isSeasonExpired || c.growthStageCode == null) ...[
+                    const Divider(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.deepOrange.shade400, width: 1.5),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.event_busy, color: Colors.deepOrange, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'CROP SEASON EXPIRED / UPDATE REQUIRED',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.deepOrange),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            c.seasonExpiryMessage ??
+                                'Sowing date is ${c.daysAfterSowing} days ago (exceeds typical season bounds). Stage-specific heat risk and field interventions are suppressed.',
+                            style: const TextStyle(fontSize: 12, height: 1.3, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.deepOrange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            ),
+                            icon: const Icon(Icons.edit_calendar, size: 16),
+                            label: const Text('Update Sowing Date in Profile', style: TextStyle(fontSize: 12)),
+                            onPressed: () {
+                              final appState = AppState.instance;
+                              if (appState.activeFarm != null) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditProfileScreen(farm: appState.activeFarm!),
+                                  ),
+                                ).then((_) => _loadInitialData());
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const Divider(height: 20),
 
                   // Interactive Stage Confirmation Selector
@@ -971,17 +1162,17 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
           const SizedBox(height: 16),
 
           // SECTION 6: Historical Trends
-          if (c.assessmentHistory.isNotEmpty)
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Recent Assessment History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Recent Assessment History (Audited Logs)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  if (c.assessmentHistory.isNotEmpty)
                     ...c.assessmentHistory.map((h) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -995,11 +1186,13 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                           ],
                         ),
                       );
-                    }).toList(),
-                  ],
-                ),
+                    }).toList()
+                  else
+                    const Text('No prior heat assessments recorded yet for this farm plot.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                ],
               ),
             ),
+          ),
           const SizedBox(height: 20),
         ],
       ),
@@ -1069,23 +1262,70 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
 
   Widget _buildInterventionCard(CropHeatIntervention rec) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F8E9),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.green.shade300),
+        border: Border.all(color: Colors.green.shade400),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(rec.titleEn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20))),
-          const SizedBox(height: 4),
-          Text(rec.descriptionEn, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  rec.titleEn,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  rec.category.replaceAll('_', ' '),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                ),
+              ),
+            ],
+          ),
+          if (rec.titleMr.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: Text(
+                rec.titleMr,
+                style: TextStyle(fontSize: 11, color: Colors.green.shade800, fontStyle: FontStyle.italic),
+              ),
+            ),
           const SizedBox(height: 6),
+          Text(rec.descriptionEn, style: const TextStyle(fontSize: 12, height: 1.3, color: Colors.black87)),
+          const SizedBox(height: 6),
+          if (rec.applicationMethod != null)
+            Text(
+              'Method & Dose: ${rec.applicationMethod} · ${rec.applicationDose ?? ""}',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+          if (rec.infrastructureRequirements != null)
+            Text(
+              'Infrastructure: ${rec.infrastructureRequirements}',
+              style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade800),
+            ),
+          const SizedBox(height: 4),
           Text('Why: ${rec.whyAppropriate}', style: TextStyle(fontSize: 11, color: Colors.green.shade900)),
-          const SizedBox(height: 2),
-          Text('Evidence: ${rec.evidenceCitation}', style: const TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 4),
+          Text(
+            'Source: ${rec.evidenceCitation}${rec.sourcePageOrTable != null ? " (${rec.sourcePageOrTable})" : ""}',
+            style: const TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic),
+          ),
+          if (rec.agronomistReviewer != null)
+            Text(
+              'Reviewer: ${rec.agronomistReviewer}',
+              style: const TextStyle(fontSize: 10, color: Colors.black54),
+            ),
         ],
       ),
     );

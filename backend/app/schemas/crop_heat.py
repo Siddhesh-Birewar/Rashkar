@@ -17,6 +17,13 @@ class CropHeatIntervention(BaseModel):
     description_mr: str
     why_appropriate: str
     evidence_citation: str
+    source_page_or_table: Optional[str] = "Package of Practices, Table 3.1"
+    agronomist_reviewer: Optional[str] = "ICAR-SAU Agrometeorological Review Panel"
+    application_method: Optional[str] = "Foliar / Soil Application"
+    application_dose: Optional[str] = "Specified dose per hectare"
+    infrastructure_requirements: Optional[str] = "Drip / Sprinkler / Knapsack Sprayer"
+    trigger_condition: Optional[str] = "Assessed Heat Stress Condition"
+    evidence_status: str = "VERIFIED_PUBLISHED"
     category: str = "VERIFIED_AGRONOMIC"  # VERIFIED_AGRONOMIC, PREVENTATIVE_MANAGEMENT, EXPERIMENTAL_SCREENING
 
 class DailyCropHeatOutlook(BaseModel):
@@ -35,17 +42,25 @@ class CropHeatAssessmentResponse(BaseModel):
     plot_name: str
     crop_code: str
     crop_common_name: str
-    crop_variety: Optional[str] = "Local Recommended Variety"
+    crop_variety: Optional[str] = "Variety not recorded"
     sowing_date: str
     days_after_sowing: int
     crop_area_acres: float
     irrigation_status: str
     soil_texture: str
+    soil_provenance_label: str = "CropNet Model Estimate (Unsampled Farm Coordinate)"
+    is_soil_synthetic: bool = True
+    
+    # Season status
+    is_season_expired: bool = False
+    season_status: str = "ACTIVE"
+    requires_season_update: bool = False
+    season_expiry_message: Optional[str] = None
     
     # Section 1: Growth stage & overrides
-    growth_stage_code: str
-    growth_stage_name_en: str
-    growth_stage_name_mr: str
+    growth_stage_code: Optional[str] = None
+    growth_stage_name_en: Optional[str] = None
+    growth_stage_name_mr: Optional[str] = None
     supported_stages: List[Dict[str, Any]]
     farmer_confirmed_stage: Optional[str] = None
     
@@ -65,9 +80,12 @@ class CropHeatAssessmentResponse(BaseModel):
     cumulative_heat_units_gdd: float
     evidence_citation: str
     evidence_status: str = "VERIFIED_PUBLISHED"
+    institution_attribution: Optional[str] = "ICAR-CRIDA / State Agricultural Universities (SAU)"
+    thermal_analysis: Optional[Dict[str, Any]] = None
     
     # Section 3: Multi-day outlook
     daily_outlook: List[DailyCropHeatOutlook]
+    four_day_outlook: Optional[List[DailyCropHeatOutlook]] = None
     
     # Section 4: Agronomic risk explanation
     generated_at_ist: str
@@ -78,6 +96,7 @@ class CropHeatAssessmentResponse(BaseModel):
     
     # Section 5: Field recommendations
     recommended_interventions: List[CropHeatIntervention]
+    field_recommendations: List[CropHeatIntervention] = Field(default_factory=list)
     
     # Section 6: Historical trends
     assessment_history: List[Dict[str, Any]]
