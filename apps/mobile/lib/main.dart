@@ -994,6 +994,27 @@ class FarmDetailScreen extends StatelessWidget {
                   SatelliteVegetationSummaryCard(farmId: farm.id),
 
                   const SizedBox(height: 20),
+                  // Prominent Action: Unified Farm Health Dashboard (Phase 5.9B)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B5E20),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.dashboard_customize_rounded, size: 24),
+                    label: const Text(
+                      'View Unified Farm Health Dashboard',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                    ),
+                    onPressed: () {
+                      FarmRepository.instance.selectedFarmId = farm.id;
+                      context.push(RoutePaths.farmHealthDashboardPath(farm.id));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
                   // Prominent Action to run Crop Suitability Advisory
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(

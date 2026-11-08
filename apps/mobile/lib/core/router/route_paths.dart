@@ -60,9 +60,13 @@ abstract final class RoutePaths {
   /// Satellite Vegetation Health Workspace: /farms/:farmId/vegetation
   static const String farmVegetation = '/farms/:farmId/vegetation';
 
+  /// Unified Farm Health Dashboard: /farms/:farmId/health
+  static const String farmHealthDashboard = '/farms/:farmId/health';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';
+  static String farmHealthDashboardPath(String farmId) => '/farms/$farmId/health';
   static String farmWaterPath(String farmId) => '/farms/$farmId/water';
   static String farmVegetationPath(String farmId) => '/farms/$farmId/vegetation';
   static String soilDetailPath(String farmId) => '/soil-testing/$farmId';
