@@ -3,8 +3,12 @@ import 'package:http/http.dart' as http;
 import '../models/farm_models.dart';
 
 class ApiService {
-  // Configurable backend URL. On Android emulator use 10.0.2.2; on device use LAN IP; default local localhost
-  static String baseUrl = 'http://127.0.0.1:8000/v1';
+  // Configurable backend URL reading from --dart-define=API_BASE_URL or defaulting to local FastAPI
+  static const String _apiHost = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://127.0.0.1:8000');
+  static String get baseUrl => _apiHost.endsWith('/v1') ? _apiHost : '$_apiHost/v1';
+
+  // Mock mode toggle for testing and zero-latency offline demo
+  static bool mockMode = false;
 
   // In-memory offline cache for weak-connectivity resilience
   static FarmSummary? _cachedSummary;
@@ -12,17 +16,20 @@ class ApiService {
 
   // --- 1. Farm Summary / Home Screen ---
   static Future<FarmSummary> getFarmSummary({String farmId = 'farm_demo_pune_01'}) async {
-    try {
-      final uri = Uri.parse('$baseUrl/farms/$farmId/summary');
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+    if (mockMode && _cachedSummary != null) return _cachedSummary!;
+    if (!mockMode) {
+      try {
+        final uri = Uri.parse('$baseUrl/farms/$farmId/summary');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _cachedSummary = FarmSummary.fromJson(data);
-        return _cachedSummary!;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          _cachedSummary = FarmSummary.fromJson(data);
+          return _cachedSummary!;
+        }
+      } catch (_) {
+        // Offline fallback
       }
-    } catch (_) {
-      // Offline fallback
     }
 
     if (_cachedSummary != null) {
@@ -309,16 +316,18 @@ class ApiService {
 
   // --- 6. Income Diversification ---
   static Future<List<IncomeOpportunity>> getIncomeOpportunities({String? cropCode}) async {
-    try {
-      final uri = Uri.parse('$baseUrl/income/opportunities${cropCode != null ? '?crop_code=$cropCode' : ''}');
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+    if (!mockMode) {
+      try {
+        final uri = Uri.parse('$baseUrl/income/opportunities${cropCode != null ? '?crop_code=$cropCode' : ''}');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode == 200) {
-        final List list = json.decode(response.body);
-        return list.map((item) => IncomeOpportunity.fromJson(item)).toList();
+        if (response.statusCode == 200) {
+          final List list = json.decode(response.body);
+          return list.map((item) => IncomeOpportunity.fromJson(item)).toList();
+        }
+      } catch (_) {
+        // Offline fallback
       }
-    } catch (_) {
-      // Offline fallback
     }
 
     return [
@@ -378,23 +387,25 @@ class ApiService {
     required double customBudgetInr,
     double labourHours = 2.0,
   }) async {
-    try {
-      final uri = Uri.parse('$baseUrl/income/calculate-scenario');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'opportunity_id': opportunityId,
-          'custom_budget_inr': customBudgetInr,
-          'available_labour_hours_day': labourHours,
-        }),
-      ).timeout(const Duration(seconds: 4));
+    if (!mockMode) {
+      try {
+        final uri = Uri.parse('$baseUrl/income/calculate-scenario');
+        final response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'opportunity_id': opportunityId,
+            'custom_budget_inr': customBudgetInr,
+            'available_labour_hours_day': labourHours,
+          }),
+        ).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode == 200) {
-        return IncomeScenario.fromJson(json.decode(response.body));
+        if (response.statusCode == 200) {
+          return IncomeScenario.fromJson(json.decode(response.body));
+        }
+      } catch (_) {
+        // Offline fallback
       }
-    } catch (_) {
-      // Offline fallback
     }
 
     final opex = customBudgetInr * 0.25;
@@ -477,16 +488,18 @@ class ApiService {
   }
 
   static Future<List<CropLossCase>> getFarmerLossCases(String farmerId) async {
-    try {
-      final uri = Uri.parse('$baseUrl/pmfby/cases/farmer/$farmerId');
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+    if (!mockMode) {
+      try {
+        final uri = Uri.parse('$baseUrl/pmfby/cases/farmer/$farmerId');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode == 200) {
-        final List list = json.decode(response.body);
-        return list.map((item) => CropLossCase.fromJson(item)).toList();
+        if (response.statusCode == 200) {
+          final List list = json.decode(response.body);
+          return list.map((item) => CropLossCase.fromJson(item)).toList();
+        }
+      } catch (_) {
+        // Return cached/offline
       }
-    } catch (_) {
-      // Return cached/offline
     }
 
     return _offlineDraftCases.isNotEmpty

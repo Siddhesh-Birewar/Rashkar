@@ -30,7 +30,7 @@ class RashkarFarmerApp extends StatelessWidget {
           bodyLarge: TextStyle(fontSize: 16.0),
           bodyMedium: TextStyle(fontSize: 14.0),
         ),
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 1,
           margin: EdgeInsets.zero,
         ),
