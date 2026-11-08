@@ -135,6 +135,7 @@ class WaterCollector(BaseDomainCollector):
                 availability_state=DataAvailabilityState.PARTIALLY_AVAILABLE,
                 last_updated=last_updated,
                 data_age_days=data_age,
+                provenance="FARMER_REPORTED",
                 registered_sources_count=len(source_items),
                 sources=source_items,
                 laboratory_name=rep.laboratory_name if rep else None,
@@ -152,7 +153,12 @@ class WaterCollector(BaseDomainCollector):
 
         # Case C: Confirmed report exists
         rep = confirmed_report
-        last_updated = rep.report_date or rep.confirmed_at or rep.upload_timestamp
+        last_updated = (
+            rep.report_date
+            or rep.sample_collection_date
+            or rep.confirmed_at
+            or rep.upload_timestamp
+        )
         data_age_days = compute_age_days(last_updated, now)
 
         # Fetch measurements for confirmed report
@@ -255,6 +261,7 @@ class WaterCollector(BaseDomainCollector):
             availability_state=availability_state,
             last_updated=last_updated,
             data_age_days=data_age_days,
+            provenance="LABORATORY_MEASURED",
             registered_sources_count=len(source_items),
             sources=source_items,
             laboratory_name=rep.laboratory_name,

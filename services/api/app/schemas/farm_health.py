@@ -109,6 +109,7 @@ class WaterDomainSummary(BaseModel):
     registered_sources_count: int = Field(default=0, description="Total active water sources registered on farm")
     sources: List[WaterSourceSummaryItem] = Field(default_factory=list, description="List of registered water sources")
     laboratory_name: Optional[str] = Field(None, description="Name of testing laboratory if tested")
+    provenance: Optional[str] = Field(None, description="Water quality data provenance: LABORATORY_MEASURED | FARMER_REPORTED | NOT_AVAILABLE")
     key_indicators: WaterKeyIndicators = Field(default_factory=WaterKeyIndicators)
     institutional_evaluations: List[WaterEvaluationFinding] = Field(default_factory=list, description="BIS/ICAR hazard evaluations")
     missing_critical_parameters: List[str] = Field(default_factory=list, description="Missing water quality parameters")
@@ -128,6 +129,7 @@ class SatelliteDomainSummary(BaseModel):
     availability_state: DataAvailabilityState
     observation_date: Optional[datetime] = Field(None, description="UTC timestamp of Sentinel-2 satellite overpass")
     observation_age_days: Optional[int] = Field(None, description="Age of satellite overpass in days")
+    provenance: str = Field(default="COPERNICUS_SENTINEL_2_L2A", description="Satellite imagery data provenance")
     sensor: Optional[str] = Field(default="Sentinel-2 L2A", description="Satellite sensor name")
     product_id: Optional[str] = Field(None, description="Copernicus product identifier")
     canopy_ndvi: Optional[float] = Field(None, description="Mean NDVI of pure Class 4 vegetation canopy pixels")
@@ -155,6 +157,8 @@ class CurrentWeatherSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     observation_time: Optional[datetime] = Field(None, description="Timestamp of weather observation")
+    source: str = Field(default="OPENWEATHER_OBSERVATION", description="Weather data source")
+    provenance: str = Field(default="OPENWEATHER_OBSERVATION", description="Weather observation provenance")
     temperature_c: Optional[float] = Field(None, description="Observed dry bulb temperature in Celsius")
     humidity_percent: Optional[float] = Field(None, description="Relative humidity percentage")
     precipitation_mm: Optional[float] = Field(None, description="Current precipitation rate in mm/h")
@@ -166,6 +170,7 @@ class CurrentWeatherSummary(BaseModel):
 class ForecastSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    provenance: str = Field(default="OPENWEATHER_FORECAST", description="Forecast data provenance")
     forecast_days_count: int = Field(default=0, description="Number of days in forecast window")
     next_48h_rain_expected_mm: Optional[float] = Field(None, description="Expected precipitation accumulation in next 48h")
     temp_min_c: Optional[float] = Field(None, description="Forecasted minimum temperature in Celsius")
@@ -176,6 +181,7 @@ class ForecastSummary(BaseModel):
 class ClimateNormalsSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    provenance: str = Field(default="NASA_POWER_CLIMATOLOGY", description="Historical climatology provenance")
     annual_rainfall_mm: Optional[float] = Field(None, description="30-year climatological annual precipitation (NASA POWER)")
     monsoon_rainfall_mm: Optional[float] = Field(None, description="30-year monsoon season precipitation")
     mean_temperature_c: Optional[float] = Field(None, description="30-year mean annual temperature")
@@ -207,6 +213,7 @@ class CropContextDomainSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     availability_state: DataAvailabilityState
+    provenance: str = Field(default="CROP_DECISION_ENGINE", description="Decision engine provenance")
     evaluated_at: Optional[datetime] = Field(None, description="Timestamp of decision engine evaluation")
     target_season: Optional[str] = Field(None, description="Cropping season evaluated (e.g. Rabi 2026-27)")
     taluka_resolved: Optional[str] = Field(None, description="Taluka used for agro-ecological zone resolution")

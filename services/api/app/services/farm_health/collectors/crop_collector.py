@@ -89,6 +89,7 @@ class CropCollector(BaseDomainCollector):
         if not eval_resp:
             return CropContextDomainSummary(
                 availability_state=DataAvailabilityState.NOT_AVAILABLE,
+                provenance="CROP_DECISION_ENGINE",
                 evaluated_at=None,
                 target_season=None,
                 taluka_resolved=taluka,
@@ -176,6 +177,7 @@ class CropCollector(BaseDomainCollector):
 
         return CropContextDomainSummary(
             availability_state=availability_state,
+            provenance="CROP_DECISION_ENGINE",
             evaluated_at=eval_resp.evaluated_at,
             target_season=target_season or eval_resp.target_season,
             taluka_resolved=eval_resp.taluka_resolved or taluka,

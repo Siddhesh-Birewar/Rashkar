@@ -175,6 +175,7 @@ GoRouter createCropNetRouter({
                             builder: (context, farm) => FarmHealthDashboardScreen(
                               farmId: farm.id,
                               farm: farm,
+                              simulateOffline: state.uri.queryParameters['offline'] == 'true',
                             ),
                           );
                         },

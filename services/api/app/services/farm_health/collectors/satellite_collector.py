@@ -42,11 +42,14 @@ class SatelliteCollector(BaseDomainCollector):
         farm_id = str(farm["id"])
         now = utc_now()
 
-        # Query latest observation
+        # Query latest observation (ordered by observation date and creation timestamp)
         obs = (
             db.query(SatelliteVegetationObservationModel)
             .filter(SatelliteVegetationObservationModel.farm_id == farm_id)
-            .order_by(SatelliteVegetationObservationModel.observation_date.desc())
+            .order_by(
+                SatelliteVegetationObservationModel.observation_date.desc(),
+                SatelliteVegetationObservationModel.created_at.desc(),
+            )
             .first()
         )
 
@@ -133,6 +136,7 @@ class SatelliteCollector(BaseDomainCollector):
             availability_state=availability_state,
             observation_date=obs_date,
             observation_age_days=obs_age_days,
+            provenance="COPERNICUS_SENTINEL_2_L2A",
             sensor=obs.sensor or "Sentinel-2 L2A",
             product_id=obs.product_id,
             canopy_ndvi=canopy_ndvi,

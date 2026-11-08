@@ -99,7 +99,9 @@ class FarmOverviewCard extends StatelessWidget {
                 ),
                 // Refresh Button
                 Tooltip(
-                  message: 'Force refresh farm health snapshot',
+                  message: snapshot.isFromCache
+                      ? 'Offline — Tap to retry synchronization'
+                      : 'Force refresh farm health snapshot',
                   child: isRefreshing
                       ? const Padding(
                           padding: EdgeInsets.all(10.0),
@@ -113,7 +115,10 @@ class FarmOverviewCard extends StatelessWidget {
                           ),
                         )
                       : IconButton(
-                          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                          icon: Icon(
+                            snapshot.isFromCache ? Icons.sync_problem_rounded : Icons.refresh_rounded,
+                            color: Colors.white,
+                          ),
                           onPressed: onRefresh,
                         ),
                 ),
@@ -144,6 +149,13 @@ class FarmOverviewCard extends StatelessWidget {
                 ),
                 _buildInfoBadge(
                   context,
+                  icon: snapshot.isFromCache ? Icons.wifi_off_rounded : Icons.cloud_done_rounded,
+                  label: 'Sync Status',
+                  value: snapshot.isFromCache ? 'Cached Offline' : 'Live Synced',
+                  valueColor: snapshot.isFromCache ? const Color(0xFFD97706) : const Color(0xFF2E7D32),
+                ),
+                _buildInfoBadge(
+                  context,
                   icon: Icons.verified_user_outlined,
                   label: 'Contract Version',
                   value: 'v${snapshot.contractVersion}',
@@ -161,12 +173,13 @@ class FarmOverviewCard extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
+    Color? valueColor,
   }) {
     final theme = Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        Icon(icon, size: 18, color: valueColor ?? theme.colorScheme.primary),
         const SizedBox(width: 8),
         Flexible(
           child: Column(
@@ -181,7 +194,8 @@ class FarmOverviewCard extends StatelessWidget {
               Text(
                 value,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
+                  color: valueColor,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

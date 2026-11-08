@@ -72,6 +72,12 @@ class WaterIntelligenceCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
+                if (water.provenance != null)
+                  _buildMetaChip(
+                    icon: Icons.verified_outlined,
+                    label: water.provenance!,
+                    color: const Color(0xFF0288D1),
+                  ),
                 if (water.laboratoryName != null)
                   _buildMetaChip(
                     icon: Icons.biotech_rounded,

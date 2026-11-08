@@ -177,6 +177,8 @@ class WeatherCollector(BaseDomainCollector):
                 obs_age_hours = max(0.0, (now - obs_utc).total_seconds() / 3600.0)
             cur_summary = CurrentWeatherSummary(
                 observation_time=obs_time,
+                source=current_obs.source or "OPENWEATHER_OBSERVATION",
+                provenance="OPENWEATHER_OBSERVATION",
                 temperature_c=current_obs.temperature_c,
                 humidity_percent=current_obs.humidity_percent,
                 precipitation_mm=current_obs.precipitation_mm,

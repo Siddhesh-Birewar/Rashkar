@@ -191,6 +191,8 @@ class SoilCollector(BaseDomainCollector):
             ph_val = _val(latest_meas_by_param["ph"])
         elif "soil_ph" in spatial_params and spatial_params["soil_ph"].value is not None:
             ph_val = spatial_params["soil_ph"].value
+        elif "ph" in spatial_params and spatial_params["ph"].value is not None:
+            ph_val = spatial_params["ph"].value
 
         # 2. SOC
         if "organic_carbon" in latest_meas_by_param:
@@ -201,6 +203,12 @@ class SoilCollector(BaseDomainCollector):
             val = spatial_params["organic_carbon"].value
             # SoilGrids SOC unit conversion if in g/kg or >10%
             if getattr(spatial_params["organic_carbon"], "unit", "") == "g/kg" or val > 10.0:
+                soc_val = round(val / 10.0, 3)
+            else:
+                soc_val = round(val, 3)
+        elif "soc" in spatial_params and spatial_params["soc"].value is not None:
+            val = spatial_params["soc"].value
+            if getattr(spatial_params["soc"], "unit", "") == "g/kg" or val > 10.0:
                 soc_val = round(val / 10.0, 3)
             else:
                 soc_val = round(val, 3)

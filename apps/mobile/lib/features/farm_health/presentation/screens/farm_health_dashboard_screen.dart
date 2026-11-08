@@ -28,12 +28,14 @@ class FarmHealthDashboardScreen extends StatefulWidget {
   final String farmId;
   final FarmItem? farm;
   final FarmHealthRepository? repository;
+  final bool simulateOffline;
 
   const FarmHealthDashboardScreen({
     super.key,
     required this.farmId,
     this.farm,
     this.repository,
+    this.simulateOffline = false,
   });
 
   @override
@@ -57,7 +59,7 @@ class _FarmHealthDashboardScreenState extends State<FarmHealthDashboardScreen> {
   @override
   void didUpdateWidget(covariant FarmHealthDashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.farmId != widget.farmId) {
+    if (oldWidget.farmId != widget.farmId || oldWidget.simulateOffline != widget.simulateOffline) {
       _fetchSnapshot();
     }
   }
@@ -73,10 +75,16 @@ class _FarmHealthDashboardScreenState extends State<FarmHealthDashboardScreen> {
     }
 
     try {
-      final res = await _repository.getFarmHealthSnapshot(
+      var res = await _repository.getFarmHealthSnapshot(
         widget.farmId,
         forceRefresh: forceRefresh,
       );
+      if (widget.simulateOffline) {
+        res = res.copyWith(
+          isFromCache: true,
+          cachedAt: DateTime.now().subtract(const Duration(minutes: 14)),
+        );
+      }
       if (!mounted) return;
       setState(() {
         _snapshot = res;
@@ -190,14 +198,105 @@ class _FarmHealthDashboardScreenState extends State<FarmHealthDashboardScreen> {
     final timelineItems = snapshot.buildTimelineItems();
 
     // Responsive layout switching
+    Widget content;
     final breakpoint = context.breakpoint;
     if (breakpoint == AppBreakpoint.desktop) {
-      return _buildDesktopLayout(context, snapshot, timelineItems);
+      content = _buildDesktopLayout(context, snapshot, timelineItems);
     } else if (breakpoint == AppBreakpoint.tablet) {
-      return _buildTabletLayout(context, snapshot, timelineItems);
+      content = _buildTabletLayout(context, snapshot, timelineItems);
     } else {
-      return _buildMobileLayout(context, snapshot, timelineItems);
+      content = _buildMobileLayout(context, snapshot, timelineItems);
     }
+
+    if (snapshot.isFromCache) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildOfflineBanner(context, snapshot),
+          const SizedBox(height: 14),
+          content,
+        ],
+      );
+    }
+
+    return content;
+  }
+
+  /// Prominent offline banner when viewing cached snapshots.
+  Widget _buildOfflineBanner(BuildContext context, FarmHealthSnapshotResponse snapshot) {
+    final cachedTimeStr = snapshot.cachedAt != null
+        ? '${snapshot.cachedAt!.hour.toString().padLeft(2, '0')}:${snapshot.cachedAt!.minute.toString().padLeft(2, '0')}'
+        : 'recent session';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDE68A),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: Color(0xFFB45309),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Offline Mode — Showing Cached Snapshot',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Retrieved at $cachedTimeStr. Real-time synchronization will automatically resume when network connectivity is restored.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFB45309),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF92400E),
+              side: const BorderSide(color: Color(0xFFD97706)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            icon: const Icon(Icons.sync_rounded, size: 16),
+            label: const Text('Retry'),
+            onPressed: () => _fetchSnapshot(forceRefresh: true),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------

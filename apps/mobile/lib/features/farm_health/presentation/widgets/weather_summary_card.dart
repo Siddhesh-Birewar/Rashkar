@@ -70,6 +70,25 @@ class WeatherSummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            // Metadata Chips: Provenance
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildMetaChip(
+                  icon: Icons.cloud_outlined,
+                  label: weather.currentWeather.provenance,
+                  color: const Color(0xFF0288D1),
+                ),
+                _buildMetaChip(
+                  icon: Icons.history_edu_outlined,
+                  label: weather.climateNormals.provenance,
+                  color: const Color(0xFF5D4037),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
             // Stale Warning Banner if STALE
             if (state == DataAvailabilityState.stale) ...[
               Container(
@@ -359,6 +378,39 @@ class WeatherSummaryCard extends StatelessWidget {
             'Live agro-meteorological data could not be retrieved from provider.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

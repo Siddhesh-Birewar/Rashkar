@@ -418,6 +418,7 @@ class WaterDomainSummary {
   final DataAvailabilityState availabilityState;
   final DateTime? lastUpdated;
   final int? dataAgeDays;
+  final String? provenance;
   final int registeredSourcesCount;
   final List<WaterSourceSummaryItem> sources;
   final String? laboratoryName;
@@ -429,6 +430,7 @@ class WaterDomainSummary {
     required this.availabilityState,
     this.lastUpdated,
     this.dataAgeDays,
+    this.provenance,
     this.registeredSourcesCount = 0,
     this.sources = const [],
     this.laboratoryName,
@@ -445,6 +447,7 @@ class WaterDomainSummary {
       availabilityState: DataAvailabilityState.fromString(json['availability_state'] as String?),
       lastUpdated: json['last_updated'] != null ? DateTime.tryParse(json['last_updated'] as String) : null,
       dataAgeDays: (json['data_age_days'] as num?)?.toInt(),
+      provenance: json['provenance'] as String?,
       registeredSourcesCount: (json['registered_sources_count'] as num?)?.toInt() ?? 0,
       sources: (json['sources'] as List<dynamic>?)
               ?.map((e) => WaterSourceSummaryItem.fromJson(_asStringMap(e) ?? const {}))
@@ -467,6 +470,7 @@ class WaterDomainSummary {
     'availability_state': availabilityState.toApiString(),
     'last_updated': lastUpdated?.toIso8601String(),
     'data_age_days': dataAgeDays,
+    'provenance': provenance,
     'registered_sources_count': registeredSourcesCount,
     'sources': sources.map((e) => e.toJson()).toList(),
     'laboratory_name': laboratoryName,
@@ -509,6 +513,7 @@ class SatelliteDomainSummary {
   final DataAvailabilityState availabilityState;
   final DateTime? observationDate;
   final int? observationAgeDays;
+  final String? provenance;
   final String? sensor;
   final String? productId;
   final double? canopyNdvi;
@@ -529,6 +534,7 @@ class SatelliteDomainSummary {
     required this.availabilityState,
     this.observationDate,
     this.observationAgeDays,
+    this.provenance = 'COPERNICUS_SENTINEL_2_L2A',
     this.sensor = 'Sentinel-2 L2A',
     this.productId,
     this.canopyNdvi,
@@ -555,6 +561,7 @@ class SatelliteDomainSummary {
       availabilityState: DataAvailabilityState.fromString(json['availability_state'] as String?),
       observationDate: json['observation_date'] != null ? DateTime.tryParse(json['observation_date'] as String) : null,
       observationAgeDays: (json['observation_age_days'] as num?)?.toInt(),
+      provenance: json['provenance'] as String? ?? 'COPERNICUS_SENTINEL_2_L2A',
       sensor: json['sensor'] as String? ?? 'Sentinel-2 L2A',
       productId: json['product_id'] as String?,
       canopyNdvi: (json['canopy_ndvi'] as num?)?.toDouble(),
@@ -578,6 +585,7 @@ class SatelliteDomainSummary {
     'availability_state': availabilityState.toApiString(),
     'observation_date': observationDate?.toIso8601String(),
     'observation_age_days': observationAgeDays,
+    'provenance': provenance,
     'sensor': sensor,
     'product_id': productId,
     'canopy_ndvi': canopyNdvi,
@@ -599,6 +607,8 @@ class SatelliteDomainSummary {
 /// Observed current weather parameters.
 class CurrentWeatherSummary {
   final DateTime? observationTime;
+  final String source;
+  final String provenance;
   final double? temperatureC;
   final double? humidityPercent;
   final double? precipitationMm;
@@ -608,6 +618,8 @@ class CurrentWeatherSummary {
 
   const CurrentWeatherSummary({
     this.observationTime,
+    this.source = 'OPENWEATHER_OBSERVATION',
+    this.provenance = 'OPENWEATHER_OBSERVATION',
     this.temperatureC,
     this.humidityPercent,
     this.precipitationMm,
@@ -621,6 +633,8 @@ class CurrentWeatherSummary {
     return CurrentWeatherSummary(
       observationTime:
           json['observation_time'] != null ? DateTime.tryParse(json['observation_time'] as String) : null,
+      source: json['source'] as String? ?? 'OPENWEATHER_OBSERVATION',
+      provenance: json['provenance'] as String? ?? 'OPENWEATHER_OBSERVATION',
       temperatureC: (json['temperature_c'] as num?)?.toDouble(),
       humidityPercent: (json['humidity_percent'] as num?)?.toDouble(),
       precipitationMm: (json['precipitation_mm'] as num?)?.toDouble(),
@@ -632,6 +646,8 @@ class CurrentWeatherSummary {
 
   Map<String, dynamic> toJson() => {
     'observation_time': observationTime?.toIso8601String(),
+    'source': source,
+    'provenance': provenance,
     'temperature_c': temperatureC,
     'humidity_percent': humidityPercent,
     'precipitation_mm': precipitationMm,
@@ -644,6 +660,7 @@ class CurrentWeatherSummary {
 /// Weather forecast summary.
 class ForecastSummary {
   final int forecastDaysCount;
+  final String provenance;
   final double? next48hRainExpectedMm;
   final double? tempMinC;
   final double? tempMaxC;
@@ -651,6 +668,7 @@ class ForecastSummary {
 
   const ForecastSummary({
     this.forecastDaysCount = 0,
+    this.provenance = 'OPENWEATHER_FORECAST',
     this.next48hRainExpectedMm,
     this.tempMinC,
     this.tempMaxC,
@@ -661,6 +679,7 @@ class ForecastSummary {
     if (json == null) return const ForecastSummary();
     return ForecastSummary(
       forecastDaysCount: (json['forecast_days_count'] as num?)?.toInt() ?? 0,
+      provenance: json['provenance'] as String? ?? 'OPENWEATHER_FORECAST',
       next48hRainExpectedMm: (json['next_48h_rain_expected_mm'] as num?)?.toDouble(),
       tempMinC: (json['temp_min_c'] as num?)?.toDouble(),
       tempMaxC: (json['temp_max_c'] as num?)?.toDouble(),
@@ -671,6 +690,7 @@ class ForecastSummary {
 
   Map<String, dynamic> toJson() => {
     'forecast_days_count': forecastDaysCount,
+    'provenance': provenance,
     'next_48h_rain_expected_mm': next48hRainExpectedMm,
     'temp_min_c': tempMinC,
     'temp_max_c': tempMaxC,
@@ -684,12 +704,14 @@ class ClimateNormalsSummary {
   final double? monsoonRainfallMm;
   final double? meanTemperatureC;
   final String? potentialWaterStressIndicator;
+  final String provenance;
 
   const ClimateNormalsSummary({
     this.annualRainfallMm,
     this.monsoonRainfallMm,
     this.meanTemperatureC,
     this.potentialWaterStressIndicator,
+    this.provenance = 'NASA_POWER_CLIMATOLOGY',
   });
 
   factory ClimateNormalsSummary.fromJson(Map<String, dynamic>? json) {
@@ -699,6 +721,7 @@ class ClimateNormalsSummary {
       monsoonRainfallMm: (json['monsoon_rainfall_mm'] as num?)?.toDouble(),
       meanTemperatureC: (json['mean_temperature_c'] as num?)?.toDouble(),
       potentialWaterStressIndicator: json['potential_water_stress_indicator'] as String?,
+      provenance: json['provenance'] as String? ?? 'NASA_POWER_CLIMATOLOGY',
     );
   }
 
@@ -707,6 +730,7 @@ class ClimateNormalsSummary {
     'monsoon_rainfall_mm': monsoonRainfallMm,
     'mean_temperature_c': meanTemperatureC,
     'potential_water_stress_indicator': potentialWaterStressIndicator,
+    'provenance': provenance,
   };
 }
 
@@ -805,6 +829,7 @@ class CropSuitabilityItem {
 /// Domain summary for Deterministic Crop Context.
 class CropContextDomainSummary {
   final DataAvailabilityState availabilityState;
+  final String provenance;
   final DateTime? evaluatedAt;
   final String? targetSeason;
   final String? talukaResolved;
@@ -818,6 +843,7 @@ class CropContextDomainSummary {
 
   const CropContextDomainSummary({
     required this.availabilityState,
+    this.provenance = 'CROP_DECISION_ENGINE',
     this.evaluatedAt,
     this.targetSeason,
     this.talukaResolved,
@@ -836,6 +862,7 @@ class CropContextDomainSummary {
     }
     return CropContextDomainSummary(
       availabilityState: DataAvailabilityState.fromString(json['availability_state'] as String?),
+      provenance: json['provenance'] as String? ?? 'CROP_DECISION_ENGINE',
       evaluatedAt: json['evaluated_at'] != null ? DateTime.tryParse(json['evaluated_at'] as String) : null,
       targetSeason: json['target_season'] as String?,
       talukaResolved: json['taluka_resolved'] as String?,
@@ -864,6 +891,7 @@ class CropContextDomainSummary {
 
   Map<String, dynamic> toJson() => {
     'availability_state': availabilityState.toApiString(),
+    'provenance': provenance,
     'evaluated_at': evaluatedAt?.toIso8601String(),
     'target_season': targetSeason,
     'taluka_resolved': talukaResolved,
@@ -921,6 +949,8 @@ class FarmHealthSnapshotResponse {
   final WeatherDomainSummary weather;
   final CropContextDomainSummary cropContext;
   final String governanceNotice;
+  final bool isFromCache;
+  final DateTime? cachedAt;
 
   const FarmHealthSnapshotResponse({
     this.contractVersion = '1.0',
@@ -941,6 +971,8 @@ class FarmHealthSnapshotResponse {
     required this.cropContext,
     this.governanceNotice =
         'CropNet AI provides independent, evidence-gated agricultural domain summaries. In accordance with institutional agricultural guidelines, no universal health score is computed.',
+    this.isFromCache = false,
+    this.cachedAt,
   });
 
   factory FarmHealthSnapshotResponse.fromJson(Map<String, dynamic> json) {
@@ -967,6 +999,52 @@ class FarmHealthSnapshotResponse {
       cropContext: CropContextDomainSummary.fromJson(_asStringMap(json['crop_context'])),
       governanceNotice: json['governance_notice'] as String? ??
           'CropNet AI provides independent, evidence-gated agricultural domain summaries. In accordance with institutional agricultural guidelines, no universal health score is computed.',
+      isFromCache: json['is_from_cache'] as bool? ?? false,
+      cachedAt: json['cached_at'] != null ? DateTime.tryParse(json['cached_at'] as String) : null,
+    );
+  }
+
+  FarmHealthSnapshotResponse copyWith({
+    String? contractVersion,
+    String? farmId,
+    String? farmName,
+    String? ownerId,
+    String? taluka,
+    String? district,
+    String? state,
+    double? calculatedAreaHectares,
+    double? calculatedAreaAcres,
+    DateTime? snapshotTimestamp,
+    OverallEvidenceOverview? overallEvidenceOverview,
+    SoilDomainSummary? soil,
+    WaterDomainSummary? water,
+    SatelliteDomainSummary? satellite,
+    WeatherDomainSummary? weather,
+    CropContextDomainSummary? cropContext,
+    String? governanceNotice,
+    bool? isFromCache,
+    DateTime? cachedAt,
+  }) {
+    return FarmHealthSnapshotResponse(
+      contractVersion: contractVersion ?? this.contractVersion,
+      farmId: farmId ?? this.farmId,
+      farmName: farmName ?? this.farmName,
+      ownerId: ownerId ?? this.ownerId,
+      taluka: taluka ?? this.taluka,
+      district: district ?? this.district,
+      state: state ?? this.state,
+      calculatedAreaHectares: calculatedAreaHectares ?? this.calculatedAreaHectares,
+      calculatedAreaAcres: calculatedAreaAcres ?? this.calculatedAreaAcres,
+      snapshotTimestamp: snapshotTimestamp ?? this.snapshotTimestamp,
+      overallEvidenceOverview: overallEvidenceOverview ?? this.overallEvidenceOverview,
+      soil: soil ?? this.soil,
+      water: water ?? this.water,
+      satellite: satellite ?? this.satellite,
+      weather: weather ?? this.weather,
+      cropContext: cropContext ?? this.cropContext,
+      governanceNotice: governanceNotice ?? this.governanceNotice,
+      isFromCache: isFromCache ?? this.isFromCache,
+      cachedAt: cachedAt ?? this.cachedAt,
     );
   }
 
@@ -988,6 +1066,8 @@ class FarmHealthSnapshotResponse {
     'weather': weather.toJson(),
     'crop_context': cropContext.toJson(),
     'governance_notice': governanceNotice,
+    'is_from_cache': isFromCache,
+    'cached_at': cachedAt?.toIso8601String(),
   };
 
   /// Generates the chronological farm observation timeline from domain timestamps.
@@ -1023,7 +1103,7 @@ class FarmHealthSnapshotResponse {
         state: water.availabilityState,
         icon: Icons.water_drop_rounded,
         color: const Color(0xFF0288D1),
-        provenance: water.laboratoryName != null ? 'LABORATORY_CONFIRMED' : 'REGISTERED_SOURCES',
+        provenance: water.provenance ?? (water.laboratoryName != null ? 'LABORATORY_MEASURED' : 'FARMER_REPORTED'),
       ));
     }
 
@@ -1040,7 +1120,7 @@ class FarmHealthSnapshotResponse {
         state: satellite.availabilityState,
         icon: Icons.satellite_alt_rounded,
         color: const Color(0xFF388E3C),
-        provenance: satellite.sensor ?? 'Sentinel-2 L2A',
+        provenance: satellite.provenance ?? 'COPERNICUS_SENTINEL_2_L2A',
       ));
     }
 
@@ -1057,7 +1137,7 @@ class FarmHealthSnapshotResponse {
         state: weather.availabilityState,
         icon: Icons.cloud_queue_rounded,
         color: const Color(0xFF0288D1),
-        provenance: 'OpenWeather + NASA POWER',
+        provenance: '${weather.currentWeather.provenance} + ${weather.climateNormals.provenance}',
       ));
     }
 
@@ -1073,7 +1153,7 @@ class FarmHealthSnapshotResponse {
         state: cropContext.availabilityState,
         icon: Icons.agriculture_rounded,
         color: const Color(0xFF689F38),
-        provenance: 'CropNet Deterministic Decision Engine',
+        provenance: cropContext.provenance,
       ));
     }
 

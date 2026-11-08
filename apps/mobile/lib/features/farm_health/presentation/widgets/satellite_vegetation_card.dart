@@ -86,6 +86,12 @@ class SatelliteVegetationCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
+                if (satellite.provenance != null)
+                  _buildMetaChip(
+                    icon: Icons.verified_outlined,
+                    label: satellite.provenance!,
+                    color: const Color(0xFF1565C0),
+                  ),
                 if (satellite.observationDate != null)
                   _buildMetaChip(
                     icon: Icons.calendar_today_rounded,
