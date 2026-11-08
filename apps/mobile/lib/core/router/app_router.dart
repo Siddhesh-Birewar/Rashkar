@@ -17,6 +17,7 @@ import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_re
 import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_upload_screen.dart';
 import 'package:cropnet_mobile/features/water/presentation/screens/water_workspace_screen.dart';
 import 'package:cropnet_mobile/features/satellite/presentation/screens/satellite_vegetation_screen.dart';
+import 'package:cropnet_mobile/features/farm_health/presentation/screens/farm_health_dashboard_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -158,6 +159,22 @@ GoRouter createCropNetRouter({
                             builder: (context, farm) => SatelliteVegetationScreen(
                               farmId: farm.id,
                               farmName: farm.name,
+                            ),
+                          );
+                        },
+                      ),
+                      GoRoute(
+                        path: 'health',
+                        name: RouteNames.farmHealthDashboard,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) {
+                          final farmId = state.pathParameters['farmId'] ?? '';
+                          return FarmRouteResolver(
+                            farmId: farmId,
+                            featureName: 'Farm Health Dashboard',
+                            builder: (context, farm) => FarmHealthDashboardScreen(
+                              farmId: farm.id,
+                              farm: farm,
                             ),
                           );
                         },

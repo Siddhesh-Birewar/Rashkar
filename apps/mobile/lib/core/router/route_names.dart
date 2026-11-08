@@ -26,4 +26,5 @@ abstract final class RouteNames {
   // Advanced Farm Health Intelligence names
   static const String farmWater = 'farmWater';
   static const String farmVegetation = 'farmVegetation';
+  static const String farmHealthDashboard = 'farmHealthDashboard';
 }

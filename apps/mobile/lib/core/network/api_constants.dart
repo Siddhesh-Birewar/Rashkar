@@ -25,6 +25,15 @@ class ApiConstants {
   // --- Farm Endpoints ---
   static const String farms = '$apiV1Prefix/farms';
   static String farmById(String farmId) => '$apiV1Prefix/farms/$farmId';
+  static String farmHealthSnapshot(String farmId, {bool forceRefresh = false, String? targetSeason}) {
+    final queryParams = <String>[];
+    if (forceRefresh) queryParams.add('force_refresh=true');
+    if (targetSeason != null && targetSeason.isNotEmpty) {
+      queryParams.add('target_season=${Uri.encodeQueryComponent(targetSeason)}');
+    }
+    final qs = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+    return '$apiV1Prefix/farms/$farmId/health-snapshot$qs';
+  }
   static String farmSoilAnalyse(String farmId) => '$apiV1Prefix/farms/$farmId/soil/analyse';
   static String farmSoil(String farmId) => '$apiV1Prefix/farms/$farmId/soil';
   static String farmSoilHistory(String farmId) => '$apiV1Prefix/farms/$farmId/soil/history';
