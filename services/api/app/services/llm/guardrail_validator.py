@@ -138,8 +138,20 @@ class GuardrailValidator:
 
         # 1. Strip fake bibliographies/references if Qwen attempted to generate them
         cleaned_text = re.sub(r"(?i)\n*(references|citations|संदर्भ|ग्रंथसूची):\s*\n.*", "", cleaned_text, flags=re.DOTALL).strip()
+        # Clean raw Markdown heading tokens (###, ####) so text flows naturally
+        cleaned_text = re.sub(r"^\s*#{1,6}\s*", "", cleaned_text, flags=re.MULTILINE).strip()
 
-        # 2. Check Decision State & Suitability Integrity
+        # 2. Check for Leaked Python Dictionaries or JSON syntax
+        dict_pattern = re.compile(r"\{['\"].*?['\"]\s*:\s*.*?\}", re.DOTALL)
+        if dict_pattern.search(cleaned_text):
+            violations.append("Raw Python Dictionary or JSON detected in explanation output.")
+
+        # 3. Check for Leaked Internal Machine Enums
+        for raw_enum in ["REGIONAL_SCREENING_ONLY", "CONDITIONALLY_SUITABLE_PENDING_DATA", "UNSUITABLE_VERIFIED_CONSTRAINT", "DECOUPLED_FRAMEWORKS"]:
+            if raw_enum in cleaned_text:
+                violations.append(f"Raw internal enum constant '{raw_enum}' leaked into explanation text.")
+
+        # 4. Check Decision State & Suitability Integrity
         for o in resp.crop_outcomes:
             c_names = {o.crop_id.lower(), o.common_name.lower(), o.common_name.split("(")[0].strip().lower()}
             m_names = {o.marathi_name.lower()} if o.marathi_name else set()

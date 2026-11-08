@@ -222,8 +222,10 @@ def test_template_fallback_generator_en():
     assert "CropNet Agricultural Advisory" in text
     assert "baramati" in text.lower()
     assert "Pomegranate" in text
-    assert "Regional Screening" in text
-    assert "Recommended Follow-Up Diagnostic Questions" in text
+    assert "Regional assessment" in text
+    assert "diagnostic questions" in text
+    assert "###" not in text
+    assert "####" not in text
 
 
 def test_template_fallback_generator_mr():
@@ -234,7 +236,9 @@ def test_template_fallback_generator_mr():
     assert "baramati" in text.lower() or "बारामती" in text
     assert "डाळिंब" in text
     assert "प्रादेशिक छाननी" in text
-    assert "आवश्यक प्रश्न" in text
+    assert "प्रश्नांची उत्तरे" in text
+    assert "###" not in text
+    assert "####" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -367,3 +371,110 @@ def test_live_ollama_qwen3_8b_integration():
     assert data["decision_id"] == decision.decision_id
     assert len(data["explanation_text"]) > 20
     assert data["generation_source"] in ("llm_qwen3_8b", "deterministic_fallback")
+    assert "structured_card" in data
+    assert data["structured_card"] is not None
+
+
+# ---------------------------------------------------------------------------
+# 6. Phase 5.8.1 Formatting, Sanitization & Structured Response Tests
+# ---------------------------------------------------------------------------
+
+def test_guardrail_validator_reject_raw_python_dict():
+    """Verify that leaked raw Python dictionaries are rejected by guardrails."""
+    decision = _create_sample_decision("chickpea", ph=7.2, taluka="Baramati")
+    leaked_dict_text = (
+        "Chickpea is conditionally suitable for your farm. "
+        "Irrigation guidance: {'management_strategy': 'DECOUPLED_FRAMEWORKS', 'framework': 'ICRISAT'}. "
+        "Please check soil drainage."
+    )
+    result = GuardrailValidator.validate(leaked_dict_text, decision, language="en")
+    assert result.is_valid is False
+    assert any("Raw Python Dictionary or JSON" in v for v in result.violations)
+
+
+def test_guardrail_validator_reject_raw_json():
+    """Verify that raw JSON blocks are rejected by guardrails."""
+    decision = _create_sample_decision("chickpea", ph=7.2, taluka="Baramati")
+    leaked_json_text = (
+        'Here is your result: {"crop": "chickpea", "status": "regional_screening"} '
+        'Verify your soil.'
+    )
+    result = GuardrailValidator.validate(leaked_json_text, decision, language="en")
+    assert result.is_valid is False
+    assert any("Raw Python Dictionary or JSON" in v for v in result.violations)
+
+
+def test_guardrail_validator_reject_raw_enum_codes():
+    """Verify that raw internal enum constants like REGIONAL_SCREENING_ONLY are rejected."""
+    decision = _create_sample_decision("chickpea", ph=7.2, taluka="Baramati")
+    raw_enum_text = (
+        "Your chickpea evaluation is in REGIONAL_SCREENING_ONLY state. "
+        "Please test soil."
+    )
+    result = GuardrailValidator.validate(raw_enum_text, decision, language="en")
+    assert result.is_valid is False
+    assert any("Raw internal enum constant" in v for v in result.violations)
+
+
+def test_chickpea_decoupled_irrigation_guidance_no_raw_dict():
+    """Verify that chickpea decoupled irrigation frameworks are cleanly formatted without dict syntax."""
+    raw_guidance = {
+        "management_strategy": "DECOUPLED_FRAMEWORKS",
+        "icrisat_2010_framework": {
+            "source": "ICRISAT Chickpea Seed Production Manual (2010, p. 11)",
+            "rule": "1 to 2 light irrigations total at critical physiological stages: Branching and Pod-filling."
+        },
+        "mpkv_2023_framework": {
+            "source": "MPKV Research Recommendations (2023, Rec. 8, pp. 2–3)",
+            "rule": "Canal-irrigated scheduling in Plain Zone Vertisols at 20–25 DAS and 60–65 DAS."
+        },
+        "anti_blending_warning": (
+            "Do NOT combine both into 4 irrigations. Applying 4 irrigations in heavy Vertisols causes "
+            "excessive vegetative growth, soil saturation, and destructive Fusarium wilt / collar rot."
+        )
+    }
+    en_formatted = TemplateFallbackGenerator.format_irrigation_guidance(raw_guidance, language="en")
+    assert "{" not in en_formatted
+    assert "}" not in en_formatted
+    assert "management_strategy" not in en_formatted
+    assert "ICRISAT Framework" in en_formatted
+    assert "MPKV Framework" in en_formatted
+    assert "Do NOT combine both into 4 irrigations" in en_formatted
+
+    mr_formatted = TemplateFallbackGenerator.format_irrigation_guidance(raw_guidance, language="mr")
+    assert "{" not in mr_formatted
+    assert "}" not in mr_formatted
+    assert "ICRISAT पद्धत" in mr_formatted
+    assert "MPKV पद्धत" in mr_formatted
+
+
+def test_structured_advisory_card_generation():
+    """Verify that StructuredAdvisoryCard generates all 6 sections with grounded observations."""
+    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati")
+    card = TemplateFallbackGenerator.generate_structured_card(decision, language="en", focus_crop="pomegranate")
+    assert card is not None
+    assert "Pomegranate" in card.title
+    assert len(card.direct_answer) > 10
+    assert len(card.what_this_means) > 10
+    assert card.crop_status_code == "REGIONAL_SCREENING_ONLY"
+    assert card.crop_status_label == "Regional assessment — field verification needed"
+    assert len(card.observations) >= 4
+    # Check Soil pH observation
+    ph_obs = next((o for o in card.observations if "Soil pH" in o.parameter), None)
+    assert ph_obs is not None
+    assert ph_obs.value == "6.8"
+    assert "Laboratory" in ph_obs.source or "Soil" in ph_obs.source
+    # Check next steps & evidence
+    assert len(card.next_steps) > 0
+    assert len(card.evidence_references) > 0
+
+
+def test_diagnostic_question_deduplication():
+    """Verify that follow-up diagnostic questions are not duplicated in explanation text."""
+    decision = _create_sample_decision("chickpea", ph=7.2, taluka="Baramati")
+    text_en = TemplateFallbackGenerator.generate_explanation(decision, language="en")
+    # Should contain transition invitation, not list each question
+    assert "Please answer the diagnostic questions below" in text_en
+    # The question text itself shouldn't be duplicated in text
+    for q in decision.follow_up_questions:
+        assert q.agronomic_rationale not in text_en

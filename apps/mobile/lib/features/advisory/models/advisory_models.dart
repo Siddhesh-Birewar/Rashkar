@@ -21,6 +21,24 @@ enum DecisionState {
       orElse: () => DecisionState.abstainInsufficientEvidence,
     );
   }
+
+  /// Farmer-friendly status labels in English and Marathi (Phase 5.8.1 UX)
+  String getFarmerFriendlyLabel(bool isMr) {
+    switch (this) {
+      case DecisionState.verifiedSuitable:
+        return isMr ? 'आपल्या शेतासाठी प्रमाणित अनुकूल' : 'Verified suitable for your farm';
+      case DecisionState.regionalScreeningOnly:
+        return isMr ? 'प्रादेशिक छाननी — प्रत्यक्ष शेत पडताळणी आवश्यक' : 'Regional assessment — field verification needed';
+      case DecisionState.conditionallySuitablePendingData:
+        return isMr ? 'सशर्त अनुकूल — शेतातील काही चाचण्या प्रलंबित' : 'Conditionally suitable — pending farm measurements';
+      case DecisionState.requiresRegionalValidation:
+        return isMr ? 'स्थानिक कृषी-हवामान पडताळणी आवश्यक' : 'Requires local agroecological validation';
+      case DecisionState.unsuitableVerifiedConstraint:
+        return isMr ? 'अयोग्य — कृषी मर्यादा आढळली' : 'Not suitable — agronomic constraint identified';
+      case DecisionState.abstainInsufficientEvidence:
+        return isMr ? 'माहिती अपुरी — शेताची सविस्तर माहिती आवश्यक' : 'Insufficient evidence — farm details required';
+    }
+  }
 }
 
 /// Canonical 4-tier evidence gating classifications.
@@ -782,6 +800,104 @@ class ConversationRequest {
   }
 }
 
+/// Individual verified agronomic observation with source provenance.
+class AdvisoryObservationItem {
+  final String parameter;
+  final String value;
+  final String source;
+  final String status;
+
+  const AdvisoryObservationItem({
+    required this.parameter,
+    required this.value,
+    required this.source,
+    this.status = 'available',
+  });
+
+  factory AdvisoryObservationItem.fromJson(Map<String, dynamic> json) {
+    return AdvisoryObservationItem(
+      parameter: json['parameter'] as String? ?? '',
+      value: json['value'] as String? ?? '',
+      source: json['source'] as String? ?? '',
+      status: json['status'] as String? ?? 'available',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'parameter': parameter,
+      'value': value,
+      'source': source,
+      'status': status,
+    };
+  }
+}
+
+/// Structured farmer-facing advisory card matching the 6 standard UI sections.
+class StructuredAdvisoryCard {
+  final String title;
+  final String directAnswer;
+  final String whatThisMeans;
+  final String? cropStatusLabel;
+  final String? cropStatusCode;
+  final List<AdvisoryObservationItem> observations;
+  final List<String> whatNeedsAttention;
+  final List<String> nextSteps;
+  final List<String> evidenceReferences;
+
+  const StructuredAdvisoryCard({
+    required this.title,
+    required this.directAnswer,
+    required this.whatThisMeans,
+    this.cropStatusLabel,
+    this.cropStatusCode,
+    this.observations = const [],
+    this.whatNeedsAttention = const [],
+    this.nextSteps = const [],
+    this.evidenceReferences = const [],
+  });
+
+  factory StructuredAdvisoryCard.fromJson(Map<String, dynamic> json) {
+    return StructuredAdvisoryCard(
+      title: json['title'] as String? ?? '',
+      directAnswer: json['direct_answer'] as String? ?? '',
+      whatThisMeans: json['what_this_means'] as String? ?? '',
+      cropStatusLabel: json['crop_status_label'] as String?,
+      cropStatusCode: json['crop_status_code'] as String?,
+      observations: (json['observations'] as List<dynamic>?)
+              ?.map((e) => AdvisoryObservationItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      whatNeedsAttention: (json['what_needs_attention'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      nextSteps: (json['next_steps'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      evidenceReferences: (json['evidence_references'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'direct_answer': directAnswer,
+      'what_this_means': whatThisMeans,
+      if (cropStatusLabel != null) 'crop_status_label': cropStatusLabel,
+      if (cropStatusCode != null) 'crop_status_code': cropStatusCode,
+      'observations': observations.map((o) => o.toJson()).toList(),
+      'what_needs_attention': whatNeedsAttention,
+      'next_steps': nextSteps,
+      'evidence_references': evidenceReferences,
+    };
+  }
+}
+
 /// Natural language explanation response with strictly bound factual metadata.
 class AgriculturalExplanationResponse {
   final String decisionId;
@@ -793,6 +909,7 @@ class AgriculturalExplanationResponse {
   final Map<String, String> decisionStateSummary;
   final List<CitationMetadata> authoritativeCitations;
   final List<FollowUpQuestion> followUpQuestions;
+  final StructuredAdvisoryCard? structuredCard;
   final String governanceNotice;
 
   const AgriculturalExplanationResponse({
@@ -805,6 +922,7 @@ class AgriculturalExplanationResponse {
     this.decisionStateSummary = const {},
     this.authoritativeCitations = const [],
     this.followUpQuestions = const [],
+    this.structuredCard,
     this.governanceNotice =
         'CropNet AI explanations are strictly derived from validated deterministic agronomic decisions.',
   });
@@ -816,6 +934,11 @@ class AgriculturalExplanationResponse {
       for (final e in map.entries) {
         summary[e.key] = e.value.toString();
       }
+    }
+
+    StructuredAdvisoryCard? card;
+    if (json['structured_card'] is Map) {
+      card = StructuredAdvisoryCard.fromJson(json['structured_card'] as Map<String, dynamic>);
     }
 
     return AgriculturalExplanationResponse(
@@ -837,6 +960,7 @@ class AgriculturalExplanationResponse {
               ?.map((e) => FollowUpQuestion.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      structuredCard: card,
       governanceNotice: json['governance_notice'] as String? ?? '',
     );
   }
@@ -853,6 +977,7 @@ class AgriculturalExplanationResponse {
       'authoritative_citations':
           authoritativeCitations.map((c) => c.toJson()).toList(),
       'follow_up_questions': followUpQuestions.map((f) => f.toJson()).toList(),
+      if (structuredCard != null) 'structured_card': structuredCard!.toJson(),
       'governance_notice': governanceNotice,
     };
   }

@@ -253,5 +253,75 @@ void main() {
         throwsA(isA<RequestTimeoutException>()),
       );
     });
+
+    test('StructuredAdvisoryCard serializes and deserializes accurately', () {
+      final cardJson = {
+        'title': 'Chickpea Agronomic Feasibility Assessment (Baramati)',
+        'direct_answer': 'Chickpea has passed regional-level screening for the Baramati area.',
+        'what_this_means': 'Regional screening is an initial assessment based on agroecological zone data.',
+        'crop_status_label': 'Regional assessment — field verification needed',
+        'crop_status_code': 'REGIONAL_SCREENING_ONLY',
+        'observations': [
+          {
+            'parameter': 'Soil pH',
+            'value': '7.8',
+            'source': 'Soil Laboratory Report',
+            'status': 'available',
+          }
+        ],
+        'what_needs_attention': [
+          'Heavy clay soil requires verified drainage to prevent collar rot.'
+        ],
+        'next_steps': [
+          'Answer diagnostic follow-up questions below.'
+        ],
+        'evidence_references': [
+          'ICRISAT — Chickpea Seed Production Manual (2010)'
+        ],
+      };
+
+      final card = StructuredAdvisoryCard.fromJson(cardJson);
+      expect(card.title, 'Chickpea Agronomic Feasibility Assessment (Baramati)');
+      expect(card.directAnswer, contains('regional-level screening'));
+      expect(card.cropStatusLabel, 'Regional assessment — field verification needed');
+      expect(card.cropStatusCode, 'REGIONAL_SCREENING_ONLY');
+      expect(card.observations.length, 1);
+      expect(card.observations.first.parameter, 'Soil pH');
+      expect(card.observations.first.value, '7.8');
+      expect(card.whatNeedsAttention.length, 1);
+      expect(card.nextSteps.length, 1);
+      expect(card.evidenceReferences.length, 1);
+
+      final serialized = card.toJson();
+      expect(serialized['crop_status_code'], 'REGIONAL_SCREENING_ONLY');
+      expect(serialized['observations'], isNotEmpty);
+    });
+
+    test('DecisionState friendly labels mapped for English and Marathi', () {
+      expect(
+        DecisionState.verifiedSuitable.getFarmerFriendlyLabel(false),
+        'Verified suitable for your farm',
+      );
+      expect(
+        DecisionState.verifiedSuitable.getFarmerFriendlyLabel(true),
+        'आपल्या शेतासाठी प्रमाणित अनुकूल',
+      );
+      expect(
+        DecisionState.regionalScreeningOnly.getFarmerFriendlyLabel(false),
+        'Regional assessment — field verification needed',
+      );
+      expect(
+        DecisionState.regionalScreeningOnly.getFarmerFriendlyLabel(true),
+        'प्रादेशिक छाननी — प्रत्यक्ष शेत पडताळणी आवश्यक',
+      );
+      expect(
+        DecisionState.unsuitableVerifiedConstraint.getFarmerFriendlyLabel(false),
+        'Not suitable — agronomic constraint identified',
+      );
+      expect(
+        DecisionState.unsuitableVerifiedConstraint.getFarmerFriendlyLabel(true),
+        'अयोग्य — कृषी मर्यादा आढळली',
+      );
+    });
   });
 }

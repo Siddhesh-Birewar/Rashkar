@@ -86,6 +86,7 @@ class AgriculturalExplanationService:
         citations = self._extract_citations(decision)
         states_summary = self._extract_decision_summary(decision)
         follow_ups = decision.follow_up_questions
+        card = TemplateFallbackGenerator.generate_structured_card(decision, language=lang, focus_crop=req.focus_crop)
 
         # 2. Check Ollama availability
         if not self.ollama.is_available() or not self.ollama.is_model_available():
@@ -102,7 +103,8 @@ class AgriculturalExplanationService:
                 validation_warnings=["Ollama service or Qwen3:8B model is offline; executed deterministic fallback"],
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         # 3. Construct restricted prompt
@@ -136,7 +138,8 @@ class AgriculturalExplanationService:
                 validation_warnings=[f"Ollama inference failed ({err}); executed deterministic fallback"],
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         raw_content = llm_res["content"]
@@ -157,7 +160,8 @@ class AgriculturalExplanationService:
                 validation_warnings=val_result.violations,
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         # 6. Success: return validated LLM explanation
@@ -170,7 +174,8 @@ class AgriculturalExplanationService:
             validation_warnings=[],
             decision_state_summary=states_summary,
             authoritative_citations=citations,
-            follow_up_questions=follow_ups
+            follow_up_questions=follow_ups,
+            structured_card=card
         )
 
     def handle_conversation(
@@ -204,6 +209,7 @@ class AgriculturalExplanationService:
         citations = self._extract_citations(current_decision)
         states_summary = self._extract_decision_summary(current_decision)
         follow_ups = current_decision.follow_up_questions
+        card = TemplateFallbackGenerator.generate_structured_card(current_decision, language=lang)
 
         # 3. If Ollama is offline, return template explanation
         if not self.ollama.is_available() or not self.ollama.is_model_available():
@@ -219,7 +225,8 @@ class AgriculturalExplanationService:
                 validation_warnings=["Ollama unavailable for conversational dialogue; executed deterministic fallback"],
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         # 4. Construct conversational dialogue prompt
@@ -259,7 +266,8 @@ class AgriculturalExplanationService:
                 validation_warnings=[f"Ollama conversation failed ({err}); executed deterministic fallback"],
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         # 6. Guardrail validation
@@ -281,7 +289,8 @@ class AgriculturalExplanationService:
                 validation_warnings=val_result.violations,
                 decision_state_summary=states_summary,
                 authoritative_citations=citations,
-                follow_up_questions=follow_ups
+                follow_up_questions=follow_ups,
+                structured_card=card
             )
 
         return AgriculturalExplanationResponse(
@@ -293,5 +302,6 @@ class AgriculturalExplanationService:
             validation_warnings=[],
             decision_state_summary=states_summary,
             authoritative_citations=citations,
-            follow_up_questions=follow_ups
+            follow_up_questions=follow_ups,
+            structured_card=card
         )

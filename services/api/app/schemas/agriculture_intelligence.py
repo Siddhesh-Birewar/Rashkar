@@ -266,6 +266,31 @@ class ConversationRequest(BaseModel):
     submitted_answers: Optional[Dict[str, Any]] = Field(None, description="Optional diagnostic parameter updates to trigger deterministic re-evaluation")
 
 
+class AdvisoryObservationItem(BaseModel):
+    """
+    Individual verified agronomic observation with source provenance.
+    """
+    parameter: str = Field(..., description="Observed parameter name (e.g. Soil pH, Nitrogen, Satellite NDVI)")
+    value: str = Field(..., description="Observed value or 'Untested / Pending'")
+    source: str = Field(..., description="Source institution or sensor (e.g. SoilGrids, Lab Report, Sentinel-2)")
+    status: str = Field(default="available", description="'available', 'missing', or 'untested'")
+
+
+class StructuredAdvisoryCard(BaseModel):
+    """
+    Structured farmer-facing advisory card matching the 6 standard UI sections.
+    """
+    title: str = Field(..., description="Advisory card title")
+    direct_answer: str = Field(..., description="Short, direct answer to the farmer's question")
+    what_this_means: str = Field(..., description="Understandable 2-3 sentence explanation of the finding")
+    crop_status_label: Optional[str] = Field(None, description="Farmer-friendly decision status label")
+    crop_status_code: Optional[str] = Field(None, description="Underlying machine-readable DecisionState code")
+    observations: List[AdvisoryObservationItem] = Field(default_factory=list, description="Verified actual observations and sensor data")
+    what_needs_attention: List[str] = Field(default_factory=list, description="Key limiting factors, missing info, or constraints")
+    next_steps: List[str] = Field(default_factory=list, description="Numbered recommended actions")
+    evidence_references: List[str] = Field(default_factory=list, description="Authoritative institutional source references")
+
+
 class AgriculturalExplanationResponse(BaseModel):
     """
     Validated natural language explanation response with strictly bound factual metadata.
@@ -279,6 +304,7 @@ class AgriculturalExplanationResponse(BaseModel):
     decision_state_summary: Dict[str, str] = Field(default_factory=dict, description="Crop ID to machine-readable decision state mapping")
     authoritative_citations: List[CitationMetadata] = Field(default_factory=list, description="Institutional citations attached directly from deterministic engine")
     follow_up_questions: List[FollowUpQuestion] = Field(default_factory=list, description="Targeted follow-up questions from deterministic engine")
+    structured_card: Optional[StructuredAdvisoryCard] = Field(default=None, description="Optional structured advisory card for rich native UI rendering")
     governance_notice: str = (
         "CropNet AI explanations are strictly derived from validated deterministic agronomic decisions. "
         "The language model is a communication layer and does not establish agronomic suitability or thresholds."
