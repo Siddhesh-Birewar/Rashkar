@@ -38,6 +38,18 @@ class MappedSoilZoneIntersection(BaseModel):
     fractional_area_coverage: float = Field(ge=0.0, le=1.0)
     soil_order_taxonomy: Optional[str] = None
 
+class DepthStratifiedSoilObservation(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    depth_interval: str  # "0-5cm", "5-15cm", "15-30cm", "30-60cm"
+    ph: Optional[NumericSoilProperty] = None
+    organic_carbon_pct: Optional[NumericSoilProperty] = None
+    clay_pct: Optional[NumericSoilProperty] = None
+    sand_pct: Optional[NumericSoilProperty] = None
+    silt_pct: Optional[NumericSoilProperty] = None
+    cation_exchange_capacity_cmol_kg: Optional[NumericSoilProperty] = None
+    total_nitrogen_g_kg: Optional[NumericSoilProperty] = None
+
 class UnifiedSoilProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,7 +64,7 @@ class UnifiedSoilProfile(BaseModel):
     spatial_coverage_status: str  # "pilot_taluka_covered", "regional_extrapolation", "unsupported"
     mapped_zones: List[MappedSoilZoneIntersection] = Field(default_factory=list)
 
-    # Physical & chemical properties
+    # Physical & chemical properties (primary topsoil interval)
     ph: NumericSoilProperty
     organic_carbon_pct: NumericSoilProperty
     clay_pct: NumericSoilProperty
@@ -61,6 +73,9 @@ class UnifiedSoilProfile(BaseModel):
     usda_texture_class: CategoricalSoilProperty
     cation_exchange_capacity_cmol_kg: NumericSoilProperty
     total_nitrogen_g_kg: NumericSoilProperty
+
+    # Multiple depth-stratified layers (0-5cm, 5-15cm, etc.)
+    depth_observations: List[DepthStratifiedSoilObservation] = Field(default_factory=list)
 
     # Strictly unavailable in current CropNet v1 feeds
     available_nitrogen_kg_ha: Optional[NumericSoilProperty] = Field(default=None)

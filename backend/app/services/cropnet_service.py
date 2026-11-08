@@ -6,7 +6,8 @@ from backend.app.schemas.soil import (
     NumericSoilProperty,
     CategoricalSoilProperty,
     MappedSoilZoneIntersection,
-    SoilVerificationStatus
+    SoilVerificationStatus,
+    DepthStratifiedSoilObservation
 )
 from backend.app.core.config import settings
 from backend.app.core.timezone import now_utc
@@ -142,7 +143,64 @@ class CropNetService:
             available_potassium_kg_ha=None,
             electrical_conductivity_ds_m=None,
             soil_depth_to_bedrock_cm=None,
-            plant_available_water_capacity_mm=None
+            plant_available_water_capacity_mm=None,
+            # Depth-stratified multi-layer observations
+            depth_observations=[
+                DepthStratifiedSoilObservation(
+                    depth_interval="0-5cm",
+                    ph=NumericSoilProperty(
+                        value=ph_val,
+                        unit="pH_scale",
+                        depth_interval="0-5cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster",
+                        spatial_resolution_m=250,
+                        uncertainty_lower_bound=ph_val - 0.35,
+                        uncertainty_upper_bound=ph_val + 0.35
+                    ),
+                    organic_carbon_pct=NumericSoilProperty(
+                        value=0.62 if is_vertisol else 0.95,
+                        unit="percent",
+                        depth_interval="0-5cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster"
+                    ),
+                    clay_pct=NumericSoilProperty(
+                        value=clay_val - 2.0,
+                        unit="percent",
+                        depth_interval="0-5cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster"
+                    )
+                ),
+                DepthStratifiedSoilObservation(
+                    depth_interval="5-15cm",
+                    ph=NumericSoilProperty(
+                        value=ph_val + 0.1,
+                        unit="pH_scale",
+                        depth_interval="5-15cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster",
+                        spatial_resolution_m=250,
+                        uncertainty_lower_bound=ph_val - 0.4,
+                        uncertainty_upper_bound=ph_val + 0.4
+                    ),
+                    organic_carbon_pct=NumericSoilProperty(
+                        value=0.48 if is_vertisol else 0.75,
+                        unit="percent",
+                        depth_interval="5-15cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster"
+                    ),
+                    clay_pct=NumericSoilProperty(
+                        value=clay_val + 2.0,
+                        unit="percent",
+                        depth_interval="5-15cm",
+                        verification_status=SoilVerificationStatus.MAP_DERIVED_ESTIMATE,
+                        source_id="SoilGrids_v2_Pilot_Raster"
+                    )
+                )
+            ]
         )
 
     @staticmethod

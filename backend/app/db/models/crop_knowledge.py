@@ -13,6 +13,7 @@ class CanonicalCropMasterModel(Base):
     crop_category = Column(String(50), nullable=False)  # oilseed, fibre, cereal, millet, pulse, commercial, vegetable, fruit
     standard_season = Column(String(50), nullable=False)  # kharif, rabi, summer, perennial
     is_pioneer_pilot_crop = Column(Boolean, default=False)  # true for Soybean, Cotton, Jowar, Sugarcane
+    support_level = Column(String(50), default="data_limited")  # rule_and_baseline_supported, advisory_only, data_limited, unsupported
     apy_alias_list = Column(JSON, default=list)  # aliases found in APY/OGD records
     created_at = Column(DateTime, default=now_utc)
 

@@ -120,7 +120,8 @@ class YieldRiskEngine:
         district: str = "Pune",
         taluka: str = "Baramati",
         farmer_confirmed_stage: Optional[str] = None,
-        weather_summary: Optional[Dict[str, Any]] = None
+        weather_summary: Optional[Dict[str, Any]] = None,
+        soil_profile_override: Optional[UnifiedSoilProfile] = None
     ) -> Dict[str, Any]:
         """
         Evaluate multi-dimensional yield risk for a crop cycle:
@@ -136,7 +137,11 @@ class YieldRiskEngine:
         )
 
         # 2. Upstream CropNet Soil Profile
-        soil_profile = CropNetService.get_soil_profile(farm_id, plot_id, taluka=taluka)
+        soil_profile = (
+            soil_profile_override
+            if soil_profile_override is not None
+            else CropNetService.get_soil_profile(farm_id, plot_id, taluka=taluka)
+        )
 
         # 3. Weather defaults if not supplied by caller
         if not weather_summary:
