@@ -159,14 +159,22 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
   Future<void> _fetchFarmSoilProfile(String farmId) async {
     try {
       final profile = await _soilRepo.getFarmSoilProfile(farmId);
-      if (mounted && profile.ph?.value != null) {
-        final phVal = profile.ph!.value!;
-        if (phVal >= 3.0 && phVal <= 11.0) {
-          setState(() {
-            _soilPh = phVal;
-            _isLabVerifiedSoil = profile.ph!.verificationStatus == VerificationStatus.laboratoryVerified;
-          });
-          _resetConversation();
+      if (mounted) {
+        if (profile.ph?.value != null) {
+          final phVal = profile.ph!.value!;
+          if (phVal >= 3.0 && phVal <= 11.0) {
+            setState(() {
+              _soilPh = phVal;
+              _isLabVerifiedSoil = profile.ph!.verificationStatus == VerificationStatus.laboratoryVerified;
+            });
+            _resetConversation();
+          } else {
+            setState(() {
+              _soilPh = null;
+              _isLabVerifiedSoil = false;
+            });
+            _resetConversation();
+          }
         } else {
           setState(() {
             _soilPh = null;
@@ -1021,7 +1029,7 @@ class _AdvisoryScreenState extends State<AdvisoryScreen> {
                     const Icon(Icons.science, size: 13, color: Color(0xFF2E7D32)),
                     const SizedBox(width: 4),
                     Text(
-                      'pH: $phText',
+                      _soilPh != null ? 'pH: $phText' : phText,
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
                     ),
                   ],
