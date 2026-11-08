@@ -125,31 +125,31 @@ class AgriculturalExplanationService:
                 continue
 
             if param == "drainage":
-                # Poor drainage / waterlogging
+                # Good / rapid drainage (check first to handle negations like 'no standing water')
                 if any(w in msg for w in [
+                    "no standing", "not standing", "drains well", "drains fast", "good", "quick",
+                    "निचरा चांगला", "वाहून जाते", "पाणी साचत नाही"
+                ]):
+                    detected["drainage"] = "good"
+                    detected["water_table_depth"] = "deep"
+                # Poor drainage / waterlogging
+                elif any(w in msg for w in [
                     "two days", "2 days", "stays", "waterlog", "standing water", "poor",
                     "साचून", "साचते", "निचरा होत नाही", "पाणथळ", "पाणी साचते", "पाणी राहते"
                 ]):
                     detected["drainage"] = "poor"
                     detected["water_table_depth"] = "shallow"
-                # Good / rapid drainage
-                elif any(w in msg for w in [
-                    "no standing", "drains well", "drains fast", "good", "quick",
-                    "निचरा चांगला", "वाहून जाते", "पाणी साचत नाही"
-                ]):
-                    detected["drainage"] = "good"
-                    detected["water_table_depth"] = "deep"
                 # Moderate drainage
                 elif any(w in msg for w in ["moderate", "medium", "24 hours", "मध्यम"]):
                     detected["drainage"] = "moderate"
                     detected["water_table_depth"] = "moderate"
 
             elif param in ("soil_depth_cm", "depth"):
-                if any(w in msg for w in ["shallow", "< 30", "less than 30", "खोल नाही", "कमी खोल", "दगड"]):
+                if any(w in msg for w in ["shallow", "< 30", "less than 30", "खोल नाही", "कमी खोल", "दगड", "मुरमाड"]):
                     detected["soil_depth_cm"] = 25.0
                 elif any(w in msg for w in ["medium", "30 to 60", "30-60", "मध्यम"]):
                     detected["soil_depth_cm"] = 45.0
-                elif any(w in msg for w in ["deep", "> 60", "more than 60", "खोल", "भारी"]):
+                elif any(w in msg for w in ["deep", "> 60", "more than 60", "खोल", "भारी", "काळी भारी"]):
                     detected["soil_depth_cm"] = 75.0
 
             elif param == "target_bahar":
@@ -160,23 +160,174 @@ class AgriculturalExplanationService:
                 elif any(w in msg for w in ["ambia", "आंबिया"]):
                     detected["target_bahar"] = "ambia_bahar"
 
-            elif param == "electrical_conductivity_ds_m":
-                if any(w in msg for w in ["sweet", "good water", "low salt", "गोड"]):
+            elif param in ("electrical_conductivity_ds_m", "water_salinity", "salinity"):
+                if any(w in msg for w in ["sweet", "good water", "low salt", "गोड पाणी", "गोड"]):
                     detected["electrical_conductivity_ds_m"] = 0.6
-                elif any(w in msg for w in ["saline", "salty", "high salt", "खारट", "क्षार"]):
+                elif any(w in msg for w in ["saline", "salty", "high salt", "खारट पाणी", "खारट", "क्षार"]):
                     detected["electrical_conductivity_ds_m"] = 2.5
 
+            elif param in ("water_table_depth", "well_depth_m", "well_depth"):
+                if any(w in msg for w in ["deep", "300", "400", "500", "खोल", "३००", "४००"]):
+                    detected["water_table_depth"] = "deep"
+                    detected["well_depth_m"] = 100.0
+                elif any(w in msg for w in ["shallow", "20", "30", "50", "उथळ", "२०", "३०", "५०"]):
+                    detected["water_table_depth"] = "shallow"
+                    detected["well_depth_m"] = 15.0
+
+            elif param in ("irrigation_type", "irrigation_method"):
+                if any(w in msg for w in ["drip", "ठिबक"]):
+                    detected["irrigation_type"] = "drip"
+                    detected["irrigation_method"] = "drip"
+                elif any(w in msg for w in ["sprinkler", "तुषार"]):
+                    detected["irrigation_type"] = "sprinkler"
+                    detected["irrigation_method"] = "sprinkler"
+                elif any(w in msg for w in ["flood", "canal", "पाटपाणी", "प्रवाही"]):
+                    detected["irrigation_type"] = "flood"
+                    detected["irrigation_method"] = "flood"
+
         return detected
+
+    @classmethod
+    def validate_explanation_guardrails(
+        cls,
+        text: str,
+        decision: FarmEvaluationResponse,
+        language: str = "en",
+        user_message: Optional[str] = None,
+        farm_context: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Validate generated explanation against Phase 5.8.2 and Phase 6.0 agronomic guardrails:
+        1. Numerical grounding and no fabricated fertilizer dosages.
+        2. No fabricated chemical spray or pesticide concentrations (ml/L).
+        3. No diagnosing disease pathogens from satellite optical reflectance alone without scientific disclaimer.
+        4. No reversing or overriding deterministic crop suitability states.
+        """
+        result = GuardrailValidator.validate(
+            text, decision, language=language, user_message=user_message, farm_context=farm_context
+        )
+        violations = list(result.violations)
+        cleaned_text = result.cleaned_text
+        text_lower = cleaned_text.lower()
+        query_lower = (user_message or "").lower()
+
+        # Check: Satellite Pathogen Diagnosis without Scientific Disclaimer
+        pathogen_terms = [
+            "fusarium", "wilt", "blight", "telya", "root rot", "collar rot", "leaf spot", "pathogen",
+            "करपा", "उकळा", "तेलकट डाग", "मूळकूज"
+        ]
+        disclaimer_markers = [
+            "disclaimer", "cannot diagnose", "cannot identify", "not a direct", "optical reflectance",
+            "indirect indicator", "वैज्ञानिक इशारा", "निदान करू शकत नाही", "अप्रत्यक्ष दर्शक", "थेट रोग निदान नाही"
+        ]
+
+        has_disclaimer = any(d in text_lower for d in disclaimer_markers)
+        has_satellite_mention = any(s in text_lower for s in ["satellite", "sentinel", "ndvi", "ndmi", "उपग्रह", "कॅनॉपी"])
+        has_pathogen_mention = any(p in text_lower for p in pathogen_terms)
+        if has_satellite_mention and has_pathogen_mention and not has_disclaimer:
+            violations.append(
+                "Satellite Pathogen Diagnosis Guardrail Violation: Optical satellite reflectance (Sentinel-2 10m) "
+                "cannot diagnose specific disease pathogens (e.g. wilt, blight, root rot). A scientific disclaimer is mandatory."
+            )
+
+        # Check: Fabricated Chemical Pesticide / Fungicide Spray Dosages
+        import re
+        spray_pattern = re.compile(
+            r"\b\d+(?:\.\d+)?\s*(?:ml|मिली|gm|ग्रॅम|g)\s*(?:per\s*liter|/l|/liter|प्रति\s*लिटर|दर\s*लिटर)\b",
+            re.IGNORECASE
+        )
+        spray_ha_pattern = re.compile(
+            r"\b\d+(?:\.\d+)?\s*(?:ml|मिली|liters?|लिटर)\s*(?:per\s*hectare|/ha|प्रति\s*हेक्टर|दर\s*हेक्टर)\b",
+            re.IGNORECASE
+        )
+        if spray_pattern.search(cleaned_text) or spray_ha_pattern.search(cleaned_text):
+            violations.append(
+                "Fabricated Chemical Spray Measurement Detected: CropNet AI strictly prohibits inventing unverified "
+                "chemical pesticide or fungicide spray dosages or concentrations."
+            )
+
+        from cropnet.services.api.app.services.llm.guardrail_validator import GuardrailValidationResult
+        return GuardrailValidationResult(
+            is_valid=len(violations) == 0,
+            violations=violations,
+            cleaned_text=cleaned_text
+        )
+
+    @staticmethod
+    def _enrich_card_observations(
+        card: StructuredAdvisoryCard,
+        farm_context: Optional[Dict[str, Any]],
+        language: str = "en"
+    ) -> StructuredAdvisoryCard:
+        """Enrich StructuredAdvisoryCard observations with grounded multi-domain snapshot evidence."""
+        if not farm_context:
+            return card
+
+        is_mr = language == "mr"
+        from cropnet.services.api.app.schemas.agriculture_intelligence import AdvisoryObservationItem
+
+        enriched_obs = list(card.observations)
+        existing_params = {o.parameter.lower() for o in enriched_obs}
+
+        # Water EC
+        water_key = farm_context.get("water_intelligence", {}).get("key_indicators", {})
+        if water_key.get("electrical_conductivity_ds_m") is not None:
+            p_name = "पाण्याची क्षारता / EC" if is_mr else "Water Salinity (EC)"
+            if not any(k in existing_params for k in ["water salinity", "पाण्याची क्षारता", "ec"]):
+                enriched_obs.append(AdvisoryObservationItem(
+                    parameter=p_name,
+                    value=f"{water_key['electrical_conductivity_ds_m']:.2f} dS/m",
+                    source="BIS IS 11624:2019 / Water Test",
+                    status="available"
+                ))
+
+        # Satellite Canopy NDVI
+        sat_intel = farm_context.get("satellite_intelligence", {})
+        if sat_intel.get("canopy_ndvi") is not None:
+            p_name = "निव्वळ पिकाची हिरवळ (Canopy NDVI)" if is_mr else "Pure Canopy NDVI"
+            if not any("canopy" in k or "कॅनॉपी" in k or "ndvi" in k for k in existing_params):
+                enriched_obs.append(AdvisoryObservationItem(
+                    parameter=p_name,
+                    value=f"{sat_intel['canopy_ndvi']:.2f}",
+                    source="Sentinel-2 L2A Class 4",
+                    status="available"
+                ))
+
+        # Weather Temperature
+        wx_cur = farm_context.get("weather_intelligence", {}).get("current_weather", {})
+        if wx_cur.get("temperature_c") is not None:
+            p_name = "सध्याचे तापमान (Weather)" if is_mr else "Current Temperature"
+            if not any("temperature" in k or "तापमान" in k for k in existing_params):
+                enriched_obs.append(AdvisoryObservationItem(
+                    parameter=p_name,
+                    value=f"{wx_cur['temperature_c']:.1f}°C",
+                    source="OpenWeather API",
+                    status="available"
+                ))
+
+        return StructuredAdvisoryCard(
+            title=card.title,
+            direct_answer=card.direct_answer,
+            what_this_means=card.what_this_means,
+            crop_status_label=card.crop_status_label,
+            crop_status_code=card.crop_status_code,
+            observations=enriched_obs,
+            what_needs_attention=card.what_needs_attention,
+            next_steps=card.next_steps,
+            evidence_references=card.evidence_references
+        )
 
     def explain_decision(
         self,
         req: ExplainDecisionRequest,
-        db: Optional[Session] = None
+        db: Optional[Session] = None,
+        snapshot: Optional[Any] = None
     ) -> Optional[AgriculturalExplanationResponse]:
         """
         Generate a structured, farmer-friendly explanation of a validated decision.
-        Uses local Qwen3:8B with JSON-Schema-constrained generation, mandatory Pydantic validation,
-        and strict numerical/agronomic guardrails.
+        Consumes Phase 5.9 FarmHealthSnapshotResponse if provided, using local Qwen3:8B
+        with JSON-Schema-constrained generation, mandatory Pydantic validation,
+        observation enrichment, and strict numerical/agronomic guardrails.
         """
         start_t = time.time()
         # 1. Fetch validated decision from deterministic engine session store
@@ -192,15 +343,18 @@ class AgriculturalExplanationService:
         fallback_card = TemplateFallbackGenerator.generate_structured_card(decision, language=lang, focus_crop=req.focus_crop)
         fallback_text = TemplateFallbackGenerator.generate_explanation(decision, language=lang, focus_crop=req.focus_crop)
 
-        # 2. Build centralized grounded farm evidence (injecting farmer query if present)
+        # 2. Build centralized grounded farm evidence (injecting farmer query and snapshot if present)
+        snap = snapshot or getattr(req, "snapshot", None)
         farm_ctx = FarmContextBuilder.build_farm_context(
             farm_id=getattr(decision, "farm_id", None),
             db=db,
             query=req.query,
             focus_crop=req.focus_crop,
             decision=decision,
-            language=lang
+            language=lang,
+            snapshot=snap
         )
+        fallback_card = self._enrich_card_observations(fallback_card, farm_ctx, language=lang)
 
         # 3. Check Ollama availability
         if not self.ollama.is_available() or not self.ollama.is_model_available():
@@ -304,8 +458,9 @@ class AgriculturalExplanationService:
             next_s = parsed_payload.next_steps or fallback_card.next_steps
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
-            val_result = GuardrailValidator.validate(
+            val_result = self.validate_explanation_guardrails(
                 combined_prose, decision, language=lang, user_message=req.query, farm_context=farm_ctx
+            )
             )
 
             if not val_result.is_valid:
@@ -335,6 +490,7 @@ class AgriculturalExplanationService:
                 next_steps=next_s or fallback_card.next_steps,
                 evidence_references=fallback_card.evidence_references
             )
+            final_card = self._enrich_card_observations(final_card, farm_ctx, language=lang)
 
             final_explanation = f"{direct_ans}\n\n{what_means}"
             self._record_live_success(latency=elapsed)
@@ -353,8 +509,9 @@ class AgriculturalExplanationService:
             )
         else:
             # Fallback to plain prose validation (for test mocks that mock plain prose)
-            val_result = GuardrailValidator.validate(
+            val_result = self.validate_explanation_guardrails(
                 raw_content, decision, language=lang, user_message=req.query, farm_context=farm_ctx
+            )
             )
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection on generated prose: {val_result.violations}")
@@ -389,14 +546,15 @@ class AgriculturalExplanationService:
     def handle_conversation(
         self,
         req: ConversationRequest,
-        db: Optional[Session] = None
+        db: Optional[Session] = None,
+        snapshot: Optional[Any] = None
     ) -> Optional[AgriculturalExplanationResponse]:
         """
         Handle conversational dialogue or diagnostic answer submission with multi-turn understanding.
         - Natural language answers to diagnostic questions are detected and re-evaluated deterministically.
-        - Grounded farm evidence is assembled and injected into domain-aware prompts.
+        - Multi-domain snapshot context and grounded farm evidence are assembled and injected into domain-aware prompts.
         - Answered follow-up questions are isolated and removed from follow-up chips.
-        - Ollama generates structured JSON validated by mandatory Pydantic schema and guardrails.
+        - Ollama generates structured JSON validated by mandatory Pydantic schema and Phase 6.0 guardrails.
         """
         start_t = time.time()
         # 1. Fetch current decision
@@ -431,14 +589,17 @@ class AgriculturalExplanationService:
         fallback_card = TemplateFallbackGenerator.generate_structured_card(current_decision, language=lang)
         fallback_text = TemplateFallbackGenerator.generate_explanation(current_decision, language=lang)
 
-        # 4. Build centralized grounded farm evidence
+        # 4. Build centralized grounded farm evidence (with snapshot if provided)
+        snap = snapshot or getattr(req, "snapshot", None)
         farm_ctx = FarmContextBuilder.build_farm_context(
             farm_id=getattr(current_decision, "farm_id", None),
             db=db,
             query=req.message,
             decision=current_decision,
-            language=lang
+            language=lang,
+            snapshot=snap
         )
+        fallback_card = self._enrich_card_observations(fallback_card, farm_ctx, language=lang)
 
         # 5. If Ollama is offline, return template explanation
         if not self.ollama.is_available() or not self.ollama.is_model_available():
@@ -548,7 +709,7 @@ class AgriculturalExplanationService:
             next_s = parsed_payload.next_steps or fallback_card.next_steps
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
-            val_result = GuardrailValidator.validate(
+            val_result = self.validate_explanation_guardrails(
                 combined_prose, current_decision, language=lang, user_message=req.message, farm_context=farm_ctx
             )
 
@@ -579,6 +740,7 @@ class AgriculturalExplanationService:
                 next_steps=next_s or fallback_card.next_steps,
                 evidence_references=fallback_card.evidence_references
             )
+            final_card = self._enrich_card_observations(final_card, farm_ctx, language=lang)
 
             final_explanation = f"{direct_ans}\n\n{what_means}"
             self._record_live_success(latency=elapsed)
@@ -596,8 +758,8 @@ class AgriculturalExplanationService:
                 structured_card=final_card
             )
         else:
-            # Plain prose handling (for test mocks that mock plain prose)
-            val_result = GuardrailValidator.validate(
+            # Plain prose handling (e.g. from conversational test mocks or conversational responses)
+            val_result = self.validate_explanation_guardrails(
                 raw_content, current_decision, language=lang, user_message=req.message, farm_context=farm_ctx
             )
             if not val_result.is_valid:
