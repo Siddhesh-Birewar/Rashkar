@@ -109,6 +109,7 @@ class YieldAssessment {
   final String cropCode;
   final String cropStageCode;
   final String cropStageNameEn;
+  final String? cropStageNameMr;
   final int das;
   final List<RiskDimensionItem> risks;
   final Map<String, dynamic> baseline;
@@ -118,6 +119,7 @@ class YieldAssessment {
     required this.cropCode,
     required this.cropStageCode,
     required this.cropStageNameEn,
+    this.cropStageNameMr,
     required this.das,
     required this.risks,
     required this.baseline,
@@ -131,6 +133,7 @@ class YieldAssessment {
       cropCode: json['crop_code'] ?? 'soybean',
       cropStageCode: stage['stage_code'] ?? 'VEGETATIVE',
       cropStageNameEn: stage['stage_name_en'] ?? 'Vegetative',
+      cropStageNameMr: stage['stage_name_mr'] ?? stage['stage_name_en'],
       das: stage['days_after_sowing'] ?? 45,
       risks: rawRisks.map((r) => RiskDimensionItem.fromJson(r)).toList(),
       baseline: json['yield_baseline'] ?? {},

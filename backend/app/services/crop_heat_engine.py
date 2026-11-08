@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import settings
 from backend.app.core.timezone import now_utc, now_ist
+from backend.app.services.weather_service import WeatherService
 from backend.app.db.models.farm import FarmModel, FarmPlotModel, CropCycleModel
 from backend.app.db.models.crop_knowledge import (
     CanonicalCropMasterModel,
@@ -93,9 +94,19 @@ class CropHeatEngine:
         ).first()
         critical_tmin = tmin_thresh_record.critical_threshold if tmin_thresh_record else 24.0
 
-        # 4. Forecast values (use overrides or defaults)
-        tmax_forecast = request.forecast_tmax_c if request.forecast_tmax_c is not None else 39.5
-        tmin_forecast = request.forecast_tmin_c if request.forecast_tmin_c is not None else 25.0
+        # 4. Forecast values (use overrides or live weather service for farm coordinates)
+        if request.forecast_tmax_c is not None:
+            tmax_forecast = request.forecast_tmax_c
+            tmin_forecast = request.forecast_tmin_c if request.forecast_tmin_c is not None else 24.0
+        else:
+            fc = WeatherService.get_hourly_forecast(farm.latitude, farm.longitude, horizon_hours=6)
+            pts = fc.get("hourly_points", [])
+            if pts:
+                tmax_forecast = max(p.get("air_temp_c", 33.0) for p in pts)
+                tmin_forecast = min(p.get("air_temp_c", 23.0) for p in pts)
+            else:
+                tmax_forecast = 34.0
+                tmin_forecast = 23.0
 
         # Evaluate Daytime Heat Stress Level
         tmax_diff = tmax_forecast - critical_tmax

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.core.timezone import now_utc, to_ist_iso, now_ist
 from backend.app.services.wbgt_solver import calculate_wbgt
+from backend.app.services.weather_service import WeatherService
 from backend.app.db.models.risk import WorkerHazardAuditLogModel
 from backend.app.schemas.worker_heat import (
     WorkerHeatAssessmentRequest,
@@ -58,30 +59,41 @@ class WorkerHeatEngine:
         )
         threshold_c = threshold_table.get(request.workload_category.lower(), 28.0)
 
-        # 3. Simulate or process 0-6 hour forecast sequence
-        # If no weather inputs provided, construct a representative solar and diurnal curve
+        # 3. Retrieve or process 0-6 hour forecast sequence via WeatherService
         hourly_projections: List[HourlyHeatRiskProjection] = []
         in_sun = (request.sun_exposure.lower() == "direct_sun")
 
-        # Fallback diurnal profile if external forecast feed is pending
-        base_ta = 33.0
-        base_rh = 55.0
-        base_wind = 2.0
-        base_solar = 650.0
+        if weather_hourly_override:
+            hourly_feed = weather_hourly_override
+            provider_name = "Provided Meteorological Hourly Feed"
+            data_quality_label = "VERIFIED"
+        else:
+            fc = WeatherService.get_hourly_forecast(request.latitude, request.longitude, horizon_hours=6)
+            hourly_feed = fc.get("hourly_points", [])
+            provider_name = fc.get("provider", "IMD 0.25° Gridded Climatological Normal Calibration")
+            data_quality_label = fc.get("data_quality", "LIMITED")
 
-        for h in range(7):  # 0 to 6 hours
-            if weather_hourly_override and h < len(weather_hourly_override):
-                w = weather_hourly_override[h]
-                ta = w.get("air_temp_c", base_ta)
-                rh = w.get("rh_pct", base_rh)
-                u = w.get("wind_speed_ms", base_wind)
-                sw = w.get("solar_irradiance_wm2", base_solar)
+        for h in range(7):  # 0 to 6 hours (always full 6-hour horizon)
+            if hourly_feed and h < len(hourly_feed):
+                w = hourly_feed[h]
+                ta = w.get("air_temp_c", 32.0)
+                rh = w.get("relative_humidity_pct", w.get("rh_pct", 55.0))
+                u = w.get("wind_speed_ms", 1.8)
+                raw_solar = w.get("solar_irradiance_wm2", 600.0)
+                sw = raw_solar if in_sun else 0.0
+            elif hourly_feed:
+                # Extrapolate beyond short feed
+                last_w = hourly_feed[-1]
+                ta = last_w.get("air_temp_c", 32.0)
+                rh = last_w.get("relative_humidity_pct", last_w.get("rh_pct", 55.0))
+                u = last_w.get("wind_speed_ms", 1.8)
+                raw_solar = max(0.0, last_w.get("solar_irradiance_wm2", 0.0) - (h * 20.0))
+                sw = raw_solar if in_sun else 0.0
             else:
-                # Slight diurnal increase over early afternoon
-                ta = base_ta + (h * 0.4)
-                rh = max(30.0, base_rh - (h * 1.5))
-                u = base_wind + (h * 0.1)
-                sw = max(0.0, base_solar - (h * 30.0)) if in_sun else 0.0
+                ta = 32.0 + (h * 0.4)
+                rh = max(30.0, 55.0 - (h * 1.5))
+                u = 1.8
+                sw = max(0.0, 600.0 - (h * 30.0)) if in_sun else 0.0
 
             wbgt_res = calculate_wbgt(
                 temp_c=ta,

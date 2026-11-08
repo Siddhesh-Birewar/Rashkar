@@ -83,6 +83,30 @@ class GuidedRegistrationRequest(BaseModel):
     irrigation_type: str = Field(default="rainfed")
     planted_area_acres: Optional[float] = Field(default=2.5)
 
+class FarmProfileUpdateRequest(BaseModel):
+    # Farmer fields
+    farmer_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    preferred_language: Optional[str] = None
+    
+    # Farm fields
+    farm_name: Optional[str] = None
+    district: Optional[str] = None
+    taluka: Optional[str] = None
+    village: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    total_area_acres: Optional[float] = None
+    
+    # Plot & Crop fields
+    planted_area_acres: Optional[float] = None
+    irrigation_type: Optional[str] = None
+    crop_code: Optional[str] = None
+    variety_name: Optional[str] = None
+    sowing_date: Optional[date] = None
+    season: Optional[str] = None
+    farmer_confirmed_stage: Optional[str] = None
+
 class FarmSummaryResponse(BaseModel):
     farmer_id: str
     farmer_name: str

@@ -87,3 +87,92 @@ def test_browser_api_data_fetch():
         assert "soil_summary" in summary_data
         
         browser.close()
+
+def test_browser_edit_profile_lifecycle():
+    """Verify complete profile editing lifecycle from browser environment."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(FRONTEND_URL, wait_until="domcontentloaded")
+
+        result = page.evaluate("""async () => {
+            // 1. Register a new farm
+            const regPayload = {
+                farmer_name: "Kisan Rao",
+                phone_number: "+919988776655",
+                district: "Pune",
+                taluka: "Baramati",
+                village: "Malegaon",
+                total_area_acres: 3.5,
+                boundary_geojson: {
+                    type: "Polygon",
+                    coordinates: [[[74.55, 18.15], [74.56, 18.15], [74.56, 18.16], [74.55, 18.16], [74.55, 18.15]]]
+                },
+                crop_code: "soybean",
+                sowing_date: "2026-06-15",
+                irrigation_source: "canal"
+            };
+            const regRes = await fetch('http://127.0.0.1:8000/v1/farms/guided-registration', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(regPayload)
+            });
+            const regData = await regRes.json();
+            const farmId = regData.farm_id;
+
+            // 2. Edit Profile
+            const updatePayload = {
+                farmer_name: "Kisan Rao Updated",
+                phone_number: "+919988776655",
+                district: "Nashik",
+                taluka: "Niphad",
+                village: "Pimpalgaon",
+                total_area_acres: 6.0,
+                centroid_lat: 20.08,
+                centroid_lon: 74.02,
+                boundary_geojson: {
+                    type: "Polygon",
+                    coordinates: [[[74.01, 20.07], [74.03, 20.07], [74.03, 20.09], [74.01, 20.09], [74.01, 20.07]]]
+                },
+                crop_code: "onion",
+                sowing_date: "2026-08-01",
+                irrigation_source: "drip"
+            };
+            const putRes = await fetch(`http://127.0.0.1:8000/v1/farms/${farmId}/profile`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(updatePayload)
+            });
+            const putData = await putRes.json();
+
+            // 3. Fetch recalculated summary
+            const sumRes = await fetch(`http://127.0.0.1:8000/v1/farms/${farmId}/summary`);
+            const sumData = await sumRes.json();
+
+            // 4. Fetch recalculated yield intelligence
+            const yieldRes = await fetch(`http://127.0.0.1:8000/v1/yield-intelligence/${farmId}/yield-risk`);
+            const yieldData = await yieldRes.json();
+
+            return {
+                farmId,
+                regStatus: regRes.status,
+                putStatus: putRes.status,
+                putData,
+                sumData,
+                yieldData
+            };
+        }""")
+
+        assert result["regStatus"] == 200
+        assert result["putStatus"] == 200
+        assert result["putData"]["farmer_name"] == "Kisan Rao Updated"
+        assert result["putData"]["active_crop_code"] == "onion"
+        assert "Nashik" in result["sumData"]["location_display"]
+        assert "Niphad" in result["sumData"]["location_display"]
+        assert result["sumData"]["total_area_acres"] == 6.0
+        assert result["yieldData"]["crop_code"] == "onion"
+        assert "yield_baseline" in result["yieldData"]
+
+        page.screenshot(path=os.path.join(SCREENSHOT_DIR, "profile_edit_lifecycle.png"))
+        browser.close()
+

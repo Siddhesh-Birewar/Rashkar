@@ -9,7 +9,7 @@ from backend.app.db.models.crop_knowledge import CanonicalCropMasterModel
 from backend.app.schemas.farm import (
     FarmCreateRequest, FarmPlotCreateRequest, CropCycleCreateRequest,
     FarmResponse, FarmerCreateRequest, FarmerResponse,
-    GuidedRegistrationRequest, FarmSummaryResponse
+    GuidedRegistrationRequest, FarmSummaryResponse, FarmProfileUpdateRequest
 )
 from backend.app.services.crop_stage_service import CropStageService
 from backend.app.services.cropnet_service import CropNetService
@@ -174,6 +174,125 @@ def guided_farm_registration(request: GuidedRegistrationRequest, db: Session = D
     db.add(soil_record)
     db.commit()
 
+    return get_farm_summary(farm.farm_id, db)
+
+@router.put("/{farm_id}/profile", response_model=FarmSummaryResponse)
+def update_farm_profile(
+    farm_id: str,
+    request: FarmProfileUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Update farmer details, farm boundaries/coordinates, plot specs,
+    and active crop season post-registration.
+    """
+    farm = db.query(FarmModel).filter(FarmModel.farm_id == farm_id).first()
+    if not farm:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    # 1. Update Farmer
+    farmer = db.query(FarmerModel).filter(FarmerModel.farmer_id == farm.owner_id).first()
+    if farmer:
+        if request.farmer_name:
+            farmer.full_name = request.farmer_name
+        if request.phone_number:
+            farmer.phone_number = request.phone_number
+        if request.preferred_language:
+            farmer.preferred_language = request.preferred_language
+        if request.district:
+            farmer.district = request.district
+        if request.taluka:
+            farmer.taluka = request.taluka
+        if request.village:
+            farmer.village = request.village
+
+    # 2. Update Farm
+    location_changed = False
+    if request.farm_name:
+        farm.farm_name = request.farm_name
+    if request.district and request.district != farm.district:
+        farm.district = request.district
+        location_changed = True
+    if request.taluka and request.taluka != farm.taluka:
+        farm.taluka = request.taluka
+        location_changed = True
+    if request.village:
+        farm.village = request.village
+    if request.latitude is not None:
+        farm.latitude = request.latitude
+    if request.longitude is not None:
+        farm.longitude = request.longitude
+    if request.total_area_acres is not None:
+        farm.total_area_acres = request.total_area_acres
+
+    # 3. Update Plot
+    plot = farm.plots[0] if farm.plots else None
+    if not plot:
+        plot_id = f"plot_{uuid.uuid4().hex[:8]}"
+        plot = FarmPlotModel(
+            plot_id=plot_id,
+            farm_id=farm.farm_id,
+            plot_name="Main Plot 1",
+            area_acres=request.planted_area_acres or request.total_area_acres or 2.0,
+            irrigation_type=request.irrigation_type or "rainfed"
+        )
+        db.add(plot)
+        db.flush()
+    else:
+        if request.planted_area_acres is not None:
+            plot.area_acres = request.planted_area_acres
+        if request.irrigation_type:
+            plot.irrigation_type = request.irrigation_type
+
+    # 4. Update Crop Cycle
+    cycle = None
+    for p in farm.plots:
+        for c in p.crop_cycles:
+            if c.is_active:
+                cycle = c
+                break
+        if cycle:
+            break
+
+    if not cycle:
+        cycle_id = f"cycle_{uuid.uuid4().hex[:8]}"
+        cycle = CropCycleModel(
+            cycle_id=cycle_id,
+            plot_id=plot.plot_id,
+            crop_code=(request.crop_code or "soybean").lower(),
+            variety_name=request.variety_name,
+            season=(request.season or "kharif").lower(),
+            sowing_date=request.sowing_date or date.today(),
+            planted_area_acres=request.planted_area_acres or plot.area_acres,
+            is_active=True
+        )
+        db.add(cycle)
+        db.flush()
+    else:
+        if request.crop_code:
+            cycle.crop_code = request.crop_code.lower()
+        if request.variety_name is not None:
+            cycle.variety_name = request.variety_name
+        if request.sowing_date:
+            cycle.sowing_date = request.sowing_date
+        if request.season:
+            cycle.season = request.season.lower()
+        if request.planted_area_acres is not None:
+            cycle.planted_area_acres = request.planted_area_acres
+        if request.farmer_confirmed_stage:
+            cycle.current_stage_code = request.farmer_confirmed_stage
+
+    # 5. Refresh soil profile if location changed
+    if location_changed:
+        soil_profile = CropNetService.get_soil_profile(farm.farm_id, plot.plot_id, farm.taluka)
+        if farm.soil_profile:
+            farm.soil_profile.ph = soil_profile.ph.value if hasattr(soil_profile, 'ph') and soil_profile.ph else 7.8
+            farm.soil_profile.organic_carbon_pct = soil_profile.organic_carbon_pct.value if hasattr(soil_profile, 'organic_carbon_pct') and soil_profile.organic_carbon_pct else 0.65
+            farm.soil_profile.clay_pct = soil_profile.clay_pct.value if hasattr(soil_profile, 'clay_pct') and soil_profile.clay_pct else 48.0
+            farm.soil_profile.cec_cmol_kg = soil_profile.cation_exchange_capacity_cmol_kg.value if hasattr(soil_profile, 'cation_exchange_capacity_cmol_kg') and soil_profile.cation_exchange_capacity_cmol_kg else 42.0
+
+    db.commit()
+    db.refresh(farm)
     return get_farm_summary(farm.farm_id, db)
 
 # --- Farm Summary & Details ---

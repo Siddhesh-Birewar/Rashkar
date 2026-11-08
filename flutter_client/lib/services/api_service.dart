@@ -232,6 +232,60 @@ class ApiService {
     return _cachedSummary!;
   }
 
+  static Future<FarmSummary?> updateFarmProfile({
+    required String farmId,
+    String? farmerName,
+    String? phoneNumber,
+    String? farmName,
+    String? district,
+    String? taluka,
+    String? village,
+    double? latitude,
+    double? longitude,
+    double? totalAreaAcres,
+    double? plantedAreaAcres,
+    String? cropCode,
+    String? varietyName,
+    String? sowingDate,
+    String? season,
+    String? irrigationType,
+    String? farmerConfirmedStage,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (farmerName != null) payload['farmer_name'] = farmerName;
+    if (phoneNumber != null) payload['phone_number'] = phoneNumber;
+    if (farmName != null) payload['farm_name'] = farmName;
+    if (district != null) payload['district'] = district;
+    if (taluka != null) payload['taluka'] = taluka;
+    if (village != null) payload['village'] = village;
+    if (latitude != null) payload['latitude'] = latitude;
+    if (longitude != null) payload['longitude'] = longitude;
+    if (totalAreaAcres != null) payload['total_area_acres'] = totalAreaAcres;
+    if (plantedAreaAcres != null) payload['planted_area_acres'] = plantedAreaAcres;
+    if (cropCode != null) payload['crop_code'] = cropCode;
+    if (varietyName != null) payload['variety_name'] = varietyName;
+    if (sowingDate != null) payload['sowing_date'] = sowingDate;
+    if (season != null) payload['season'] = season;
+    if (irrigationType != null) payload['irrigation_type'] = irrigationType;
+    if (farmerConfirmedStage != null) payload['farmer_confirmed_stage'] = farmerConfirmedStage;
+
+    try {
+      final uri = Uri.parse('$baseUrl/farms/$farmId/profile');
+      final response = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(payload),
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _cachedSummary = FarmSummary.fromJson(data);
+        return _cachedSummary;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // --- 3. Yield Intelligence ---
   static Future<YieldAssessment> getYieldAssessment({
     required String farmId,

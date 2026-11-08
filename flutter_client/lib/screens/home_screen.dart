@@ -8,6 +8,7 @@ import 'extra_income_screen.dart';
 import 'crop_loss_screen.dart';
 import 'ask_rashkar_screen.dart';
 import 'farm_registration_screen.dart';
+import 'edit_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenRegistration;
@@ -73,6 +74,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(builder: (_) => const FarmRegistrationScreen()),
                   );
+                } else if (value == '__edit__') {
+                  if (summary != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => EditProfileScreen(farm: summary)),
+                    ).then((_) => _refresh());
+                  }
                 } else if (value == '__clear__') {
                   appState.clearSession();
                 } else {
@@ -115,6 +123,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 }
                 items.add(const PopupMenuDivider());
+                if (summary != null) {
+                  items.add(
+                    const PopupMenuItem<String>(
+                      value: '__edit__',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Color(0xFF1B5E20), size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit Active Farm Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
                 items.add(
                   const PopupMenuItem<String>(
                     value: '__register__',
