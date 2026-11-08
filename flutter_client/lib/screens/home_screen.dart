@@ -357,17 +357,50 @@ class _HomeScreenState extends State<HomeScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Icon(Icons.location_on, color: Color(0xFF1B5E20)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Color(0xFFE8F5E9),
+                        child: Icon(Icons.location_on, color: Color(0xFF1B5E20)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(farm.farmName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 2),
+                            Text('${farm.activeCropName ?? "Crop"} · ${farm.locationDisplay}', style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          appState.setActiveFarm(farm);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                        child: const Text('Open'),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Color(0xFF1B5E20)),
+                        tooltip: 'Edit Profile',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => EditProfileScreen(farm: farm)),
+                          ).then((_) => _refresh());
+                        },
+                      ),
+                    ],
                   ),
-                  title: Text(farm.farmName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${farm.activeCropName ?? "Crop"} · ${farm.locationDisplay}'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () {
-                    appState.setActiveFarm(farm);
-                  },
                 ),
               );
             }).toList(),
@@ -423,28 +456,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGreetingCard(FarmSummary summary) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE0E0E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Good day, ${summary.farmerName}!',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Good day, ${summary.farmerName}!',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${summary.farmName} · ${summary.locationDisplay}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                ],
+              ),
             ),
-            Text(
-              '${summary.farmName} · ${summary.locationDisplay}',
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => EditProfileScreen(farm: summary)),
+                ).then((_) => _refresh());
+              },
+              icon: const Icon(Icons.edit, size: 16),
+              label: const Text('Edit Profile'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B5E20),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
             ),
           ],
         ),
-        const CircleAvatar(
-          radius: 22,
-          backgroundColor: Color(0xFFE8F5E9),
-          child: Icon(Icons.person, color: Color(0xFF1B5E20), size: 28),
-        )
-      ],
+      ),
     );
   }
 
@@ -507,6 +565,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => EditProfileScreen(farm: s)),
+                  ).then((_) => _refresh());
+                },
+                icon: const Icon(Icons.edit_location_alt, size: 16),
+                label: const Text('Edit Crop, Sowing Date or Farm Location'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF1B5E20),
+                  side: const BorderSide(color: Color(0xFF1B5E20)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ),
           ],
         ),

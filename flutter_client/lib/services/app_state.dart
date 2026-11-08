@@ -35,7 +35,7 @@ class AppState extends ChangeNotifier {
   double get activeLongitude => _activeFarm?.longitude ?? 74.577;
 
   /// Default to clean starting state as requested by the user
-  Future<void> initialize({bool forceClean = true}) async {
+  Future<void> initialize({bool forceClean = false}) async {
     _isLoading = true;
     notifyListeners();
 
