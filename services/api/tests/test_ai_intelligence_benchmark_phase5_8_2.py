@@ -29,7 +29,8 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     SoilDataProvenance,
     DecisionState,
     ExplainDecisionRequest,
-    ConversationRequest
+    ConversationRequest,
+    ConversationMessage
 )
 from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
 from cropnet.services.api.app.services.llm.ollama_client import OllamaClient
@@ -455,7 +456,7 @@ def evaluate_response_quality(
     scores["factual_consistency"] = 0.2 if has_forbidden else 1.0
 
     # 5. Grounding
-    val_res = GuardrailValidator.validate(resp_text, decision, language=scenario["lang"])
+    val_res = GuardrailValidator.validate(resp_text, decision, language=scenario["lang"], user_message=scenario.get("query"))
     scores["grounding"] = 1.0 if val_res.is_valid else 0.5
 
     # 6. Uncertainty
@@ -516,8 +517,11 @@ def test_farm_context_builder_domain_classification():
 def test_deterministic_fallback_benchmark_across_30_scenarios(engine, explanation_service):
     """
     Run all 30 benchmark scenarios through deterministic fallback.
-    Proves 100% test pass rate, strict grounding, and zero fabrication.
+    Proves 100% test pass rate, strict grounding, zero fabrication,
+    accurate passing of scenario queries, and multi-turn execution.
+    Verifies that runtime invocation counters record all 30 fallbacks under offline category.
     """
+    explanation_service.reset_telemetry()
     scenario_scores = []
 
     for s in BENCHMARK_SCENARIOS:
@@ -539,12 +543,21 @@ def test_deterministic_fallback_benchmark_across_30_scenarios(engine, explanatio
 
         # Force deterministic fallback by calling with mocked offline ollama
         with patch.object(OllamaClient, "is_available", return_value=False):
-            req = ExplainDecisionRequest(
-                decision_id=decision.decision_id,
-                language=s["lang"],
-                focus_crop=s["crop"]
-            )
-            res = explanation_service.explain_decision(req)
+            if s.get("is_multiturn"):
+                conv_req = ConversationRequest(
+                    decision_id=decision.decision_id,
+                    message=s["query"],
+                    language=s["lang"]
+                )
+                res = explanation_service.handle_conversation(conv_req)
+            else:
+                req = ExplainDecisionRequest(
+                    decision_id=decision.decision_id,
+                    language=s["lang"],
+                    focus_crop=s["crop"],
+                    query=s["query"]
+                )
+                res = explanation_service.explain_decision(req)
 
             assert res is not None
             assert res.generation_source == "deterministic_fallback"
@@ -556,17 +569,105 @@ def test_deterministic_fallback_benchmark_across_30_scenarios(engine, explanatio
             assert avg_score >= 0.70, f"Scenario {s['id']} score {avg_score:.2f} below 0.70"
 
     total_benchmark_avg = sum(scenario_scores) / len(scenario_scores)
-    assert total_benchmark_avg >= 0.85, f"Overall deterministic fallback benchmark {total_benchmark_avg:.2f} below 0.85"
+    # Documented empirical score across 30 scenarios is ~0.880-0.882
+    assert 0.85 <= total_benchmark_avg <= 0.95, f"Overall deterministic fallback benchmark {total_benchmark_avg:.4f} outside expected [0.85, 0.95]"
+
+    # Verify telemetry counters recorded all 30 fallbacks under offline category
+    telemetry = explanation_service.get_telemetry().snapshot()
+    assert telemetry["total_requests"] == 30
+    assert telemetry["live_qwen_invocations"] == 0
+    assert telemetry["live_qwen_successes"] == 0
+    assert telemetry["fallback_invocations"] == 30
+    assert telemetry["fallback_reasons"]["offline"] == 30
 
 
-def test_multiturn_natural_language_diagnostic_intent_disambiguation(engine, explanation_service):
+def test_live_qwen3_8b_benchmark_evaluation(engine, explanation_service):
     """
-    Test Part 7 multi-turn natural language understanding:
-    Farmer: 'Water stays for two days after heavy rain'
-    CropNet must detect drainage intent, execute deterministic re-evaluation,
-    and update suitability to DISQUALIFIED / UNSUITABLE.
+    Execute live Ollama Qwen3:8B inference on representative benchmark scenarios
+    across both English and Marathi.
+    Validates:
+    - Live Qwen3:8B execution with structured JSON-Schema-constrained generation
+    - Invocation telemetry recording live successes and zero fallbacks
+    - High factual grounding and response quality >= 0.85
     """
-    # 1. Initial evaluation with missing water table / clay soil
+    ollama = OllamaClient()
+    if not ollama.is_available() or not ollama.is_model_available():
+        pytest.skip("Local Ollama or Qwen3:8B model is offline; skipping live call.")
+
+    explanation_service.reset_telemetry()
+
+    # Representative live scenarios:
+    # 1. scenario_01: Complete Soil Lab Report (English)
+    # 2. scenario_25: Marathi Chickpea Assessment (Marathi)
+    selected_scenarios = [
+        BENCHMARK_SCENARIOS[0],   # scenario_01 (English)
+        BENCHMARK_SCENARIOS[24],  # scenario_25 (Marathi)
+    ]
+
+    for s in selected_scenarios:
+        ctx_data = {
+            "taluka": s["taluka"],
+            "soil_ph": s["ctx"].get("soil_ph", 7.0),
+            "soil_texture": s["ctx"].get("soil_texture", "clay loam"),
+            "target_season": s["season"],
+            "target_crops": [s["crop"]],
+            "drainage": s["ctx"].get("drainage", "moderate"),
+            "irrigation_source": s["ctx"].get("irrigation_source", "canal"),
+            "soil_data_provenance": SoilDataProvenance.LABORATORY_MEASURED if "Complete" in s["name"] else SoilDataProvenance.SPATIALLY_ESTIMATED_ISRIC
+        }
+        if "electrical_conductivity_ds_m" in s["ctx"]:
+            ctx_data["electrical_conductivity_ds_m"] = s["ctx"]["electrical_conductivity_ds_m"]
+
+        ctx = FarmContextInput(**ctx_data)
+        decision = engine.evaluate_farm(ctx)
+
+        if s.get("is_multiturn"):
+            conv_req = ConversationRequest(
+                decision_id=decision.decision_id,
+                message=s["query"],
+                language=s["lang"]
+            )
+            res = explanation_service.handle_conversation(conv_req)
+        else:
+            req = ExplainDecisionRequest(
+                decision_id=decision.decision_id,
+                language=s["lang"],
+                focus_crop=s["crop"],
+                query=s["query"]
+            )
+            res = explanation_service.explain_decision(req)
+
+        assert res is not None
+        assert res.generation_source == "llm_qwen3_8b"
+        assert res.validation_passed is True
+        assert res.structured_card is not None
+
+        scores = evaluate_response_quality(s, res.explanation_text, res.structured_card, decision)
+        composite = sum(scores.values()) / len(scores)
+        assert composite >= 0.80, f"Live Qwen Scenario {s['id']} score {composite:.4f} below 0.80"
+
+    telemetry = explanation_service.get_telemetry().snapshot()
+    assert telemetry["total_requests"] == len(selected_scenarios)
+    assert telemetry["live_qwen_invocations"] == len(selected_scenarios)
+    assert telemetry["live_qwen_successes"] == len(selected_scenarios)
+    assert telemetry["fallback_invocations"] == 0
+    assert telemetry["mean_live_latency_seconds"] > 0.0
+
+
+def test_multiturn_conversational_continuity_and_question_isolation(engine, explanation_service):
+    """
+    Test contextual multi-turn follow-up interpretation and ensure answered
+    diagnostic questions are properly isolated and removed from follow-up prompts.
+    3-Turn Interactive Sequence:
+    - Turn 1: Farmer asks about crop suitability; decision has missing water table / clay soil.
+      Follow-up questions include diagnostic question for drainage.
+    - Turn 2: Farmer replies: 'Water stays for two days after heavy rain.'
+      Engine detects drainage intent, deterministically re-evaluates chickpea to UNSUITABLE,
+      and removes the answered drainage question from follow-up questions.
+    - Turn 3: Farmer asks: 'What other crop can I plant in heavy waterlogged soil?'
+      Engine preserves conversation context history and answered question remains isolated.
+    """
+    # 1. Turn 1: Initial evaluation with missing drainage
     ctx = FarmContextInput(
         taluka="Baramati",
         soil_ph=7.8,
@@ -578,8 +679,10 @@ def test_multiturn_natural_language_diagnostic_intent_disambiguation(engine, exp
     decision = engine.evaluate_farm(ctx)
     outcome = decision.crop_outcomes[0]
     assert outcome.is_disqualified is False
+    # Ensure drainage is in pending follow-up questions
+    assert any(q.target_parameter == "drainage" for q in decision.follow_up_questions)
 
-    # 2. Farmer replies in natural language with poor drainage condition
+    # 2. Turn 2: Farmer answers diagnostic question
     conv_req = ConversationRequest(
         decision_id=decision.decision_id,
         message="Water stays for two days after heavy rain.",
@@ -587,40 +690,178 @@ def test_multiturn_natural_language_diagnostic_intent_disambiguation(engine, exp
     )
 
     with patch.object(OllamaClient, "is_available", return_value=False):
-        res = explanation_service.handle_conversation(conv_req)
-        assert res is not None
-        # Must reflect re-evaluation to UNSUITABLE
-        assert res.decision_state_summary["chickpea"] == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT.value
-        assert "not recommended" in res.explanation_text.lower() or "disqualified" in res.explanation_text.lower() or "निचरा" in res.explanation_text or "drainage" in res.explanation_text.lower()
+        res2 = explanation_service.handle_conversation(conv_req)
+        assert res2 is not None
+        # Deterministic re-evaluation changed state to UNSUITABLE
+        assert res2.decision_state_summary["chickpea"] == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT.value
+        # CRITICAL TEST: Answered diagnostic question MUST BE ISOLATED and REMOVED
+        assert not any(q.target_parameter == "drainage" for q in res2.follow_up_questions)
+
+    # 3. Turn 3: Follow-up question maintaining conversation history
+    conv_req3 = ConversationRequest(
+        decision_id=decision.decision_id,
+        message="What other crop can I plant in heavy waterlogged soil?",
+        language="en",
+        history=[
+            ConversationMessage(role="user", content="Water stays for two days after heavy rain."),
+            ConversationMessage(role="assistant", content=res2.explanation_text)
+        ]
+    )
+
+    with patch.object(OllamaClient, "is_available", return_value=False):
+        res3 = explanation_service.handle_conversation(conv_req3)
+        assert res3 is not None
+        # Drainage remains isolated
+        assert not any(q.target_parameter == "drainage" for q in res3.follow_up_questions)
+        # Decision state remains firmly grounded
+        assert res3.decision_state_summary["chickpea"] == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT.value
 
 
-def test_live_ollama_qwen3_8b_benchmark_sample(engine, explanation_service):
+def test_deterministic_decision_safeguards_inversion_rejection(engine, explanation_service):
     """
-    Execute live Ollama Qwen3:8B inference on representative benchmark scenarios.
-    Skips if local Ollama daemon or model is offline.
+    Verify Sole Authority Invariant: Qwen CANNOT alter deterministic crop decisions
+    (from Phase 5.1 rules engine), measurements, or references.
+    If LLM claims a disqualified crop is suitable, guardrails reject it and trigger fallback,
+    recording guardrail_violation in runtime telemetry.
     """
-    ollama = OllamaClient()
-    if not ollama.is_available() or not ollama.is_model_available():
-        pytest.skip("Local Ollama or Qwen3:8B offline; skipping live call.")
+    explanation_service.reset_telemetry()
 
-    # Test Scenario 1: Complete Soil Lab Report (English)
     ctx = FarmContextInput(
         taluka="Baramati",
         soil_ph=8.1,
         soil_texture="clay",
         target_season="rabi",
         target_crops=["chickpea"],
+        drainage="poor",
+        water_table_depth="shallow",
         soil_data_provenance=SoilDataProvenance.LABORATORY_MEASURED
     )
     decision = engine.evaluate_farm(ctx)
-    req = ExplainDecisionRequest(
-        decision_id=decision.decision_id,
-        language="en",
-        focus_crop="chickpea"
-    )
+    outcome = decision.crop_outcomes[0]
+    # Chickpea is strictly disqualified due to poor drainage / shallow water table
+    assert outcome.is_disqualified is True or outcome.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT
 
-    res = explanation_service.explain_decision(req)
-    assert res is not None
-    assert res.generation_source in ("llm_qwen3_8b", "deterministic_fallback")
-    assert res.structured_card is not None
-    assert res.structured_card.crop_status_code is not None
+    # Mock Ollama generating an ungrounded hallucination claiming chickpea is suitable
+    hallucinated_payload = {
+        "success": True,
+        "content": json.dumps({
+            "title": "Chickpea Recommended",
+            "direct_answer": "Chickpea is highly suitable and recommended for your farm this season.",
+            "what_this_means": "Your heavy clay soil will provide excellent moisture retention for chickpea roots.",
+            "what_needs_attention": ["Ensure regular irrigation"],
+            "next_steps": ["Plant chickpea seeds immediately"]
+        }),
+        "model": "qwen3:8b",
+        "latency_seconds": 1.2
+    }
+
+    with patch.object(OllamaClient, "is_available", return_value=True), \
+         patch.object(OllamaClient, "is_model_available", return_value=True), \
+         patch.object(OllamaClient, "chat_completion", return_value=hallucinated_payload):
+        req = ExplainDecisionRequest(
+            decision_id=decision.decision_id,
+            language="en",
+            focus_crop="chickpea"
+        )
+        res = explanation_service.explain_decision(req)
+
+        # Must be rejected by guardrails and forced to deterministic fallback
+        assert res.generation_source == "deterministic_fallback"
+        assert res.validation_passed is False
+        assert any("Decision State Contradiction / Inversion" in w for w in res.validation_warnings)
+        assert res.structured_card.crop_status_code in ("UNSUITABLE_VERIFIED_CONSTRAINT", "DISQUALIFIED")
+
+        # Telemetry must show guardrail_violation recorded
+        telemetry = explanation_service.get_telemetry().snapshot()
+        assert telemetry["fallback_invocations"] == 1
+        assert telemetry["fallback_reasons"]["guardrail_violation"] == 1
+
+
+def test_pydantic_json_schema_constrained_generation_enforcement(engine, explanation_service):
+    """
+    Verify JSON Schema grammar enforcement and mandatory Pydantic validation:
+    If LLM returns corrupted JSON or malformed schema keys, Pydantic validation
+    catches it before card construction, triggers fallback, and records pydantic_validation_error.
+    """
+    explanation_service.reset_telemetry()
+
+    ctx = FarmContextInput(
+        taluka="Baramati",
+        soil_ph=7.0,
+        soil_texture="loam",
+        target_season="rabi",
+        target_crops=["chickpea"],
+        soil_data_provenance=SoilDataProvenance.LABORATORY_MEASURED
+    )
+    decision = engine.evaluate_farm(ctx)
+
+    # Corrupted payload missing required fields and having invalid types
+    corrupted_json_payload = {
+        "success": True,
+        "content": '{"broken_title": 12345, "invalid_payload": true, "direct_answer": 9999}',
+        "model": "qwen3:8b",
+        "latency_seconds": 0.8
+    }
+
+    with patch.object(OllamaClient, "is_available", return_value=True), \
+         patch.object(OllamaClient, "is_model_available", return_value=True), \
+         patch.object(OllamaClient, "chat_completion", return_value=corrupted_json_payload):
+        req = ExplainDecisionRequest(
+            decision_id=decision.decision_id,
+            language="en",
+            focus_crop="chickpea"
+        )
+        res = explanation_service.explain_decision(req)
+
+        # Must trigger deterministic fallback due to Pydantic schema validation failure
+        assert res.generation_source == "deterministic_fallback"
+        assert res.validation_passed is False
+        assert any("Pydantic schema validation failed" in w for w in res.validation_warnings)
+
+        # Verify telemetry counter recorded pydantic_validation_error
+        telemetry = explanation_service.get_telemetry().snapshot()
+        assert telemetry["fallback_invocations"] == 1
+        assert telemetry["fallback_reasons"]["pydantic_validation_error"] == 1
+
+
+def test_bilingual_english_and_marathi_quality(engine, explanation_service):
+    """
+    Evaluate English and Marathi response quality without redesigning the Advisory UI.
+    Verifies:
+    - Accurate Devanagari script presence for Marathi
+    - Absence of leaked internal machine enum codes in both languages
+    - Proper structured card generation with localized direct answer and steps
+    """
+    ctx = FarmContextInput(
+        taluka="Baramati",
+        soil_ph=7.2,
+        soil_texture="clay loam",
+        target_season="rabi",
+        target_crops=["chickpea"],
+        soil_data_provenance=SoilDataProvenance.LABORATORY_MEASURED
+    )
+    decision = engine.evaluate_farm(ctx)
+
+    # 1. English Evaluation
+    req_en = ExplainDecisionRequest(decision_id=decision.decision_id, language="en", focus_crop="chickpea")
+    with patch.object(OllamaClient, "is_available", return_value=False):
+        res_en = explanation_service.explain_decision(req_en)
+        assert res_en is not None
+        assert "REGIONAL_SCREENING_ONLY" not in res_en.explanation_text
+        assert "DECOUPLED_FRAMEWORKS" not in res_en.explanation_text
+        assert res_en.structured_card is not None
+        assert "chickpea" in res_en.structured_card.title.lower()
+
+    # 2. Marathi Evaluation
+    req_mr = ExplainDecisionRequest(decision_id=decision.decision_id, language="mr", focus_crop="chickpea")
+    with patch.object(OllamaClient, "is_available", return_value=False):
+        res_mr = explanation_service.explain_decision(req_mr)
+        assert res_mr is not None
+        # Must contain Marathi Devanagari script
+        assert bool(re.search(r"[\u0900-\u097F]", res_mr.explanation_text))
+        # Must not contain raw machine enums
+        assert "REGIONAL_SCREENING_ONLY" not in res_mr.explanation_text
+        assert "DECOUPLED_FRAMEWORKS" not in res_mr.explanation_text
+        assert res_mr.structured_card is not None
+        assert bool(re.search(r"[\u0900-\u097F]", res_mr.structured_card.direct_answer))
+

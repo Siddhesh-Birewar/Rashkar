@@ -101,7 +101,7 @@ class OllamaClient:
         """
         target_model = model or self.default_model
         target_temp = temperature if temperature is not None else settings.OLLAMA_TEMPERATURE
-        target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
+        target_max_tokens = max_tokens or max(settings.OLLAMA_MAX_TOKENS, 1024)
         req_timeout = timeout or self.timeout_seconds
 
         payload: Dict[str, Any] = {
@@ -114,7 +114,10 @@ class OllamaClient:
             }
         }
         if format is not None:
-            payload["format"] = format
+            if hasattr(format, "model_json_schema"):
+                payload["format"] = format.model_json_schema()
+            else:
+                payload["format"] = format
 
         start_t = time.time()
         timeout_config = httpx.Timeout(
@@ -133,6 +136,7 @@ class OllamaClient:
                     logger.error(f"Ollama chat error HTTP {resp.status_code}: {resp.text}")
                     return {
                         "success": False,
+                        "error_type": "http_error",
                         "error": f"HTTP {resp.status_code}: {resp.text}",
                         "content": None,
                         "latency_seconds": elapsed
@@ -160,6 +164,7 @@ class OllamaClient:
             logger.warning(f"Ollama inference timed out after {elapsed:.2f}s (limit: {req_timeout}s)")
             return {
                 "success": False,
+                "error_type": "timeout",
                 "error": f"Inference timed out after {req_timeout}s",
                 "content": None,
                 "latency_seconds": elapsed
@@ -169,6 +174,7 @@ class OllamaClient:
             logger.warning(f"Could not connect to Ollama at {self.base_url}: {e}")
             return {
                 "success": False,
+                "error_type": "connection_refused",
                 "error": f"Connection refused at {self.base_url}",
                 "content": None,
                 "latency_seconds": elapsed
@@ -178,6 +184,7 @@ class OllamaClient:
             logger.error(f"Unexpected error during Ollama invocation: {e}")
             return {
                 "success": False,
+                "error_type": "unspecified_error",
                 "error": str(e),
                 "content": None,
                 "latency_seconds": elapsed
@@ -197,7 +204,7 @@ class OllamaClient:
         """
         target_model = model or self.default_model
         target_temp = temperature if temperature is not None else settings.OLLAMA_TEMPERATURE
-        target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
+        target_max_tokens = max_tokens or max(settings.OLLAMA_MAX_TOKENS, 1024)
         req_timeout = timeout or self.timeout_seconds
 
         payload: Dict[str, Any] = {
@@ -210,7 +217,10 @@ class OllamaClient:
             }
         }
         if format is not None:
-            payload["format"] = format
+            if hasattr(format, "model_json_schema"):
+                payload["format"] = format.model_json_schema()
+            else:
+                payload["format"] = format
 
         start_t = time.time()
         timeout_config = httpx.Timeout(
@@ -229,6 +239,7 @@ class OllamaClient:
                     logger.error(f"Ollama async chat error HTTP {resp.status_code}: {resp.text}")
                     return {
                         "success": False,
+                        "error_type": "http_error",
                         "error": f"HTTP {resp.status_code}: {resp.text}",
                         "content": None,
                         "latency_seconds": elapsed
@@ -255,6 +266,7 @@ class OllamaClient:
             logger.warning(f"Ollama async inference timed out after {elapsed:.2f}s")
             return {
                 "success": False,
+                "error_type": "timeout",
                 "error": f"Inference timed out after {req_timeout}s",
                 "content": None,
                 "latency_seconds": elapsed
@@ -263,6 +275,7 @@ class OllamaClient:
             elapsed = time.time() - start_t
             return {
                 "success": False,
+                "error_type": "connection_refused",
                 "error": f"Connection refused at {self.base_url}",
                 "content": None,
                 "latency_seconds": elapsed
@@ -271,6 +284,7 @@ class OllamaClient:
             elapsed = time.time() - start_t
             return {
                 "success": False,
+                "error_type": "unspecified_error",
                 "error": str(e),
                 "content": None,
                 "latency_seconds": elapsed

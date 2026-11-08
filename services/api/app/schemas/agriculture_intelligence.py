@@ -244,6 +244,7 @@ class ExplainDecisionRequest(BaseModel):
     decision_id: str = Field(..., description="UUID of the validated decision")
     language: Optional[str] = Field(default="en", description="Target explanation language: 'en' or 'mr'")
     focus_crop: Optional[str] = Field(None, description="Optional specific crop_id to focus the explanation on")
+    query: Optional[str] = Field(None, description="Optional specific farmer question or query to evaluate")
 
 
 class ConversationMessage(BaseModel):

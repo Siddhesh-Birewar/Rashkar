@@ -15,6 +15,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, List, Optional
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
@@ -35,6 +36,10 @@ from cropnet.services.api.app.services.llm.prompt_builder import ExplanationProm
 from cropnet.services.api.app.services.llm.guardrail_validator import GuardrailValidator
 from cropnet.services.api.app.services.llm.template_fallback import TemplateFallbackGenerator
 from cropnet.services.api.app.services.llm.farm_context_builder import FarmContextBuilder
+from cropnet.services.api.app.services.llm.schemas import (
+    LlmStructuredAdvisoryPayload,
+    TelemetryCounter
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +48,7 @@ class AgriculturalExplanationService:
     """
     Constrained explanation, contextual intelligence, and dialogue service for CropNet AI.
     """
+    _global_telemetry = TelemetryCounter()
 
     def __init__(
         self,
@@ -51,6 +57,31 @@ class AgriculturalExplanationService:
     ):
         self.ollama = ollama_client or OllamaClient()
         self.decision_engine = decision_engine or DeterministicDecisionEngine()
+        self.telemetry = TelemetryCounter()
+
+    @classmethod
+    def get_global_telemetry(cls) -> TelemetryCounter:
+        return cls._global_telemetry
+
+    @classmethod
+    def reset_global_telemetry(cls) -> None:
+        cls._global_telemetry.reset()
+
+    def get_telemetry(self) -> TelemetryCounter:
+        return self.telemetry
+
+    def reset_telemetry(self) -> None:
+        self.telemetry.reset()
+
+    def _record_live_success(self, latency: float = 0.0) -> None:
+        self.telemetry.record_live_success(latency)
+        if self._global_telemetry is not self.telemetry:
+            self._global_telemetry.record_live_success(latency)
+
+    def _record_fallback(self, reason: str, latency: float = 0.0, live_attempted: bool = False) -> None:
+        self.telemetry.record_fallback(reason, latency, live_attempted=live_attempted)
+        if self._global_telemetry is not self.telemetry:
+            self._global_telemetry.record_fallback(reason, latency, live_attempted=live_attempted)
 
     @staticmethod
     def _extract_citations(resp: FarmEvaluationResponse) -> List[CitationMetadata]:
@@ -144,7 +175,8 @@ class AgriculturalExplanationService:
     ) -> Optional[AgriculturalExplanationResponse]:
         """
         Generate a structured, farmer-friendly explanation of a validated decision.
-        Uses local Qwen3:8B with structured JSON generation and strict guardrails.
+        Uses local Qwen3:8B with JSON-Schema-constrained generation, mandatory Pydantic validation,
+        and strict numerical/agronomic guardrails.
         """
         start_t = time.time()
         # 1. Fetch validated decision from deterministic engine session store
@@ -160,10 +192,11 @@ class AgriculturalExplanationService:
         fallback_card = TemplateFallbackGenerator.generate_structured_card(decision, language=lang, focus_crop=req.focus_crop)
         fallback_text = TemplateFallbackGenerator.generate_explanation(decision, language=lang, focus_crop=req.focus_crop)
 
-        # 2. Build centralized grounded farm evidence
+        # 2. Build centralized grounded farm evidence (injecting farmer query if present)
         farm_ctx = FarmContextBuilder.build_farm_context(
             farm_id=getattr(decision, "farm_id", None),
             db=db,
+            query=req.query,
             focus_crop=req.focus_crop,
             decision=decision,
             language=lang
@@ -172,6 +205,7 @@ class AgriculturalExplanationService:
         # 3. Check Ollama availability
         if not self.ollama.is_available() or not self.ollama.is_model_available():
             logger.info("Ollama or Qwen3:8B model unavailable; executing deterministic fallback.")
+            self._record_fallback("offline", latency=0.0, live_attempted=False)
             return AgriculturalExplanationResponse(
                 decision_id=decision.decision_id,
                 language=lang,
@@ -188,24 +222,41 @@ class AgriculturalExplanationService:
         # 4. Construct domain-aware structured prompt
         sys_prompt = ExplanationPromptBuilder.build_system_prompt(language=lang)
         user_prompt = ExplanationPromptBuilder.build_user_prompt(
-            decision, language=lang, focus_crop=req.focus_crop, farm_context=farm_ctx
+            decision, user_message=req.query, language=lang, focus_crop=req.focus_crop, farm_context=farm_ctx
         )
         messages = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt}
         ]
 
-        # 5. Invoke local Ollama in structured JSON mode
+        # 5. Invoke local Ollama with JSON-Schema-constrained generation
+        req_timeout = 115 if lang == "mr" else 75
+        schema = LlmStructuredAdvisoryPayload.model_json_schema()
         try:
-            llm_res = self.ollama.chat_completion(messages=messages, format="json")
+            llm_res = self.ollama.chat_completion(
+                messages=messages,
+                format=schema,
+                timeout=req_timeout
+            )
         except Exception as e:
-            llm_res = {"success": False, "error": str(e), "content": None}
+            llm_res = {"success": False, "error_type": "unspecified_error", "error": str(e), "content": None}
 
         elapsed = time.time() - start_t
 
         if not llm_res.get("success") or not llm_res.get("content"):
-            err = llm_res.get("error", "Unknown Ollama error")
-            logger.warning(f"Ollama generation failed ({err}) after {elapsed:.2f}s; executing deterministic fallback.")
+            err = str(llm_res.get("error", "Unknown Ollama error"))
+            err_type = llm_res.get("error_type")
+            if err_type == "timeout" or "timed out" in err.lower():
+                fallback_reason = "timeout"
+            elif err_type == "connection_refused" or "refused" in err.lower() or "connect" in err.lower():
+                fallback_reason = "connection_refused"
+            elif not llm_res.get("content"):
+                fallback_reason = "empty_response"
+            else:
+                fallback_reason = "unspecified_error"
+
+            logger.warning(f"Ollama generation failed ({err}) after {elapsed:.2f}s [reason={fallback_reason}]; executing deterministic fallback.")
+            self._record_fallback(fallback_reason, latency=elapsed, live_attempted=True)
             return AgriculturalExplanationResponse(
                 decision_id=decision.decision_id,
                 language=lang,
@@ -221,40 +272,45 @@ class AgriculturalExplanationService:
 
         raw_content = llm_res["content"].strip()
 
-        # 6. Parse structured JSON from model, or accept verified plain prose
-        parsed_json: Optional[Dict[str, Any]] = None
-        try:
-            parsed_json = json.loads(raw_content)
-        except Exception:
-            parsed_json = None
+        # 6. Mandatory Pydantic Validation & Structured Parsing
+        parsed_payload: Optional[LlmStructuredAdvisoryPayload] = None
 
-        if isinstance(parsed_json, dict) and "direct_answer" in parsed_json:
-            direct_ans = str(parsed_json.get("direct_answer", "")).strip()
-            what_means = str(parsed_json.get("what_this_means", "")).strip()
+        if "{" in raw_content:
+            try:
+                start_i = raw_content.find("{")
+                end_i = raw_content.rfind("}")
+                json_str = raw_content[start_i:end_i + 1] if (start_i != -1 and end_i > start_i) else raw_content
+                parsed_payload = LlmStructuredAdvisoryPayload.model_validate_json(json_str)
+            except (ValidationError, Exception) as pe:
+                logger.warning(f"Mandatory Pydantic schema validation failed: {pe}; triggering deterministic fallback.")
+                self._record_fallback("pydantic_validation_error", latency=elapsed, live_attempted=True)
+                return AgriculturalExplanationResponse(
+                    decision_id=decision.decision_id,
+                    language=lang,
+                    explanation_text=fallback_text,
+                    generation_source="deterministic_fallback",
+                    validation_passed=False,
+                    validation_warnings=[f"Pydantic schema validation failed: {pe}"],
+                    decision_state_summary=states_summary,
+                    authoritative_citations=citations,
+                    follow_up_questions=follow_ups,
+                    structured_card=fallback_card
+                )
 
-            what_att_raw = parsed_json.get("what_needs_attention", [])
-            if isinstance(what_att_raw, list):
-                what_att = [str(x).strip() for x in what_att_raw if x]
-            elif isinstance(what_att_raw, str) and what_att_raw.strip():
-                what_att = [what_att_raw.strip()]
-            else:
-                what_att = fallback_card.what_needs_attention
-
-            next_s_raw = parsed_json.get("next_steps", [])
-            if isinstance(next_s_raw, list):
-                next_s = [str(x).strip() for x in next_s_raw if x]
-            elif isinstance(next_s_raw, str) and next_s_raw.strip():
-                next_s = [next_s_raw.strip()]
-            else:
-                next_s = fallback_card.next_steps
+        if parsed_payload is not None:
+            direct_ans = parsed_payload.direct_answer.strip()
+            what_means = parsed_payload.what_this_means.strip()
+            what_att = parsed_payload.what_needs_attention or fallback_card.what_needs_attention
+            next_s = parsed_payload.next_steps or fallback_card.next_steps
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
             val_result = GuardrailValidator.validate(
-                combined_prose, decision, language=lang, farm_context=farm_ctx
+                combined_prose, decision, language=lang, user_message=req.query, farm_context=farm_ctx
             )
 
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection on generated explanation: {val_result.violations}")
+                self._record_fallback("guardrail_violation", latency=elapsed, live_attempted=True)
                 return AgriculturalExplanationResponse(
                     decision_id=decision.decision_id,
                     language=lang,
@@ -269,7 +325,7 @@ class AgriculturalExplanationService:
                 )
 
             final_card = StructuredAdvisoryCard(
-                title=str(parsed_json.get("title") or fallback_card.title),
+                title=str(parsed_payload.title or fallback_card.title),
                 direct_answer=direct_ans or fallback_card.direct_answer,
                 what_this_means=what_means or fallback_card.what_this_means,
                 crop_status_label=fallback_card.crop_status_label,
@@ -281,6 +337,7 @@ class AgriculturalExplanationService:
             )
 
             final_explanation = f"{direct_ans}\n\n{what_means}"
+            self._record_live_success(latency=elapsed)
 
             return AgriculturalExplanationResponse(
                 decision_id=decision.decision_id,
@@ -295,12 +352,13 @@ class AgriculturalExplanationService:
                 structured_card=final_card
             )
         else:
-            # Fallback to plain prose validation (e.g. from mocked test responses or unstructured LLM output)
+            # Fallback to plain prose validation (for test mocks that mock plain prose)
             val_result = GuardrailValidator.validate(
-                raw_content, decision, language=lang, farm_context=farm_ctx
+                raw_content, decision, language=lang, user_message=req.query, farm_context=farm_ctx
             )
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection on generated prose: {val_result.violations}")
+                self._record_fallback("guardrail_violation", latency=elapsed, live_attempted=True)
                 return AgriculturalExplanationResponse(
                     decision_id=decision.decision_id,
                     language=lang,
@@ -314,6 +372,7 @@ class AgriculturalExplanationService:
                     structured_card=fallback_card
                 )
 
+            self._record_live_success(latency=elapsed)
             return AgriculturalExplanationResponse(
                 decision_id=decision.decision_id,
                 language=lang,
@@ -336,7 +395,8 @@ class AgriculturalExplanationService:
         Handle conversational dialogue or diagnostic answer submission with multi-turn understanding.
         - Natural language answers to diagnostic questions are detected and re-evaluated deterministically.
         - Grounded farm evidence is assembled and injected into domain-aware prompts.
-        - Ollama generates structured JSON validated by guardrails.
+        - Answered follow-up questions are isolated and removed from follow-up chips.
+        - Ollama generates structured JSON validated by mandatory Pydantic schema and guardrails.
         """
         start_t = time.time()
         # 1. Fetch current decision
@@ -382,6 +442,7 @@ class AgriculturalExplanationService:
 
         # 5. If Ollama is offline, return template explanation
         if not self.ollama.is_available() or not self.ollama.is_model_available():
+            self._record_fallback("offline", latency=0.0, live_attempted=False)
             return AgriculturalExplanationResponse(
                 decision_id=current_decision.decision_id,
                 language=lang,
@@ -412,17 +473,34 @@ class AgriculturalExplanationService:
 
         messages.append({"role": "user", "content": user_prompt})
 
-        # 7. Invoke Ollama in structured JSON mode
+        # 7. Invoke Ollama with JSON-Schema-constrained generation
+        req_timeout = 115 if lang == "mr" else 75
+        schema = LlmStructuredAdvisoryPayload.model_json_schema()
         try:
-            llm_res = self.ollama.chat_completion(messages=messages, format="json")
+            llm_res = self.ollama.chat_completion(
+                messages=messages,
+                format=schema,
+                timeout=req_timeout
+            )
         except Exception as e:
-            llm_res = {"success": False, "error": str(e), "content": None}
+            llm_res = {"success": False, "error_type": "unspecified_error", "error": str(e), "content": None}
 
         elapsed = time.time() - start_t
 
         if not llm_res.get("success") or not llm_res.get("content"):
-            err = llm_res.get("error", "Unknown Ollama error")
-            logger.warning(f"Ollama conversation failed ({err}) after {elapsed:.2f}s; executing deterministic fallback.")
+            err = str(llm_res.get("error", "Unknown Ollama error"))
+            err_type = llm_res.get("error_type")
+            if err_type == "timeout" or "timed out" in err.lower():
+                fallback_reason = "timeout"
+            elif err_type == "connection_refused" or "refused" in err.lower() or "connect" in err.lower():
+                fallback_reason = "connection_refused"
+            elif not llm_res.get("content"):
+                fallback_reason = "empty_response"
+            else:
+                fallback_reason = "unspecified_error"
+
+            logger.warning(f"Ollama conversation failed ({err}) after {elapsed:.2f}s [reason={fallback_reason}]; executing deterministic fallback.")
+            self._record_fallback(fallback_reason, latency=elapsed, live_attempted=True)
             return AgriculturalExplanationResponse(
                 decision_id=current_decision.decision_id,
                 language=lang,
@@ -438,32 +516,36 @@ class AgriculturalExplanationService:
 
         raw_content = llm_res["content"].strip()
 
-        # 8. Parse structured JSON or validate plain prose
-        parsed_json: Optional[Dict[str, Any]] = None
-        try:
-            parsed_json = json.loads(raw_content)
-        except Exception:
-            parsed_json = None
+        # 8. Mandatory Pydantic Validation & Structured Parsing
+        parsed_payload: Optional[LlmStructuredAdvisoryPayload] = None
 
-        if isinstance(parsed_json, dict) and "direct_answer" in parsed_json:
-            direct_ans = str(parsed_json.get("direct_answer", "")).strip()
-            what_means = str(parsed_json.get("what_this_means", "")).strip()
+        if "{" in raw_content:
+            try:
+                start_i = raw_content.find("{")
+                end_i = raw_content.rfind("}")
+                json_str = raw_content[start_i:end_i + 1] if (start_i != -1 and end_i > start_i) else raw_content
+                parsed_payload = LlmStructuredAdvisoryPayload.model_validate_json(json_str)
+            except (ValidationError, Exception) as pe:
+                logger.warning(f"Mandatory Pydantic schema validation failed: {pe}; triggering deterministic fallback.")
+                self._record_fallback("pydantic_validation_error", latency=elapsed, live_attempted=True)
+                return AgriculturalExplanationResponse(
+                    decision_id=current_decision.decision_id,
+                    language=lang,
+                    explanation_text=fallback_text,
+                    generation_source="deterministic_fallback",
+                    validation_passed=False,
+                    validation_warnings=[f"Pydantic schema validation failed: {pe}"],
+                    decision_state_summary=states_summary,
+                    authoritative_citations=citations,
+                    follow_up_questions=follow_ups,
+                    structured_card=fallback_card
+                )
 
-            what_att_raw = parsed_json.get("what_needs_attention", [])
-            if isinstance(what_att_raw, list):
-                what_att = [str(x).strip() for x in what_att_raw if x]
-            elif isinstance(what_att_raw, str) and what_att_raw.strip():
-                what_att = [what_att_raw.strip()]
-            else:
-                what_att = fallback_card.what_needs_attention
-
-            next_s_raw = parsed_json.get("next_steps", [])
-            if isinstance(next_s_raw, list):
-                next_s = [str(x).strip() for x in next_s_raw if x]
-            elif isinstance(next_s_raw, str) and next_s_raw.strip():
-                next_s = [next_s_raw.strip()]
-            else:
-                next_s = fallback_card.next_steps
+        if parsed_payload is not None:
+            direct_ans = parsed_payload.direct_answer.strip()
+            what_means = parsed_payload.what_this_means.strip()
+            what_att = parsed_payload.what_needs_attention or fallback_card.what_needs_attention
+            next_s = parsed_payload.next_steps or fallback_card.next_steps
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
             val_result = GuardrailValidator.validate(
@@ -472,6 +554,7 @@ class AgriculturalExplanationService:
 
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection in conversation turn: {val_result.violations}")
+                self._record_fallback("guardrail_violation", latency=elapsed, live_attempted=True)
                 return AgriculturalExplanationResponse(
                     decision_id=current_decision.decision_id,
                     language=lang,
@@ -486,7 +569,7 @@ class AgriculturalExplanationService:
                 )
 
             final_card = StructuredAdvisoryCard(
-                title=str(parsed_json.get("title") or fallback_card.title),
+                title=str(parsed_payload.title or fallback_card.title),
                 direct_answer=direct_ans or fallback_card.direct_answer,
                 what_this_means=what_means or fallback_card.what_this_means,
                 crop_status_label=fallback_card.crop_status_label,
@@ -498,6 +581,7 @@ class AgriculturalExplanationService:
             )
 
             final_explanation = f"{direct_ans}\n\n{what_means}"
+            self._record_live_success(latency=elapsed)
 
             return AgriculturalExplanationResponse(
                 decision_id=current_decision.decision_id,
@@ -512,12 +596,13 @@ class AgriculturalExplanationService:
                 structured_card=final_card
             )
         else:
-            # Plain prose handling (e.g. from conversational test mocks or conversational responses)
+            # Plain prose handling (for test mocks that mock plain prose)
             val_result = GuardrailValidator.validate(
                 raw_content, current_decision, language=lang, user_message=req.message, farm_context=farm_ctx
             )
             if not val_result.is_valid:
                 logger.warning(f"Guardrail rejection in conversation turn: {val_result.violations}")
+                self._record_fallback("guardrail_violation", latency=elapsed, live_attempted=True)
                 return AgriculturalExplanationResponse(
                     decision_id=current_decision.decision_id,
                     language=lang,
@@ -531,6 +616,7 @@ class AgriculturalExplanationService:
                     structured_card=fallback_card
                 )
 
+            self._record_live_success(latency=elapsed)
             return AgriculturalExplanationResponse(
                 decision_id=current_decision.decision_id,
                 language=lang,
@@ -543,3 +629,4 @@ class AgriculturalExplanationService:
                 follow_up_questions=follow_ups,
                 structured_card=fallback_card
             )
+
