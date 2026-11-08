@@ -72,11 +72,12 @@ async def sync_satellite_observations(
     if not poly_geojson:
         raise HTTPException(status_code=400, detail="Farm polygon geometry is missing.")
 
-    # Calculate observation
+    # Calculate observation (attempts live Sentinel-2 L2A raster streaming, fallback to model)
     indices = copernicus_client.compute_polygon_indices(
         polygon_geojson=poly_geojson,
         farm_area_ha=area_ha,
         observation_date=datetime.utcnow(),
+        use_live_raster=True,
     )
 
     # Persist observation in database
