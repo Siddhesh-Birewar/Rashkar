@@ -85,12 +85,18 @@ class SatelliteSyncResponse(BaseModel):
 
 class VegetationTimeSeriesPoint(BaseModel):
     date: datetime
-    mean_ndvi: Optional[float]
-    median_ndvi: Optional[float]
-    mean_ndmi: Optional[float]
-    valid_pixels: int
-    cloud_masked_percent: float
-    quality_status: str
+    mean_ndvi: Optional[float] = None
+    median_ndvi: Optional[float] = None
+    mean_ndmi: Optional[float] = None
+    valid_pixels: int = 0
+    cloud_masked_percent: float = 0.0
+    quality_status: str = "VALID_OBSERVATION"
+    vegetation_pixel_count: Optional[int] = None
+    bare_soil_pixel_count: Optional[int] = None
+    vegetation_coverage_percent: Optional[float] = None
+    bare_soil_coverage_percent: Optional[float] = None
+    vegetation_mean_ndvi: Optional[float] = None
+    vegetation_mean_ndmi: Optional[float] = None
 
 
 class VegetationTimeSeriesResponse(BaseModel):
@@ -101,3 +107,25 @@ class VegetationTimeSeriesResponse(BaseModel):
     series: List[VegetationTimeSeriesPoint]
     vegetation_interpretation: str
     scientific_disclaimer: str
+
+
+class SatelliteSpatialMetadataResponse(BaseModel):
+    farm_id: str
+    product_id: str
+    observation_date: datetime
+    bounds: List[float]  # [min_lon, min_lat, max_lon, max_lat]
+    width: int
+    height: int
+    spatial_resolution_meters: float = 10.0
+    b11_native_resolution_meters: float = 20.0
+    vegetation_pixel_count: int = 0
+    bare_soil_pixel_count: int = 0
+    water_pixel_count: int = 0
+    cloud_masked_pixel_count: int = 0
+    boundary_masked_pixel_count: int = 0
+    total_pixel_count: int = 0
+    ndvi_map_url: str
+    ndmi_map_url: str
+    scl_map_url: str
+    legend: Dict[str, Any]
+    scientific_disclosure: str

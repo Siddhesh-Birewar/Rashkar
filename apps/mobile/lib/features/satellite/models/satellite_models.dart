@@ -21,6 +21,25 @@ class SatelliteObservation {
   final bool isSmallFarmWarning;
   final DateTime createdAt;
 
+  // SCL Class-Segregated Counts & Coverage
+  final int? vegetationPixelCount;
+  final int? bareSoilPixelCount;
+  final int? waterPixelCount;
+  final double? vegetationCoveragePercent;
+  final double? bareSoilCoveragePercent;
+  final double? waterCoveragePercent;
+
+  // Pure Class-4 Canopy & Class-5 Soil Metrics
+  final double? vegetationMeanNdvi;
+  final double? vegetationMeanNdmi;
+  final double? bareSoilMeanNdvi;
+
+  // Spatial Discretization & Lineage Provenance
+  final double? polygonAreaHectares;
+  final double? rasterDiscretizedAreaHectares;
+  final String? radiometricConversionProvenance;
+  final String dataAttribution;
+
   SatelliteObservation({
     required this.id,
     required this.farmId,
@@ -43,6 +62,19 @@ class SatelliteObservation {
     this.qualityNotes,
     required this.isSmallFarmWarning,
     required this.createdAt,
+    this.vegetationPixelCount,
+    this.bareSoilPixelCount,
+    this.waterPixelCount,
+    this.vegetationCoveragePercent,
+    this.bareSoilCoveragePercent,
+    this.waterCoveragePercent,
+    this.vegetationMeanNdvi,
+    this.vegetationMeanNdmi,
+    this.bareSoilMeanNdvi,
+    this.polygonAreaHectares,
+    this.rasterDiscretizedAreaHectares,
+    this.radiometricConversionProvenance,
+    this.dataAttribution = 'Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.',
   });
 
   factory SatelliteObservation.fromJson(Map<String, dynamic> json) {
@@ -72,6 +104,20 @@ class SatelliteObservation {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
+      vegetationPixelCount: json['vegetation_pixel_count'] as int?,
+      bareSoilPixelCount: json['bare_soil_pixel_count'] as int?,
+      waterPixelCount: json['water_pixel_count'] as int?,
+      vegetationCoveragePercent: (json['vegetation_coverage_percent'] as num?)?.toDouble(),
+      bareSoilCoveragePercent: (json['bare_soil_coverage_percent'] as num?)?.toDouble(),
+      waterCoveragePercent: (json['water_coverage_percent'] as num?)?.toDouble(),
+      vegetationMeanNdvi: (json['vegetation_mean_ndvi'] as num?)?.toDouble(),
+      vegetationMeanNdmi: (json['vegetation_mean_ndmi'] as num?)?.toDouble(),
+      bareSoilMeanNdvi: (json['bare_soil_mean_ndvi'] as num?)?.toDouble(),
+      polygonAreaHectares: (json['polygon_area_hectares'] as num?)?.toDouble(),
+      rasterDiscretizedAreaHectares: (json['raster_discretized_area_hectares'] as num?)?.toDouble(),
+      radiometricConversionProvenance: json['radiometric_conversion_provenance'] as String?,
+      dataAttribution: json['data_attribution'] as String? ??
+          'Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.',
     );
   }
 }
@@ -85,6 +131,13 @@ class VegetationTimeSeriesPoint {
   final double cloudMaskedPercent;
   final String qualityStatus;
 
+  final int? vegetationPixelCount;
+  final int? bareSoilPixelCount;
+  final double? vegetationCoveragePercent;
+  final double? bareSoilCoveragePercent;
+  final double? vegetationMeanNdvi;
+  final double? vegetationMeanNdmi;
+
   VegetationTimeSeriesPoint({
     required this.date,
     this.meanNdvi,
@@ -93,6 +146,12 @@ class VegetationTimeSeriesPoint {
     required this.validPixels,
     required this.cloudMaskedPercent,
     required this.qualityStatus,
+    this.vegetationPixelCount,
+    this.bareSoilPixelCount,
+    this.vegetationCoveragePercent,
+    this.bareSoilCoveragePercent,
+    this.vegetationMeanNdvi,
+    this.vegetationMeanNdmi,
   });
 
   factory VegetationTimeSeriesPoint.fromJson(Map<String, dynamic> json) {
@@ -106,6 +165,12 @@ class VegetationTimeSeriesPoint {
       validPixels: json['valid_pixels'] as int? ?? 0,
       cloudMaskedPercent: (json['cloud_masked_percent'] as num?)?.toDouble() ?? 0.0,
       qualityStatus: json['quality_status'] as String? ?? 'VALID_OBSERVATION',
+      vegetationPixelCount: json['vegetation_pixel_count'] as int?,
+      bareSoilPixelCount: json['bare_soil_pixel_count'] as int?,
+      vegetationCoveragePercent: (json['vegetation_coverage_percent'] as num?)?.toDouble(),
+      bareSoilCoveragePercent: (json['bare_soil_coverage_percent'] as num?)?.toDouble(),
+      vegetationMeanNdvi: (json['vegetation_mean_ndvi'] as num?)?.toDouble(),
+      vegetationMeanNdmi: (json['vegetation_mean_ndmi'] as num?)?.toDouble(),
     );
   }
 }
@@ -141,6 +206,73 @@ class VegetationTimeSeriesData {
           [],
       vegetationInterpretation: json['vegetation_interpretation'] as String? ?? '',
       scientificDisclaimer: json['scientific_disclaimer'] as String? ?? '',
+    );
+  }
+}
+
+class SatelliteSpatialMetadata {
+  final String farmId;
+  final String productId;
+  final DateTime observationDate;
+  final List<double> bounds; // [min_lon, min_lat, max_lon, max_lat]
+  final int width;
+  final int height;
+  final double spatialResolutionMeters;
+  final double b11NativeResolutionMeters;
+  final int vegetationPixelCount;
+  final int bareSoilPixelCount;
+  final int waterPixelCount;
+  final int cloudMaskedPixelCount;
+  final int boundaryMaskedPixelCount;
+  final int totalPixelCount;
+  final String ndviMapUrl;
+  final String ndmiMapUrl;
+  final String sclMapUrl;
+  final String scientificDisclosure;
+
+  SatelliteSpatialMetadata({
+    required this.farmId,
+    required this.productId,
+    required this.observationDate,
+    required this.bounds,
+    required this.width,
+    required this.height,
+    required this.spatialResolutionMeters,
+    required this.b11NativeResolutionMeters,
+    required this.vegetationPixelCount,
+    required this.bareSoilPixelCount,
+    required this.waterPixelCount,
+    required this.cloudMaskedPixelCount,
+    required this.boundaryMaskedPixelCount,
+    required this.totalPixelCount,
+    required this.ndviMapUrl,
+    required this.ndmiMapUrl,
+    required this.sclMapUrl,
+    required this.scientificDisclosure,
+  });
+
+  factory SatelliteSpatialMetadata.fromJson(Map<String, dynamic> json) {
+    return SatelliteSpatialMetadata(
+      farmId: json['farm_id'] as String? ?? '',
+      productId: json['product_id'] as String? ?? '',
+      observationDate: json['observation_date'] != null
+          ? DateTime.tryParse(json['observation_date'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      bounds: (json['bounds'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0, 0.0, 0.0],
+      width: json['width'] as int? ?? 40,
+      height: json['height'] as int? ?? 40,
+      spatialResolutionMeters: (json['spatial_resolution_meters'] as num?)?.toDouble() ?? 10.0,
+      b11NativeResolutionMeters: (json['b11_native_resolution_meters'] as num?)?.toDouble() ?? 20.0,
+      vegetationPixelCount: json['vegetation_pixel_count'] as int? ?? 0,
+      bareSoilPixelCount: json['bare_soil_pixel_count'] as int? ?? 0,
+      waterPixelCount: json['water_pixel_count'] as int? ?? 0,
+      cloudMaskedPixelCount: json['cloud_masked_pixel_count'] as int? ?? 0,
+      boundaryMaskedPixelCount: json['boundary_masked_pixel_count'] as int? ?? 0,
+      totalPixelCount: json['total_pixel_count'] as int? ?? 0,
+      ndviMapUrl: json['ndvi_map_url'] as String? ?? '',
+      ndmiMapUrl: json['ndmi_map_url'] as String? ?? '',
+      sclMapUrl: json['scl_map_url'] as String? ?? '',
+      scientificDisclosure: json['scientific_disclosure'] as String? ?? '',
     );
   }
 }

@@ -17,6 +17,7 @@ import 'package:cropnet_mobile/features/weather/data/weather_repository.dart';
 import 'package:cropnet_mobile/features/weather/models/weather_models.dart';
 import 'package:cropnet_mobile/features/crop/data/crop_repository.dart';
 import 'package:cropnet_mobile/features/crop/models/crop_models.dart';
+import 'package:cropnet_mobile/features/satellite/presentation/widgets/satellite_vegetation_summary_card.dart';
 import 'package:cropnet_mobile/features/auth/auth_service.dart';
 import 'package:cropnet_mobile/features/auth/auth_state.dart';
 
@@ -986,6 +987,11 @@ class FarmDetailScreen extends StatelessWidget {
                   _buildDetailRow('Irrigation Type', farm.irrigationType.toUpperCase()),
                   _buildDetailRow('Water Source', farm.waterSource.toUpperCase()),
                   _buildDetailRow('Boundary Points', '${farm.polygonPoints.length} vertices (GeoJSON Polygon)'),
+
+                  const SizedBox(height: 16),
+
+                  // Sentinel-2 Satellite Vegetation Summary Card
+                  SatelliteVegetationSummaryCard(farmId: farm.id),
 
                   const SizedBox(height: 20),
                   // Prominent Action to run Crop Suitability Advisory

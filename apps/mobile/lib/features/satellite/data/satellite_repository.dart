@@ -5,6 +5,8 @@ import '../models/satellite_models.dart';
 
 /// Repository for Sentinel-2 Satellite Vegetation Intelligence.
 class SatelliteRepository {
+  static final SatelliteRepository instance = SatelliteRepository();
+
   final ApiClient _client;
 
   SatelliteRepository({ApiClient? client}) : _client = client ?? ApiClient();
@@ -43,5 +45,18 @@ class SatelliteRepository {
       queryParameters: {'months': months},
     );
     return VegetationTimeSeriesData.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<SatelliteSpatialMetadata?> getSpatialMetadata(String farmId) async {
+    try {
+      final res = await _client.get('${_satelliteBasePath(farmId)}/latest/spatial-metadata');
+      return SatelliteSpatialMetadata.fromJson(res as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String getRasterMapUrl(String farmId, String indexType) {
+    return '${_client.baseUrl}${_satelliteBasePath(farmId)}/latest/raster-map?index_type=$indexType';
   }
 }

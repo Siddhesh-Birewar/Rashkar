@@ -304,10 +304,25 @@ def test_satellite_sync_and_timeseries_endpoints(client):
     obs_list = res.json()
     assert len(obs_list) >= 1
 
-    # 4. Get vegetation timeseries
+    # 4. Get vegetation timeseries (genuine observations without synthetic fabrication)
     res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/timeseries?months=6")
     assert res.status_code == 200
     ts = res.json()
-    assert len(ts["series"]) >= 3
+    assert len(ts["series"]) >= 1
     assert ts["vegetation_interpretation"] != ""
     assert "MUST NEVER be interpreted as direct diagnoses" in ts["scientific_disclaimer"]
+
+    # 5. Get spatial raster metadata
+    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/spatial-metadata")
+    assert res.status_code == 200
+    meta = res.json()
+    assert meta["farm_id"] == str(TEST_FARM_ID)
+    assert meta["spatial_resolution_meters"] == 10.0
+    assert len(meta["bounds"]) == 4
+
+    # 6. Get derived raster map image (PNG)
+    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/raster-map?index_type=ndvi")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "image/png"
+    assert len(res.content) > 0
+    assert "X-Raster-Bounds" in res.headers
