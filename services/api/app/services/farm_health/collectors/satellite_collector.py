@@ -43,9 +43,14 @@ class SatelliteCollector(BaseDomainCollector):
         now = utc_now()
 
         # Query latest observation (ordered by observation date and creation timestamp)
+        # Excludes isolated synthetic QA records and failed retrieval records
         obs = (
             db.query(SatelliteVegetationObservationModel)
-            .filter(SatelliteVegetationObservationModel.farm_id == farm_id)
+            .filter(
+                SatelliteVegetationObservationModel.farm_id == farm_id,
+                SatelliteVegetationObservationModel.quality_status != "SYNTHETIC_QA_ISOLATED",
+                SatelliteVegetationObservationModel.quality_status != "NO_USABLE_OBSERVATION",
+            )
             .order_by(
                 SatelliteVegetationObservationModel.observation_date.desc(),
                 SatelliteVegetationObservationModel.created_at.desc(),

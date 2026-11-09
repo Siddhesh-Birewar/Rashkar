@@ -147,21 +147,42 @@ class TestCopernicusMockProvider:
 
     def test_mock_polygon_indices_computation_and_provenance(self):
         """Verify computation over Baramati demonstration geometry with explicit mock provenance."""
+        import unittest.mock
         qa_polygon = {
             "type": "Polygon",
             "coordinates": [[[74.5, 18.1], [74.52, 18.1], [74.52, 18.12], [74.5, 18.12], [74.5, 18.1]]]
         }
-        res = copernicus_client.compute_polygon_indices(qa_polygon, farm_area_ha=2.5)
+        mock_raster_result = {
+            "sensor": "Sentinel-2 L2A",
+            "spatial_resolution_meters": 10.0,
+            "b11_native_resolution_meters": 20.0,
+            "b08_native_resolution_meters": 10.0,
+            "target_grid_meters": 10.0,
+            "resampling_method": "bilinear",
+            "copernicus_provider_status": "AUTHENTICATED",
+            "mean_ndvi": 0.58,
+            "mean_ndmi": 0.25,
+            "valid_pixel_count": 50,
+            "quality_status": "VALID_OBSERVATION",
+        }
+        with unittest.mock.patch.object(copernicus_client, "fetch_live_raster_indices", return_value=mock_raster_result):
+            res = copernicus_client.compute_polygon_indices(qa_polygon, farm_area_ha=2.5)
+            assert res["sensor"] == "Sentinel-2 L2A"
+            assert res["spatial_resolution_meters"] == 10.0
+            assert res["b11_native_resolution_meters"] == 20.0
+            assert res["b08_native_resolution_meters"] == 10.0
+            assert res["target_grid_meters"] == 10.0
+            assert res["resampling_method"] == "bilinear"
+            assert res["copernicus_provider_status"] == "AUTHENTICATED"
+            assert res["mean_ndvi"] is not None
+            assert 0.0 <= res["mean_ndvi"] <= 1.0
 
-        assert res["sensor"] == "Sentinel-2 L2A"
-        assert res["spatial_resolution_meters"] == 10.0
-        assert res["b11_native_resolution_meters"] == 20.0
-        assert res["b08_native_resolution_meters"] == 10.0
-        assert res["target_grid_meters"] == 10.0
-        assert res["resampling_method"] == "bilinear"
-        assert res["copernicus_provider_status"] in ("STANDALONE_DETERMINISTIC_MODEL", "AUTHENTICATED")
-        assert res["mean_ndvi"] is not None
-        assert 0.0 <= res["mean_ndvi"] <= 1.0
+        # Unmocked / retrieval failure must fail closed to PROVIDER_UNAVAILABLE
+        with unittest.mock.patch.object(copernicus_client, "fetch_live_raster_indices", return_value=None):
+            res_fail = copernicus_client.compute_polygon_indices(qa_polygon, farm_area_ha=2.5)
+            assert res_fail["quality_status"] == "NO_USABLE_OBSERVATION"
+            assert res_fail["copernicus_provider_status"] == "PROVIDER_UNAVAILABLE"
+            assert res_fail["mean_ndvi"] is None
 
 
 # ===========================================================================

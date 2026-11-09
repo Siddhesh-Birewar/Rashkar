@@ -91,20 +91,40 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
       final meta = await _repository.getSpatialMetadata(widget.farmId);
 
       if (!mounted) return;
+      final effectiveObs = obs ?? _latest;
+      final now = DateTime.now();
+      final isToday = effectiveObs != null &&
+          effectiveObs.observationDate.year == now.year &&
+          effectiveObs.observationDate.month == now.month &&
+          effectiveObs.observationDate.day == now.day;
+
+      String feedbackMsg;
+      bool isError;
+      if (obs != null && isToday) {
+        feedbackMsg = 'Sentinel-2 imagery successfully synced!';
+        isError = false;
+      } else if (effectiveObs != null) {
+        feedbackMsg = 'Live Sentinel-2 pass unavailable. Preserving latest historical observation (${_formatDate(effectiveObs.observationDate)}).';
+        isError = true;
+      } else {
+        feedbackMsg = 'Live Sentinel-2 pass unavailable. No historical observations recorded.';
+        isError = true;
+      }
+
       setState(() {
-        _latest = obs;
+        _latest = effectiveObs;
         _timeSeries = ts;
         _spatialMeta = meta;
         _isSyncing = false;
-        _syncFeedbackMessage = 'Sentinel-2 imagery successfully synced!';
-        _syncFeedbackIsError = false;
+        _syncFeedbackMessage = feedbackMsg;
+        _syncFeedbackIsError = isError;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sentinel-2 observation successfully retrieved and processed!'),
-          backgroundColor: Color(0xFF2E7D32),
-          duration: Duration(seconds: 4),
+        SnackBar(
+          content: Text(feedbackMsg),
+          backgroundColor: isError ? Colors.orange.shade800 : const Color(0xFF2E7D32),
+          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
@@ -113,7 +133,9 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
       final is409 = errorStr.contains('409') || errorStr.contains('already in progress');
       final msg = is409
           ? 'Satellite sync is already in progress for this farm. Please wait a moment.'
-          : 'Sync failed: $e';
+          : (_latest != null
+              ? 'Live pass retrieval failed. Displaying latest historical observation (${_formatDate(_latest!.observationDate)}).'
+              : 'Sync failed: $e');
 
       setState(() {
         _isSyncing = false;
@@ -374,6 +396,11 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
         ? '${obs.rasterDiscretizedAreaHectares!.toStringAsFixed(2)} ha (${obs.totalPixelCount} cells)'
         : '${obs.totalPixelCount} cells';
 
+    final now = DateTime.now();
+    final isToday = obs.observationDate.year == now.year &&
+        obs.observationDate.month == now.month &&
+        obs.observationDate.day == now.day;
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -399,6 +426,29 @@ class _SatelliteVegetationScreenState extends State<SatelliteVegetationScreen> {
               ],
             ),
             const Divider(height: 20),
+            if (!isToday) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFF59E0B)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history_rounded, size: 18, color: Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Historical Observation: Acquired on ${_formatDate(obs.observationDate)} (${obs.sensor}). Live satellite pass unavailable.',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Wrap(
               spacing: 24,
               runSpacing: 10,
