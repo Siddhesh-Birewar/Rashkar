@@ -667,6 +667,44 @@ class ApiService {
     return _offlineDraftCases;
   }
 
+  static Future<List<CropLossCase>> getReviewerQueue() async {
+    try {
+      final uri = Uri.parse('$baseUrl/pmfby/reviewer/queue');
+      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List list = json.decode(response.body);
+        return list.map((item) => CropLossCase.fromJson(item)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<CropLossCase?> submitReviewDecision({
+    required String caseId,
+    required String reviewerId,
+    required String decision,
+    required String rationale,
+    String? compensationBasis,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/pmfby/cases/$caseId/review');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'reviewer_id': reviewerId,
+          'decision': decision,
+          'rationale': rationale,
+          'recommended_compensation_basis': compensationBasis ?? 'PMFBY Mid-Season Adversity (Clause 21.2)',
+        }),
+      ).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return CropLossCase.fromJson(json.decode(response.body));
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // --- 8. AI Grounded Assistant ---
   static Future<Map<String, dynamic>> sendAssistantMessage({
     required String farmerId,

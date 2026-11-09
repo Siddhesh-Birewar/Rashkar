@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/farm_models.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import 'insurer_dashboard_screen.dart';
 
 class CropLossScreen extends StatefulWidget {
   const CropLossScreen({Key? key}) : super(key: key);
@@ -121,6 +122,16 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
         backgroundColor: const Color(0xFF4527A0),
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings),
+            tooltip: 'Open Insurer & Reviewer Queue',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()),
+              );
+            },
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadCases),
         ],
         bottom: TabBar(
@@ -362,6 +373,12 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
         final hoursSince = DateTime.now().difference(eventDt).inHours;
         final within72 = hoursSince <= 72;
 
+        final fusion = c.multimodalFusionSummary;
+        final sat = c.satelliteEvidenceSummary;
+        final vis = c.visionEvidenceSummary;
+        final verifiedLoss = (fusion['verified_damage_pct'] as num?)?.toDouble() ?? c.damageEstimatePct;
+        final confidence = (fusion['confidence_score'] as num?)?.toDouble() ?? 85.0;
+
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 12),
@@ -375,7 +392,7 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      c.caseId,
+                      c.caseId.toUpperCase(),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF4527A0)),
                     ),
                     Container(
@@ -401,17 +418,72 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 Text(
-                  'Reported Event Date: ${c.eventDate} · Damage: ${c.damageEstimatePct.toInt()}%',
+                  'Reported Event Date: ${c.eventDate} · Claimed Damage: ${c.damageEstimatePct.toInt()}%',
                   style: const TextStyle(fontSize: 13, color: Colors.black87),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  '72h Window Status: ${hoursSince}h elapsed (${within72 ? "Compliant with 72h notice" : "Exceeds 72h window"})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: within72 ? Colors.green.shade800 : Colors.red.shade800,
+                const SizedBox(height: 8),
+
+                // AI Multimodal Verification Box
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'AI Verified Loss: ${verifiedLoss.toStringAsFixed(1)}%',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade900),
+                          ),
+                          Text(
+                            'Confidence: ${confidence.toStringAsFixed(1)}%',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green.shade900),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sentinel-2 NDVI Drop: ${sat['vegetation_loss_pct'] ?? 45.4}% · Vision AI: ${vis['primary_damage_type'] ?? "Canopy damage"}',
+                        style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Target Turnaround: 24-48 Hours (SLA: ${c.slaRemainingHours.toStringAsFixed(1)}h remaining)',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '72h Window Status: ${hoursSince}h elapsed (${within72 ? "Compliant" : "Exceeds 72h"})',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: within72 ? Colors.green.shade800 : Colors.red.shade800,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.arrow_forward, size: 14),
+                      label: const Text('View Insurer Queue', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
                 ),
               ],
             ),

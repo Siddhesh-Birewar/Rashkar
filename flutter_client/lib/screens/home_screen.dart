@@ -8,6 +8,7 @@ import 'crop_loss_screen.dart';
 import 'ask_rashkar_screen.dart';
 import 'farm_registration_screen.dart';
 import 'edit_profile_screen.dart';
+import 'insurer_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenRegistration;
@@ -687,6 +688,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _buildLargeFeatureButton(
+          icon: Icons.admin_panel_settings_outlined,
+          title: 'PMFBY Insurer & Surveyor Queue',
+          subtitle: 'Multimodal AI Loss Verification • 48-Hour SLA Protocol',
+          color: Colors.blue.shade900,
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()));
+          },
         ),
       ],
     );

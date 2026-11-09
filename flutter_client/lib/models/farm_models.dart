@@ -272,6 +272,8 @@ class WorkerHourlyProjection {
   final double thresholdLimitC;
   final String trend;
   final String workRestCycle;
+  final double? heatIndexC;
+  final double? utciC;
 
   WorkerHourlyProjection({
     required this.forecastHourOffset,
@@ -287,6 +289,8 @@ class WorkerHourlyProjection {
     required this.thresholdLimitC,
     required this.trend,
     required this.workRestCycle,
+    this.heatIndexC,
+    this.utciC,
   });
 
   factory WorkerHourlyProjection.fromJson(Map<String, dynamic> json) {
@@ -304,6 +308,8 @@ class WorkerHourlyProjection {
       thresholdLimitC: (json['threshold_limit_c'] as num?)?.toDouble() ?? 28.0,
       trend: json['trend'] ?? 'STEADY',
       workRestCycle: json['work_rest_cycle'] ?? 'Continuous work',
+      heatIndexC: (json['heat_index_c'] as num?)?.toDouble(),
+      utciC: (json['utci_c'] as num?)?.toDouble(),
     );
   }
 }
@@ -322,6 +328,12 @@ class WorkerHeatResponse {
   final double currentWindSpeedKmh;
   final double currentSolarRadiationWm2;
   final double currentWbgtEstimatedC;
+  final double? currentHeatIndexC;
+  final double? currentUtciC;
+  final Map<String, dynamic> personalizedHeatStrainScore;
+  final Map<String, dynamic> topographicDownscaling;
+  final Map<String, dynamic> mlForecastMetadata;
+  final String nextAssessmentRefreshIst;
   final String dataConfidence;
 
   final String peakRiskHourIst;
@@ -392,6 +404,12 @@ class WorkerHeatResponse {
     this.currentWindSpeedKmh = 6.5,
     this.currentSolarRadiationWm2 = 600.0,
     required this.currentWbgtEstimatedC,
+    this.currentHeatIndexC,
+    this.currentUtciC,
+    this.personalizedHeatStrainScore = const {},
+    this.topographicDownscaling = const {},
+    this.mlForecastMetadata = const {},
+    this.nextAssessmentRefreshIst = '',
     this.dataConfidence = 'HIGH',
     this.peakRiskHourIst = '',
     this.peakRiskReason = '',
@@ -450,6 +468,12 @@ class WorkerHeatResponse {
       currentWindSpeedKmh: (json['current_wind_speed_kmh'] as num?)?.toDouble() ?? 6.5,
       currentSolarRadiationWm2: (json['current_solar_radiation_wm2'] as num?)?.toDouble() ?? 600.0,
       currentWbgtEstimatedC: (json['current_wbgt_estimated_c'] as num?)?.toDouble() ?? 27.8,
+      currentHeatIndexC: (json['current_heat_index_c'] as num?)?.toDouble(),
+      currentUtciC: (json['current_utci_c'] as num?)?.toDouble(),
+      personalizedHeatStrainScore: Map<String, dynamic>.from(json['personalized_heat_strain_score'] ?? {}),
+      topographicDownscaling: Map<String, dynamic>.from(json['topographic_downscaling'] ?? {}),
+      mlForecastMetadata: Map<String, dynamic>.from(json['ml_forecast_metadata'] ?? {}),
+      nextAssessmentRefreshIst: json['next_assessment_refresh_ist'] ?? '',
       dataConfidence: json['data_confidence'] ?? 'HIGH',
       peakRiskHourIst: json['peak_risk_hour_ist'] ?? '',
       peakRiskReason: json['peak_risk_reason'] ?? '',
@@ -632,6 +656,8 @@ class CropHeatAssessment {
 
   final List<CropHeatIntervention> recommendedInterventions;
   final List<Map<String, dynamic>> assessmentHistory;
+  final Map<String, dynamic> personalizedCropVulnerabilityScore;
+  final Map<String, dynamic> topographicDownscaling;
 
   // Compatibility getters
   String get stageCode => growthStageCode ?? 'unknown';
@@ -687,6 +713,8 @@ class CropHeatAssessment {
     this.stageBiologicalVulnerability = '',
     this.recommendedInterventions = const [],
     this.assessmentHistory = const [],
+    this.personalizedCropVulnerabilityScore = const {},
+    this.topographicDownscaling = const {},
   });
 
   factory CropHeatAssessment.fromJson(Map<String, dynamic> json) {
@@ -741,6 +769,8 @@ class CropHeatAssessment {
       stageBiologicalVulnerability: json['stage_biological_vulnerability'] ?? '',
       recommendedInterventions: rawInterventions.map((i) => CropHeatIntervention.fromJson(i)).toList(),
       assessmentHistory: List<Map<String, dynamic>>.from(rawHistory),
+      personalizedCropVulnerabilityScore: Map<String, dynamic>.from(json['personalized_crop_vulnerability_score'] ?? {}),
+      topographicDownscaling: Map<String, dynamic>.from(json['topographic_downscaling'] ?? {}),
     );
   }
 }
@@ -1018,6 +1048,12 @@ class CropLossCase {
   final List<String> photoUrls;
   final String dossierStatus;
   final Map<String, dynamic> weatherEvidenceSummary;
+  final Map<String, dynamic> satelliteEvidenceSummary;
+  final Map<String, dynamic> visionEvidenceSummary;
+  final Map<String, dynamic> multimodalFusionSummary;
+  final int slaTargetHours;
+  final double slaRemainingHours;
+  final String slaStatus;
   final String? reviewerDecision;
   final String? reviewerRationale;
   final String createdAt;
@@ -1036,6 +1072,12 @@ class CropLossCase {
     required this.photoUrls,
     required this.dossierStatus,
     required this.weatherEvidenceSummary,
+    this.satelliteEvidenceSummary = const {},
+    this.visionEvidenceSummary = const {},
+    this.multimodalFusionSummary = const {},
+    this.slaTargetHours = 48,
+    this.slaRemainingHours = 48.0,
+    this.slaStatus = "within_sla",
     this.reviewerDecision,
     this.reviewerRationale,
     required this.createdAt,
@@ -1056,6 +1098,12 @@ class CropLossCase {
       photoUrls: List<String>.from(json['photo_urls'] ?? []),
       dossierStatus: json['dossier_status'] ?? 'draft_saved',
       weatherEvidenceSummary: Map<String, dynamic>.from(json['weather_evidence_summary'] ?? {}),
+      satelliteEvidenceSummary: Map<String, dynamic>.from(json['satellite_evidence_summary'] ?? {}),
+      visionEvidenceSummary: Map<String, dynamic>.from(json['vision_evidence_summary'] ?? {}),
+      multimodalFusionSummary: Map<String, dynamic>.from(json['multimodal_fusion_summary'] ?? {}),
+      slaTargetHours: (json['sla_target_hours'] as num?)?.toInt() ?? 48,
+      slaRemainingHours: (json['sla_remaining_hours'] as num?)?.toDouble() ?? 48.0,
+      slaStatus: json['sla_status'] ?? 'within_sla',
       reviewerDecision: json['reviewer_decision'],
       reviewerRationale: json['reviewer_rationale'],
       createdAt: json['created_at'] ?? '',

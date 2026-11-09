@@ -82,6 +82,8 @@ class CropHeatAssessmentResponse(BaseModel):
     evidence_status: str = "VERIFIED_PUBLISHED"
     institution_attribution: Optional[str] = "ICAR-CRIDA / State Agricultural Universities (SAU)"
     thermal_analysis: Optional[Dict[str, Any]] = None
+    personalized_crop_vulnerability_score: Optional[Dict[str, Any]] = None
+    topographic_downscaling: Optional[Dict[str, Any]] = None
     
     # Section 3: Multi-day outlook
     daily_outlook: List[DailyCropHeatOutlook]

@@ -18,6 +18,7 @@ class NoCacheHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 def run(port=8080):
     os.chdir(DIRECTORY)
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", port), NoCacheHTTPRequestHandler) as httpd:
         print(f"Serving Flutter Web without cache on http://127.0.0.1:{port} from {DIRECTORY}")
         sys.stdout.flush()

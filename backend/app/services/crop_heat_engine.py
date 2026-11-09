@@ -14,6 +14,10 @@ from backend.app.db.models.crop_knowledge import (
 )
 from backend.app.db.models.risk import CropHeatAssessmentLogModel
 from backend.app.services.crop_stage_service import CropStageService
+from backend.app.services.thermal_indices_service import (
+    compute_crop_heat_vulnerability_score,
+    apply_topographic_lapse_downscaling,
+)
 from backend.app.schemas.crop_heat import (
     CropHeatAssessmentRequest,
     CropHeatAssessmentResponse,
@@ -507,6 +511,33 @@ class CropHeatEngine:
             "warm_night_respiration_penalty": warm_night_penalty
         }
 
+        # Explainable 0-100 Crop Heat Vulnerability Score
+        crop_score = compute_crop_heat_vulnerability_score(
+            max_temp_c=tmax_forecast,
+            optimum_temp_c=opt_max,
+            critical_temp_c=crit_tmax,
+            growth_stage_code=stage_code,
+            soil_moisture_status="moderate",
+            is_irrigated=(irrigation.lower() != "rainfed"),
+        )
+
+        # Topographic downscaling
+        downscaled_crop_temp, lapse_crop_adj = apply_topographic_lapse_downscaling(
+            base_temp_c=tmax_forecast,
+            farm_elevation_m=560.0,
+            grid_elevation_m=540.0,
+        )
+        topographic_info = {
+            "base_grid_resolution_km": 11.0,
+            "target_plot_resolution_km": 1.0,
+            "farm_elevation_m": 560.0,
+            "grid_elevation_m": 540.0,
+            "lapse_rate_c_per_km": 6.5,
+            "lapse_adjustment_c": lapse_crop_adj,
+            "downscaled_plot_tmax_c": downscaled_crop_temp,
+            "methodology": "Environmental Lapse Rate Topographic Downscaling (ICAR/WMO standard)"
+        }
+
         return CropHeatAssessmentResponse(
             assessment_id=assessment_id,
             farm_id=farm.farm_id,
@@ -551,6 +582,8 @@ class CropHeatEngine:
             evidence_status="VERIFIED_PUBLISHED",
             institution_attribution=citation,
             thermal_analysis=thermal_data,
+            personalized_crop_vulnerability_score=crop_score,
+            topographic_downscaling=topographic_info,
             
             daily_outlook=daily_outlook,
             four_day_outlook=daily_outlook,

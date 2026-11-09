@@ -37,6 +37,8 @@ class HourlyHeatRiskProjection(BaseModel):
     solar_irradiance_wm2: float
     wbgt_estimated_c: float
     wbgt_effective_c: float
+    heat_index_c: Optional[float] = None
+    utci_c: Optional[float] = None
     hazard_level: str
     exceeds_screening_threshold: bool
     threshold_limit_c: float
@@ -66,6 +68,12 @@ class WorkerHeatAssessmentResponse(BaseModel):
     current_wind_speed_kmh: float
     current_solar_radiation_wm2: float
     current_wbgt_estimated_c: float
+    current_heat_index_c: Optional[float] = None
+    current_utci_c: Optional[float] = None
+    personalized_heat_strain_score: Optional[Dict[str, Any]] = None
+    topographic_downscaling: Optional[Dict[str, Any]] = None
+    ml_forecast_metadata: Optional[Dict[str, Any]] = None
+    next_assessment_refresh_ist: Optional[str] = None
     data_confidence: str = "HIGH"
     missing_variables: List[str] = Field(default_factory=list)
     missing_variables_warning: Optional[str] = None

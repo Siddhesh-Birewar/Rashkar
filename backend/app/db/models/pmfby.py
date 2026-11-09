@@ -25,7 +25,9 @@ class CropLossCaseModel(Base):
     gps_latitude = Column(Float, nullable=True)
     gps_longitude = Column(Float, nullable=True)
     weather_evidence_summary = Column(JSON, default=dict)  # Associated IMD/ERA5 weather anomalies
-    satellite_evidence_summary = Column(JSON, default=dict)  # Vegetation index change if available
+    satellite_evidence_summary = Column(JSON, default=dict)  # Vegetation index change (Sentinel-2 NDVI, NDWI, EVI)
+    vision_evidence_summary = Column(JSON, default=dict)  # YOLOv8, U-Net, ViT damage analysis
+    multimodal_fusion_summary = Column(JSON, default=dict)  # Fused % loss, confidence score, and routing recommendation
     dossier_status = Column(String(50), default="draft_saved")  # draft_saved, evidence_submitted, under_review, review_completed
     is_demo_synthetic = Column(Boolean, default=True)  # Clearly labels demo vs actual legal records
     
