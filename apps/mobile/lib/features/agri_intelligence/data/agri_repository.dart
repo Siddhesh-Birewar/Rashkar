@@ -84,6 +84,18 @@ class AgriIntelligenceRepository {
     return CropHeatResult.fromJson(json);
   }
 
+  Future<FarmHeatRiskResult> assessFarmHeat(
+    String farmId, {
+    required String cropCode,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      ApiConstants.heatRiskFarm(farmId),
+      body: {'crop_code': cropCode, 'include_worker_heat': true},
+      fromJson: (j) => j as Map<String, dynamic>,
+    );
+    return FarmHeatRiskResult.fromJson(json);
+  }
+
   Future<WorkerHeatResult> assessWorkerHeat({
     required double airTempC,
     required double relativeHumidityPct,

@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cropnet_mobile/core/router/farm_state.dart';
 
 import '../../../../core/utils/native_file_picker.dart';
 import '../../../../shared/responsive/breakpoints.dart';
@@ -41,6 +42,13 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
   CropHeatResult? _cropHeatResult;
   String? _cropHeatError;
 
+  // Farm heat-risk state
+  List<dynamic> _farms = const [];
+  String? _selectedFarmId;
+  bool _farmRiskLoading = false;
+  FarmHeatRiskResult? _farmRiskResult;
+  String? _farmRiskError;
+
   // Worker heat state
   final _airTempCtrl = TextEditingController(text: '37');
   final _rhCtrl = TextEditingController(text: '60');
@@ -56,6 +64,47 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
     super.initState();
     _repo = widget.repository ?? AgriIntelligenceRepository.instance;
     _tabs = TabController(length: 2, vsync: this);
+    _loadFarms();
+  }
+
+  Future<void> _loadFarms() async {
+    try {
+      if (FarmRepository.instance.farms.isEmpty) {
+        await FarmRepository.instance.loadFarms();
+      }
+      if (!mounted) return;
+      setState(() {
+        _farms = FarmRepository.instance.farms;
+        if (_selectedFarmId == null && _farms.isNotEmpty) {
+          _selectedFarmId = _farms.first.id as String;
+        }
+      });
+    } catch (_) {
+      // Farm list is optional; the rest of the hub still works.
+    }
+  }
+
+  Future<void> _assessFarmHeat() async {
+    final farmId = _selectedFarmId;
+    if (farmId == null) return;
+    setState(() {
+      _farmRiskLoading = true;
+      _farmRiskError = null;
+    });
+    try {
+      final res = await _repo.assessFarmHeat(farmId, cropCode: _cropCode);
+      if (!mounted) return;
+      setState(() {
+        _farmRiskResult = res;
+        _farmRiskLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _farmRiskLoading = false;
+        _farmRiskError = e.toString().replaceAll('Exception: ', '');
+      });
+    }
   }
 
   @override
@@ -294,6 +343,8 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildFarmHeatSection(),
+          const Divider(height: 28),
           _sectionTitle('Crop Heat-Stress Assessment'),
           const Text('Verified thermal physiology for soybean, cotton, jowar and onion.',
               style: TextStyle(fontSize: 12, color: Colors.black54)),
@@ -376,6 +427,97 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
             _workerHeatCard(_workerHeatResult!),
           ],
           AppSpacing.verticalSpaceXXL,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFarmHeatSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle('Farm Heat Risk (weather-backed)'),
+        const Text(
+          "Uses the farm's live weather forecast and its crop context. Assessment is marked as limited when data is missing.",
+          style: TextStyle(fontSize: 12, color: Colors.black54),
+        ),
+        AppSpacing.verticalSpaceSM,
+        if (_farms.isEmpty)
+          const Text('No farms available. Create a farm first.', style: TextStyle(fontSize: 12, color: Colors.black54))
+        else
+          DropdownButtonFormField<String>(
+            initialValue: _selectedFarmId,
+            decoration: const InputDecoration(labelText: 'Farm', border: OutlineInputBorder()),
+            items: _farms
+                .map((f) => DropdownMenuItem<String>(
+                      value: f.id as String,
+                      child: Text(f.name as String),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedFarmId = v),
+          ),
+        AppSpacing.verticalSpaceSM,
+        FilledButton.icon(
+          onPressed: _farmRiskLoading || _selectedFarmId == null ? null : _assessFarmHeat,
+          icon: _farmRiskLoading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.thermostat),
+          label: const Text('Assess farm heat risk'),
+        ),
+        if (_farmRiskError != null) ...[AppSpacing.verticalSpaceSM, _errorCard(_farmRiskError!)],
+        if (_farmRiskResult != null) ...[AppSpacing.verticalSpaceSM, _farmRiskCard(_farmRiskResult!)],
+      ],
+    );
+  }
+
+  Widget _farmRiskCard(FarmHeatRiskResult r) {
+    final color = switch (r.riskCategory) {
+      'CRITICAL' => const Color(0xFFC62828),
+      'HIGH' => const Color(0xFFE65100),
+      'MODERATE' => const Color(0xFFF9A825),
+      _ => const Color(0xFF2E7D32),
+    };
+    return Container(
+      decoration: AppDecorations.card(),
+      padding: AppSpacing.paddingAllLG,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${r.farmName} • ${r.cropCommonName} • ${r.stageName}',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          AppSpacing.verticalSpaceXS,
+          Text('${r.riskLabel} (${r.riskCategory})',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+          Text(
+            'Forecast ${r.tmax.toStringAsFixed(1)}°C / ${r.tmin.toStringAsFixed(1)}°C • '
+            '${r.hoursAbove.toStringAsFixed(1)} h above critical • warm night: ${r.warmNight ? "Yes" : "No"}',
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          if (r.dailyOutlook.isNotEmpty) ...[
+            AppSpacing.verticalSpaceSM,
+            const Text('Multi-day outlook', style: TextStyle(fontWeight: FontWeight.w600)),
+            for (final d in r.dailyOutlook)
+              Text('${d["date"]}: ${d["tmax_c"]}°C / ${d["tmin_c"]}°C — ${d["risk_category"]}',
+                  style: const TextStyle(fontSize: 12)),
+          ],
+          if (r.interventions.isNotEmpty) ...[
+            AppSpacing.verticalSpaceSM,
+            const Text('Recommended interventions', style: TextStyle(fontWeight: FontWeight.w600)),
+            for (final i in r.interventions)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text('• ${i["title"]}: ${i["description"]}', style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+          if (r.limitations.isNotEmpty) ...[
+            AppSpacing.verticalSpaceSM,
+            const Text('Assessment limitations',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.orange)),
+            for (final l in r.limitations)
+              Text('• $l', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+          ],
+          AppSpacing.verticalSpaceXS,
+          Text(r.provenance, style: const TextStyle(fontSize: 11, color: Colors.black45)),
         ],
       ),
     );

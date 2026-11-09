@@ -80,4 +80,5 @@ class ApiConstants {
   static const String heatRiskCrop = '$apiV1Prefix/heat-risk/crop';
   static const String heatRiskWorker = '$apiV1Prefix/heat-risk/worker';
   static const String heatRiskCrops = '$apiV1Prefix/heat-risk/crops';
+  static String heatRiskFarm(String farmId) => '$apiV1Prefix/heat-risk/farm/$farmId';
 }

@@ -117,3 +117,65 @@ class WorkerHeatResult {
     );
   }
 }
+
+class FarmHeatRiskResult {
+  final String farmName;
+  final String cropCommonName;
+  final String stageName;
+  final String riskCategory;
+  final String riskLabel;
+  final double tmax;
+  final double tmin;
+  final double hoursAbove;
+  final bool warmNight;
+  final List<Map<String, dynamic>> dailyOutlook;
+  final List<Map<String, dynamic>> interventions;
+  final List<String> limitations;
+  final String provenance;
+  final String weatherSource;
+
+  const FarmHeatRiskResult({
+    required this.farmName,
+    required this.cropCommonName,
+    required this.stageName,
+    required this.riskCategory,
+    required this.riskLabel,
+    required this.tmax,
+    required this.tmin,
+    required this.hoursAbove,
+    required this.warmNight,
+    required this.dailyOutlook,
+    required this.interventions,
+    required this.limitations,
+    required this.provenance,
+    required this.weatherSource,
+  });
+
+  factory FarmHeatRiskResult.fromJson(Map<String, dynamic> json) {
+    return FarmHeatRiskResult(
+      farmName: json['farm_name'] as String? ?? '',
+      cropCommonName: json['crop_common_name'] as String? ?? '',
+      stageName: json['growth_stage_name'] as String? ?? '',
+      riskCategory: json['risk_category'] as String? ?? 'UNKNOWN',
+      riskLabel: json['risk_label'] as String? ?? '',
+      tmax: (json['forecast_tmax_c'] as num?)?.toDouble() ?? 0,
+      tmin: (json['forecast_tmin_c'] as num?)?.toDouble() ?? 0,
+      hoursAbove: (json['hours_above_critical'] as num?)?.toDouble() ?? 0,
+      warmNight: json['warm_night_hazard'] as bool? ?? false,
+      dailyOutlook: (json['daily_outlook'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
+      interventions: (json['interventions'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
+      limitations: (json['limitations'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      provenance: json['provenance'] as String? ?? '',
+      weatherSource: json['weather_source'] as String? ?? '',
+    );
+  }
+}
