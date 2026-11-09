@@ -86,7 +86,7 @@ def assistant_chat(request: ChatMessageRequest, db: Session = Depends(get_db)):
     chat_result = OllamaAgentService.generate_chat_response(
         message=request.message,
         context=ctx,
-        timeout=15.0
+        timeout=60.0
     )
 
     reply_text = chat_result["reply"]

@@ -12,7 +12,7 @@ from backend.app.services.crop_stage_service import CropStageService
 from backend.app.services.opportunity_feasibility_engine import OpportunityFeasibilityEngine
 from backend.app.schemas.income import FarmerResourceProfile
 
-OLLAMA_API_URL = "http://127.0.0.1:11434/api/generate"
+OLLAMA_API_URL = "http://127.0.0.1:11434/api/chat"
 DEFAULT_MODEL = "qwen3:8b"
 
 class OllamaAgentService:
@@ -155,28 +155,29 @@ class OllamaAgentService:
         message: str,
         context: Dict[str, Any],
         model: str = DEFAULT_MODEL,
-        timeout: float = 30.0
+        timeout: float = 60.0
     ) -> Dict[str, Any]:
-        """Generates grounded response using Ollama with automatic template fallback."""
+        """Generates grounded response using Ollama /api/chat with automatic template fallback."""
         sys_prompt = cls.build_system_prompt(context)
-        full_prompt = f"<|im_start|>system\n{sys_prompt}<|im_end|>\n<|im_start|>user\n{message}<|im_end|>\n<|im_start|>assistant\n"
 
         try:
             payload = {
                 "model": model,
-                "prompt": full_prompt,
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": message}
+                ],
                 "stream": False,
                 "options": {
                     "temperature": 0.3,
                     "top_p": 0.85,
-                    "num_predict": 180
                 }
             }
             with httpx.Client(timeout=timeout) as client:
                 res = client.post(OLLAMA_API_URL, json=payload)
                 if res.status_code == 200:
                     data = res.json()
-                    response_text = data.get("response", "").strip()
+                    response_text = data.get("message", {}).get("content", "").strip() or data.get("response", "").strip()
                     if response_text:
                         return {
                             "reply": response_text,
@@ -184,8 +185,8 @@ class OllamaAgentService:
                             "model_name": model,
                             "is_fallback": False
                         }
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[OLLAMA_SERVICE_ERROR] Failed to query Ollama at {OLLAMA_API_URL}: {type(e).__name__}: {e}")
 
         # Deterministic Grounded Fallback if Ollama is unreachable
         return {
@@ -205,17 +206,18 @@ class OllamaAgentService:
     ) -> Generator[str, None, None]:
         """Yields Server-Sent Events (SSE) data stream."""
         sys_prompt = cls.build_system_prompt(context)
-        full_prompt = f"<|im_start|>system\n{sys_prompt}<|im_end|>\n<|im_start|>user\n{message}<|im_end|>\n<|im_start|>assistant\n"
 
         try:
             payload = {
                 "model": model,
-                "prompt": full_prompt,
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": message}
+                ],
                 "stream": True,
                 "options": {
                     "temperature": 0.3,
                     "top_p": 0.85,
-                    "num_predict": 180
                 }
             }
             with httpx.Client(timeout=timeout) as client:
@@ -225,7 +227,7 @@ class OllamaAgentService:
                             if line:
                                 try:
                                     chunk_json = json.loads(line)
-                                    token = chunk_json.get("response", "")
+                                    token = chunk_json.get("message", {}).get("content", "") or chunk_json.get("response", "")
                                     done = chunk_json.get("done", False)
                                     yield f"data: {json.dumps({'token': token, 'done': done, 'provider': 'ollama'})}\n\n"
                                     if done:

@@ -866,7 +866,7 @@ class ApiService {
           'message': message,
           'session_id': sessionId,
         }),
-      ).timeout(const Duration(seconds: 25));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
