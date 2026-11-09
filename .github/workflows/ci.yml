@@ -2,7 +2,7 @@ name: Rashkar CI
 
 on:
   push:
-    branches: [ master, main, "yeild-and-heat-risk-feature" ]
+    branches: [ master, main, "yeild-and-heat-risk-feature", "yield-and-heat-risk-feature" ]
   pull_request:
     branches: [ master, main ]
 

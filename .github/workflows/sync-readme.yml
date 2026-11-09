@@ -1,0 +1,61 @@
+name: Sync README to Main
+
+on:
+  push:
+    branches:
+      - "yeild-and-heat-risk-feature"
+      - "yield-and-heat-risk-feature"
+    paths:
+      - "README.md"
+  workflow_dispatch:
+
+jobs:
+  sync-readme:
+    name: Synchronize README to Main Branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Main Branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-repo
+          fetch-depth: 1
+
+      - name: Checkout Feature Branch README
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          path: feature-repo
+          sparse-checkout: |
+            README.md
+          sparse-checkout-cone-mode: false
+
+      - name: Copy README and Verify Diff
+        run: |
+          cp feature-repo/README.md main-repo/README.md
+          cd main-repo
+          
+          # Check status
+          git status --porcelain
+          
+          # Strictly verify that ONLY README.md has changes
+          CHANGED_FILES=$(git status --porcelain | awk '{print $2}')
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changes in README.md; skipping sync."
+            exit 0
+          fi
+          
+          if [ "$CHANGED_FILES" != "README.md" ]; then
+            echo "SECURITY VIOLATION: Files other than README.md were modified: $CHANGED_FILES"
+            echo "Refusing to commit to main!"
+            exit 1
+          fi
+
+          echo "Diff strictly verified to affect only README.md."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs(readme): sync root README from ${{ github.ref_name }} [skip ci]"
+          git push origin main

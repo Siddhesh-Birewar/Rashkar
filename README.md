@@ -18,13 +18,21 @@ Instead of disconnected static dashboards, Rashkar operates on a unified model o
 1. **What is happening on my farm right now?**
 2. **What specific, verified action should I take next?**
 
-### Key Modules
-- **Worker Heat Risk**: High-resolution 0–6 hour wet-bulb globe temperature (WBGT) occupational safety screening using the Liljegren et al. (2008) physics engine calibrated to ACGIH 2023 TLVs and ISO 7243:2017 screening action limits. Features signed threshold comparisons, workload screening (light, moderate, heavy, very heavy), sun vs. shade micro-climate modeling, shift duration limitation warnings, and clinically reviewed emergency triage.
-- **Crop Heat Risk**: Phenological heat hazard assessment across 38 canonical Maharashtra crops. Tracks Days After Sowing (DAS), identifies biological stage vulnerabilities, alerts on expired crop cycles, and provides agronomist-reviewed, citation-backed interventions (distinguishing drip lateral pulse irrigation from micro-sprinkler canopy misting).
+### Core Product Pillars (Aligned with Official Hackathon Proposal)
+- **Pillar 1: Personalized Farm-Level Heat-Risk AI**:
+  - **Worker Heat Risk**: High-resolution 0–6 hour wet-bulb globe temperature (WBGT) occupational safety screening using the Liljegren et al. (2008) physics engine calibrated to ACGIH 2023 TLVs and ISO 7243:2017 screening action limits. Supports Rothfusz Heat Index, Steadman Apparent Temperature, UTCI polynomial approximations, signed threshold exceedance logic, workload screening (light, moderate, heavy, very heavy), sun vs. shade micro-climate modeling, shift duration limitation warnings, and clinically reviewed emergency triage.
+  - **Topographic Downscaling**: Elevation lapse-rate adjustment (-6.5°C / 1000m) for hyper-local thermal modeling.
+  - **Crop Heat Risk**: Phenological heat hazard assessment across 38 canonical Maharashtra crops. Tracks Days After Sowing (DAS), identifies biological stage vulnerabilities, alerts on expired crop cycles, and provides agronomist-reviewed, citation-backed interventions.
+  - **Validated ML Pipeline**: Random Forest extreme heat classifier (96.35% accuracy), XGBoost effective temperature regressor ($R^2 = 0.9981$), and PyTorch LSTM sequence forecast ($\text{MAE} = 0.308^\circ\text{C}$).
+- **Pillar 2: Plot-Level PMFBY Crop-Loss Verification**:
+  - **Optical & Spectral Analysis**: Sentinel-2 10m band deficit tracking for pre/post-event NDVI and NDWI vegetation health declines.
+  - **Multimodal Field Vision**: Computer vision pipeline incorporating YOLOv8 damage localization, U-Net area segmentation, and Vision Transformer (ViT) loss severity assessment.
+  - **Insurer Claim Dashboard**: Complete triage workflow with mandatory 48-hour SLA countdown timers, claim review dossiers, confidence thresholds, and real-time adjudication actions.
+
+### Supporting Capabilities
 - **Yield Intelligence & Yield Risk**: Multi-scenario yield benchmarking and climate risk analysis combining historical APY crop records with agro-climatic normal distributions (1991–2020 IMD normal baseline and 2010–2024 AgERA5 reanalysis).
 - **Income Diversification**: Practical farm enterprise addition (dairy, indigenous goat rearing, desi poultry, sericulture, apiary, shade net polyhouse) with realistic CAPEX, recurring OPEX, net margins, and water requirements calibrated to NABARD FY 2026-27 unit cost norms.
 - **AI Agricultural Assistant**: Grounded, contextual advice powered by local Ollama models (e.g. `qwen3:8b`) with transparent fallback to deterministic rule engines when AI runtimes are offline. Core agronomic calculations never depend on LLM generation.
-- **PMFBY Crop Loss Review**: Structured local documentation workflow for crop-loss evidence capture and formal claim dossier preparation under Pradhan Mantri Fasal Bima Yojana guidelines.
 
 ---
 
@@ -118,7 +126,7 @@ Open `http://127.0.0.1:8080` in your web browser.
 
 ### Backend Test Suite (Pytest)
 ```bash
-# Run all 43 backend unit, engine, and integration tests
+# Run all 52 backend unit, engine, and integration tests
 python -m pytest backend/tests/ -v
 ```
 
