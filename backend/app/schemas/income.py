@@ -43,6 +43,26 @@ class FarmerResourceProfile(BaseModel):
     risk_tolerance: str = Field(default="moderate", description="conservative, moderate, aggressive")
     category_preference: str = Field(default="all", description="all, zero_cash, very_low_cost, moderate_enterprise, crop_diversification, group_external")
 
+    # Farmer Age & Personal Circumstances (Part A)
+    age_range: Optional[str] = Field(
+        default="36-45",
+        description="under_25, 25-35, 36-45, 46-55, 56-65, above_65, prefer_not_to_say"
+    )
+    work_preference: Optional[str] = Field(
+        default="daily_physical",
+        description="daily_physical, light_physical, manage_supervise, family_help, hire_labor, low_attention"
+    )
+    payback_horizon: Optional[str] = Field(
+        default="within_6_months",
+        description="few_weeks, 3_to_6_months, 6_to_12_months, more_than_year"
+    )
+    family_management_role: Optional[str] = Field(
+        default="self",
+        description="self, family_member, multiple_family, hired_labor, fpo_group"
+    )
+    current_crop_code: Optional[str] = Field(default=None, description="Active standing crop code")
+    current_crop_stage: Optional[str] = Field(default=None, description="Current growth stage code")
+
     @property
     def is_zero_budget(self) -> bool:
         return self.available_investment_inr <= 0.0 and self.monthly_operating_budget_inr <= 0.0
@@ -87,7 +107,7 @@ class OpportunityCatalogItem(BaseModel):
 # -----------------------------------------------------------------------------
 class DiscoveredOpportunity(BaseModel):
     opportunity: OpportunityCatalogItem
-    feasibility_status: str  # FEASIBLE_WITH_CURRENT_RESOURCES, FEASIBLE_WITH_SMALL_ADDITIONAL_INPUT, REQUIRES_MORE_INFORMATION, NOT_CURRENTLY_AFFORDABLE, NOT_SUITABLE_FOR_LOCATION_OR_SEASON, MARKET_NOT_VERIFIED, NOT_RECOMMENDED
+    feasibility_status: str  # USES_EXISTING_RESOURCES, FEASIBLE_NOW, NOT_CURRENTLY_AFFORDABLE, NEEDS_MORE_WATER_OR_LABOR, EQUIPMENT_NOT_OWNED, NOT_SUITABLE_CURRENTLY
     suitability_score: int  # 0 to 100 based on weighted criteria
     is_feasible: bool
     capital_gap_inr: float = 0.0
@@ -95,6 +115,14 @@ class DiscoveredOpportunity(BaseModel):
     missing_requirements: List[str] = Field(default_factory=list)
     primary_benefit_label: str = ""
     evidence_source: str = ""
+    estimated_annual_profit_inr: float = 0.0
+    estimated_annual_savings_inr: float = 0.0
+    payback_months: float = 1.0
+    market_benchmark_summary: str = ""
+    tripartite_return: Optional[dict] = None
+    # 5 Clean Farmer Categories (Part D.13 & E.14)
+    feasibility_category: str = "CAN_TRY_WITH_WHAT_YOU_HAVE"  # CAN_TRY_WITH_WHAT_YOU_HAVE, CAN_TRY_WITH_SMALL_ADDITIONAL_AMOUNT, NEEDS_MORE_MONEY, NEEDS_MORE_INFORMATION, NOT_SUITABLE_CURRENTLY
+    farmer_summary_qa: Optional[Dict[str, Any]] = None  # 6 standard plain-language questions
     # Backward compatibility with earlier frontend models
     suitability_score_pct: Optional[int] = None
     is_suitable: Optional[bool] = None

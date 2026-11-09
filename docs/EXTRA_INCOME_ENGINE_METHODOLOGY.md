@@ -4,71 +4,60 @@
 
 The **Extra Income & Farm Diversification Engine** in Rashkar was completely rebuilt to move away from predetermined commercial catalogues towards **farmer-personalized opportunity discovery**. Rather than asking *"What commercial agriculture enterprise can I sell to this farmer?"*, the engine answers:
 
-> *"Given the exact resources, byproducts, spare land, water window, family labour, and capital I already have on my farm, what additional income can I realistically earn or what input expenses can I eliminate without taking destructive financial risks?"*
+> *"Given the exact resources, byproducts, spare land, water window, family labour, age and working preferences, and capital I already have on my farm, what additional income can I realistically earn or what input expenses can I eliminate without taking destructive financial risks?"*
 
 ---
 
-## 2. The 5 Opportunity Discovery Categories
+## 2. The 5 Clean Feasibility Categories
 
-Opportunities are classified and prioritized across five progressive tiers:
+Rather than relying on confusing numerical percentage scores, every enterprise is classified into five unmistakable categories based on multi-gate feasibility and capital gap audits:
 
-### Category A: Zero-Additional-Cash-Cost Opportunities (Evaluated First)
-*   **On-Farm Crop Residue Composting (`OPP_COMPOST_COST_SAVING_01`)**: Converts harvested crop biomass (soybean straw, cotton stalks, jowar stover) and cow dung into high-grade organic manure. Replaces 8–12 bags of commercial DAP/Urea, eliminating ₹14,000/year in input expenses at ₹0 upfront capital.
-*   **Collective Grain Aggregation & APMC Grading (`OPP_DIRECT_APMC_FPO_01`)**: Simple manual sieving, moisture checking, and collective aggregation with the local FPO capture a ₹250–₹350/quintal quality premium over distressed local trader gates.
-*   **Local Farm Equipment Sharing & Custom Hiring Pool (`OPP_EQUIPMENT_SHARING_01`)**: Custom hiring of farm tractor implements or sprayers during idle weekday windows.
-
-### Category B: Very Low-Cost Opportunities (< ₹15,000 Outlay)
-*   **Field Boundary Drumstick / Moringa Plantation (`OPP_MORINGA_BUND_01`)**: Cultivating 40–50 PKM-1 hybrid drumstick saplings on uncultivated field bunds using surplus runoff. Capital: ₹3,500; Annual Profit: ₹28,000.
-*   **Smallholder Backyard Poultry (`OPP_DESI_POULTRY_LOW_COST_01`)**: 20-bird indigenous Aseel/Kadaknath scavenged backyard flock. Capital: ₹4,500; Annual Profit: ₹18,000.
-*   **Azolla Bed Livestock Feed Supplement (`OPP_AZOLLA_FEED_SAVING_01`)**: 12x4 ft silpaulin pit growing protein-rich aquatic fern. Saves 25% of commercial cattle feed purchases (₹11,000/year saved on a ₹2,200 setup).
-
-### Category C: Low-to-Moderate Enterprise Units
-*   **Starter Indigenous Osmanabadi Goat Unit (2 Does + 1 Buck - `OPP_SMALL_GOAT_2_PLUS_1`)**: Scaled specifically for ₹15,000–₹25,000 budgets. Requires 1.0 hr/day family labour and pulse crop husks.
-*   **Commercial Osmanabadi Goat Unit (10 Does + 1 Buck - `OPP_OSMANABADI_GOAT_10_PLUS_1`)**: Sized for ₹75,000+ budgets. Explicitly marked as infeasible with exact capital shortfall displayed for farmers with lower budgets.
-*   **Oyster Mushroom Cultivation (`OPP_OYSTER_MUSHROOM_01`)**: 100-bag seasonal batch indoor crop grown on pasteurized soybean straw. Capital: ₹20,000; Annual Profit: ₹65,000 (reconciled across card, modal, and comparison views).
-*   **Scientific Apiculture & Honey Production (`OPP_BEEKEEPING_01`)**: 5 bee colonies providing ₹38,000 net profit plus 15–20% cross-pollination yield boost for oilseeds.
-
-### Category D: Alternative & Secondary Crop Diversification
-*   **Short-Duration Summer Moong (`OPP_SUMMER_MOONG_CROP_01`)**: 65-day catch crop utilizing residual moisture, adding ₹32,000 profit and fixing 35 kg atmospheric Nitrogen/ha.
-
-### Category E: Group-Based / FPO External Services
-*   **FPO Collective Input Bulk Procurement (`OPP_FPO_COLLECTIVE_INPUT_01`)**: Pooling seed and agro-chemical orders to access wholesale distributor pricing, saving 12–16% (₹12,000/year) on inputs.
+1. **`CAN_TRY_WITH_WHAT_YOU_HAVE`**: Zero additional investment required or completely affordable within current budget and working capital, with zero physical or biological constraints violated.
+2. **`CAN_TRY_WITH_SMALL_ADDITIONAL_AMOUNT`**: Highly suited to current farm assets and skills, with a small capital gap ($\le ₹10,000$) that can be covered by micro-credit or seasonal savings.
+3. **`NEEDS_MORE_MONEY`**: Requires substantial capital beyond available funds ($> ₹10,000$ gap). Explicitly states exact setup + operational cash shortfall.
+4. **`NEEDS_MORE_INFORMATION`**: Biological feasibility depends on unresolved field variables (e.g., standing crop rotation window, soil drainage, unverified market linkage).
+5. **`NOT_SUITABLE_CURRENTLY`**: Hard physical, agronomic, or resource constraints violated (e.g. required machinery not owned, water insufficient for high-water crop, standing crop conflict).
 
 ---
 
-## 3. Multi-Gate Feasibility Engine
+## 3. Farmer Age, Working Preferences & Personal Circumstances
 
-Every opportunity is audited through five distinct feasibility gates before scoring:
-
-1.  **Capital Outlay Gate**: `available_investment_inr >= min_investment_inr`. If false, `capital_gap_inr = min_investment - available_investment`.
-2.  **Land & Space Gate**: Verifies whether required space (field, bund, covered room, animal shed, yard) exists on the farm.
-3.  **Water Reliability Gate**: Compares seasonal requirement against water source (e.g. rainfed, seasonal canal, perennial borewell).
-4.  **Labour Gate**: Ensures required daily hours do not exceed family availability without hired labour capacity.
-5.  **Byproduct Match Gate**: Confirms crop residues (straw, stover, dung) are available for composting, mushroom substrates, or livestock feed.
-
-### Suitability Scoring (0–95 Scale)
-- Scores are continuously variable (never fake identical 98% badges).
-- Infeasible or capital-deficient options are strictly capped at $\le 55$ with status `NOT_CURRENTLY_AFFORDABLE` and explicit capital gap reporting.
-
----
-
-## 4. Single-Source Authoritative Financial Service
-
-To eliminate discrepancies between cards, detail screens, and comparison tables:
-*   `IncomeFinancialService` calculates authoritative figures based on unit capacity.
-*   **Reconciled Metrics**: Card profit, comparison matrix net profit, and scenario base-case net profit are derived from the exact same calculation function.
-*   **12-Month Production Cash Flows**:
-    - Month 1: Initial capital outlay ($-\text{CAPEX}$).
-    - Months 2–7: Recurring operational outlays ($-\text{OPEX}$ e.g. feed/vaccination) without immediate returns.
-    - Months 8–12: Revenue realization after biological gestation/harvest (e.g. goat kid sales or mushroom harvests).
+The engine treats farmer age with dignity and practical nuance, adhering to strict ethical guidelines:
+- **No Disqualification Based on Age**: Age is **NEVER** treated as an automatic disqualifier or equated with physical disability. A farmer over 65 is eligible for all enterprises.
+- **Work Preferences**:
+  - `active_physical`: Routine manual agricultural operations.
+  - `light_physical`: Lower physical impact operations (e.g., apiculture inspection, seed grading, azolla skimming).
+  - `manage_supervise`: Farm management, procurement, and supervision. If a labor-intensive activity is evaluated, an alert highlights family or hired labor support without blocking the recommendation.
+- **Payback Horizon**:
+  - `few_weeks`: Quick-cash activities (e.g., grain aggregation, custom hiring, composting).
+  - `3_to_6_months`: Seasonal crop and poultry cycles.
+  - `within_1_year`: Annual farm diversification.
+  - `long_term`: Multi-year gestation (e.g. goat breeding, horticulture). Alerts are triggered if an activity has gestation exceeding the farmer's stated horizon.
+- **Family Role**:
+  - Distinguishes between direct personal execution and shared family collective operations.
 
 ---
 
-## 5. Verified Data Provenance & Citations
+## 4. Rigorous Agronomic & Resource Gates
 
-All assumptions and unit costs are grounded in official agricultural institutions:
-*   **NABARD Maharashtra State Focus Paper FY 2026-27**: Unit cost norms for small ruminants, sericulture, and micro-enterprises.
-*   **Mahatma Phule Krishi Vidyapeeth (MPKV), Rahuri**: University package of practices for vermicomposting, pulse residues, and Osmanabadi goat breeding.
-*   **ICAR-National Institute of Abiotic Stress Management (NIASM), Baramati**: Agro-allied integration and climate-resilient farming systems.
-*   **Khadi and Village Industries Commission (KVIC)**: Beekeeping and honey processing unit economics.
-*   **Agmarknet (DMI, Ministry of Agriculture)**: Prevailing modal market prices across Maharashtra APMC mandis.
+1. **Standing Crop & Sunflower Validation**:
+   - Hybrid sunflower (`OPP_SUNFLOWER_INTERCROP_01`) cannot be intercropped with standing onion during bulb development due to canopy shading, root zone moisture competition, and bulb rotting.
+   - It is approved only when dedicated fallow acreage is available or as a sequential post-harvest rotation.
+2. **Composting Zero-Cost Audit**:
+   - Zero-cash composting requires verified cattle dung or livestock on farm.
+   - For farms without livestock, a bio-decomposer starter culture (~₹1,200) is required and audited against available operating cash.
+   - Biomass audits strictly reserve 50% of residues for livestock feed and surface mulching.
+3. **Custom Hiring / Equipment Sharing Gate**:
+   - Strictly verifies owned machinery (tractor, sprayer, pump, rotavator) in `existing_assets` before recommending custom hiring pool income.
+
+---
+
+## 5. The 6 Plain-Language Farmer Questions & Answers
+
+Every opportunity provides standardized, plain-language answers:
+1. **What is it?**: Simple, non-technical explanation.
+2. **Why does it suit my farm?**: Explicitly lists matching resources from the farmer's profile.
+3. **What will I need to start?**: Transparent capital, space, and labor breakdown.
+4. **How will I earn or save money?**: Economic value split into direct cash income, avoided input expenses, and loss prevention.
+5. **When will I receive money?**: Realistic gestation and APMC market payment cadence.
+6. **What should I be careful about?**: Honest operational warnings, disease vulnerabilities, and market risks.

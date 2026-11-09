@@ -158,15 +158,21 @@ def get_farm_resource_profile(farm_id: str, db: Session = Depends(get_db)):
     farm = db.query(FarmModel).filter(FarmModel.farm_id == farm_id).first()
     total_area = farm.total_area_acres if farm and farm.total_area_acres else 2.5
     
-    # Check plot crops for byproduct prefilling
+    # Check plot crops for byproduct prefilling and standing crop stage
     plots = db.query(FarmPlotModel).filter(FarmPlotModel.farm_id == farm_id).all() if farm else []
     byproducts = []
     has_drip = False
+    active_crop_code = "soybean"
+    active_crop_stage = "stage_vegetative"
+
     for p in plots:
         if p.irrigation_type and "drip" in p.irrigation_type.lower():
             has_drip = True
         cycles = db.query(CropCycleModel).filter(CropCycleModel.plot_id == p.plot_id).all()
         for c in cycles:
+            if c.is_active:
+                active_crop_code = c.crop_code
+                active_crop_stage = c.current_stage_code or "stage_vegetative"
             if c.crop_code in ["soybean", "cotton", "jowar", "onion"]:
                 byproducts.append(f"{c.crop_code}_straw")
 
@@ -183,7 +189,13 @@ def get_farm_resource_profile(farm_id: str, db: Session = Depends(get_db)):
         existing_assets=["drip"] if has_drip else ["tools"],
         crop_byproducts=list(set(byproducts)) if byproducts else ["crop_residue", "cow_dung"],
         byproduct_surplus_available=True,
-        category_preference="all"
+        category_preference="all",
+        age_range="36_to_45",
+        work_preference="active_physical",
+        payback_horizon="within_1_year",
+        family_management_role="personal_direct",
+        current_crop_code=active_crop_code,
+        current_crop_stage=active_crop_stage
     )
 
 @router.put("/farms/{farm_id}/profile", response_model=FarmerResourceProfile)

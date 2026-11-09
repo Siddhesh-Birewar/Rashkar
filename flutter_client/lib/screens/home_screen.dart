@@ -20,10 +20,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  DashboardSummaryResponse? _dashboardSummary;
+  bool _loadingDashboard = false;
+  String? _lastLoadedFarmId;
+
   @override
   void initState() {
     super.initState();
     AppState.instance.addListener(_onStateChange);
+    _checkAndLoadDashboard();
   }
 
   @override
@@ -33,11 +38,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onStateChange() {
+    _checkAndLoadDashboard();
     if (mounted) setState(() {});
+  }
+
+  void _checkAndLoadDashboard() {
+    final activeId = AppState.instance.activeFarmId;
+    if (activeId != null && activeId != _lastLoadedFarmId && !_loadingDashboard) {
+      _loadDashboard(activeId);
+    }
+  }
+
+  Future<void> _loadDashboard(String farmId) async {
+    _loadingDashboard = true;
+    _lastLoadedFarmId = farmId;
+    try {
+      final res = await ApiService.getDashboardIssues(farmId);
+      if (mounted) {
+        setState(() {
+          _dashboardSummary = res;
+          _loadingDashboard = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingDashboard = false);
+    }
   }
 
   Future<void> _refresh() async {
     await AppState.instance.refreshFarms();
+    final activeId = AppState.instance.activeFarmId;
+    if (activeId != null) {
+      await _loadDashboard(activeId);
+    }
   }
 
   @override
@@ -197,6 +230,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _buildGreetingCard(summary),
+                            const SizedBox(height: 16),
+                            _buildIssueFirstSection(),
                             const SizedBox(height: 16),
                             _buildFarmGlanceCard(summary),
                             const SizedBox(height: 16),
@@ -509,6 +544,276 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildIssueFirstSection() {
+    if (_loadingDashboard && _dashboardSummary == null) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1B5E20))),
+                SizedBox(width: 12),
+                Text('Checking farm conditions and heat alerts...', style: TextStyle(color: Colors.black54, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final summary = _dashboardSummary;
+    if (summary == null || summary.issues.isEmpty) {
+      // All clear positive state
+      return Card(
+        elevation: 0,
+        color: const Color(0xFFE8F5E9),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFA5D6A7), width: 1.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 28),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'FARM STATUS: ALL CLEAR & ON TRACK',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20), letterSpacing: 0.5),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text('NO ISSUES', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                summary?.positiveStatusSummary ??
+                    'No major concerns found in the latest assessments. Weather conditions and soil moisture are within safe agronomic bounds. Your crops and workers are operating in safe thermal environments.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF1B5E20), height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildStatusPill(Icons.thermostat, 'Thermal Conditions Safe'),
+                  _buildStatusPill(Icons.grass, 'Crop Growth on Schedule'),
+                  _buildStatusPill(Icons.water_drop, 'Moisture Monitored'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Issues requiring attention
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'ISSUES REQUIRING ATTENTION TODAY',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFB71C1C), letterSpacing: 0.8),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: summary.hasUrgentIssues ? const Color(0xFFD32F2F) : const Color(0xFFE65100),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${summary.totalIssuesCount} ${summary.totalIssuesCount == 1 ? "ISSUE" : "ISSUES"} FOUND',
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...summary.issues.map((issue) => _buildIssueCard(issue)),
+      ],
+    );
+  }
+
+  Widget _buildStatusPill(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFC8E6C9)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF2E7D32)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1B5E20))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIssueCard(DashboardIssue issue) {
+    Color barColor;
+    Color badgeBg;
+    String badgeText;
+    IconData icon;
+
+    switch (issue.severity) {
+      case 'URGENT_ATTENTION':
+        barColor = const Color(0xFFD32F2F);
+        badgeBg = const Color(0xFFFFEBEE);
+        badgeText = 'URGENT ATTENTION';
+        icon = Icons.warning_amber_rounded;
+        break;
+      case 'NEEDS_ATTENTION':
+        barColor = const Color(0xFFE65100);
+        badgeBg = const Color(0xFFFFF3E0);
+        badgeText = 'NEEDS ATTENTION';
+        icon = Icons.error_outline;
+        break;
+      case 'KEEP_AN_EYE_ON':
+        barColor = const Color(0xFFF57F17);
+        badgeBg = const Color(0xFFFFFDE7);
+        badgeText = 'KEEP AN EYE ON';
+        icon = Icons.visibility_outlined;
+        break;
+      default:
+        barColor = const Color(0xFF1976D2);
+        badgeBg = const Color(0xFFE3F2FD);
+        badgeText = 'INFORMATION';
+        icon = Icons.info_outline;
+    }
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: barColor.withOpacity(0.3), width: 1.2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: badgeBg,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(13), topRight: Radius.circular(13)),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: barColor, size: 18),
+                  const SizedBox(width: 8),
+                  Text(badgeText, style: TextStyle(color: barColor, fontWeight: FontWeight.bold, fontSize: 11)),
+                  const Spacer(),
+                  Text(
+                    issue.domain.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(color: barColor.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    issue.title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF212121)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    issue.summary,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF424242), height: 1.3),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline, size: 16, color: Color(0xFF1B5E20)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            issue.recommendedAction,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1B5E20)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _navigateToRoute(issue.actionTargetRoute),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: barColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.arrow_forward, size: 16),
+                      label: Text(
+                        issue.actionButtonLabel,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToRoute(String route) {
+    if (route == '/heat-safety') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const HeatSafetyScreen()));
+    } else if (route == '/my-crop') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyCropScreen()));
+    } else if (route == '/extra-income') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraIncomeScreen()));
+    } else if (route == '/crop-loss') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const CropLossScreen()));
+    } else if (route == '/ask-rashkar') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const AskRashkarScreen()));
+    }
   }
 
   Widget _buildFarmGlanceCard(FarmSummary s) {

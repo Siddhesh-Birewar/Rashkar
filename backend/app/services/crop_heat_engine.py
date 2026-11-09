@@ -9,6 +9,7 @@ from backend.app.services.weather_service import WeatherService
 from backend.app.db.models.farm import FarmModel, FarmPlotModel, CropCycleModel, SoilProfileModel
 from backend.app.db.models.crop_knowledge import (
     CanonicalCropMasterModel,
+    CropStageReferenceModel,
     AgronomicThresholdRegistryModel,
     AgronomicAdvisoryCatalogueModel
 )
@@ -76,6 +77,91 @@ CROP_SPECIES_PHYSIOLOGY = {
             {"stage_code": "stage_bulb_initiation", "stage_name": "Bulb Initiation", "stage_name_en": "Bulb Initiation", "das_range": "DAS 41-70", "crit_tmax": 33.0},
             {"stage_code": "stage_bulb_development", "stage_name": "Bulb Development & Enlargement", "stage_name_en": "Bulb Development & Enlargement", "das_range": "DAS 71-105", "crit_tmax": 34.0},
             {"stage_code": "stage_maturity", "stage_name": "Neck Fall & Harvest", "stage_name_en": "Neck Fall & Harvest", "das_range": "DAS 106-130", "crit_tmax": 38.0}
+        ]
+    },
+    "sugarcane": {
+        "base_temp_c": 12.0,
+        "optimal_min": 28.0,
+        "optimal_max": 35.0,
+        "night_crit_c": 20.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Sprouting & Tillering", "stage_name_en": "Sprouting & Tillering", "das_range": "DAS 0-60", "crit_tmax": 42.0},
+            {"stage_code": "stage_grand_growth", "stage_name": "Grand Growth & Internode Elongation", "stage_name_en": "Grand Growth & Internode Elongation", "das_range": "DAS 61-240", "crit_tmax": 40.0},
+            {"stage_code": "stage_maturity", "stage_name": "Ripening & Sucrose Accumulation", "stage_name_en": "Ripening & Sucrose Accumulation", "das_range": "DAS 241-360", "crit_tmax": 38.0}
+        ]
+    },
+    "wheat": {
+        "base_temp_c": 4.0,
+        "optimal_min": 18.0,
+        "optimal_max": 25.0,
+        "night_crit_c": 18.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Crown Root & Tillering", "stage_name_en": "Crown Root & Tillering", "das_range": "DAS 0-35", "crit_tmax": 30.0},
+            {"stage_code": "stage_flowering", "stage_name": "Booting & Anthesis", "stage_name_en": "Booting & Anthesis", "das_range": "DAS 36-65", "crit_tmax": 32.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Filling & Milk Stage", "stage_name_en": "Grain Filling & Milk Stage", "das_range": "DAS 66-95", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 96-115", "crit_tmax": 37.0}
+        ]
+    },
+    "gram": {
+        "base_temp_c": 8.0,
+        "optimal_min": 20.0,
+        "optimal_max": 28.0,
+        "night_crit_c": 18.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 0-30", "crit_tmax": 35.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Pod Initiation", "stage_name_en": "Flowering & Pod Initiation", "das_range": "DAS 31-60", "crit_tmax": 32.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Filling & Seed Growth", "stage_name_en": "Pod Filling & Seed Growth", "das_range": "DAS 61-90", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Pod Maturity & Harvest", "stage_name_en": "Pod Maturity & Harvest", "das_range": "DAS 91-110", "crit_tmax": 38.0}
+        ]
+    },
+    "tur": {
+        "base_temp_c": 10.0,
+        "optimal_min": 25.0,
+        "optimal_max": 33.0,
+        "night_crit_c": 22.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 0-60", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Pod Formation", "stage_name_en": "Flowering & Pod Formation", "das_range": "DAS 61-120", "crit_tmax": 35.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Filling & Seed Hardening", "stage_name_en": "Pod Filling & Seed Hardening", "das_range": "DAS 121-160", "crit_tmax": 36.5},
+            {"stage_code": "stage_maturity", "stage_name": "Maturity & Pod Drydown", "stage_name_en": "Maturity & Pod Drydown", "das_range": "DAS 161-190", "crit_tmax": 40.0}
+        ]
+    },
+    "bajra": {
+        "base_temp_c": 12.0,
+        "optimal_min": 28.0,
+        "optimal_max": 36.0,
+        "night_crit_c": 24.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-15", "crit_tmax": 42.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Tillering & Stem Elongation", "stage_name_en": "Tillering & Stem Elongation", "das_range": "DAS 16-35", "crit_tmax": 42.0},
+            {"stage_code": "stage_flowering", "stage_name": "Boot & Anthesis", "stage_name_en": "Boot & Anthesis", "das_range": "DAS 36-55", "crit_tmax": 38.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "stage_name_en": "Grain Development / Dough", "das_range": "DAS 56-75", "crit_tmax": 40.0},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 76-90", "crit_tmax": 44.0}
+        ]
+    },
+    "maize": {
+        "base_temp_c": 10.0,
+        "optimal_min": 24.0,
+        "optimal_max": 32.0,
+        "night_crit_c": 22.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Early Seedling", "stage_name_en": "Emergence & Early Seedling", "das_range": "DAS 0-15", "crit_tmax": 38.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Knee-High to Tasseling", "stage_name_en": "Knee-High to Tasseling", "das_range": "DAS 16-45", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Silking & Pollination", "stage_name_en": "Silking & Pollination", "das_range": "DAS 46-65", "crit_tmax": 35.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Cob Filling & Grain Hardening", "stage_name_en": "Cob Filling & Grain Hardening", "das_range": "DAS 66-95", "crit_tmax": 37.0},
+            {"stage_code": "stage_maturity", "stage_name": "Black Layer & Harvest", "stage_name_en": "Black Layer & Harvest", "das_range": "DAS 96-115", "crit_tmax": 40.0}
+        ]
+    },
+    "groundnut": {
+        "base_temp_c": 10.0,
+        "optimal_min": 24.0,
+        "optimal_max": 30.0,
+        "night_crit_c": 20.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-20", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering & Pegging", "stage_name_en": "Peak Flowering & Pegging", "das_range": "DAS 21-50", "crit_tmax": 34.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Development & Kernel Filling", "stage_name_en": "Pod Development & Kernel Filling", "das_range": "DAS 51-90", "crit_tmax": 35.0},
+            {"stage_code": "stage_maturity", "stage_name": "Pod Maturity & Harvest", "stage_name_en": "Pod Maturity & Harvest", "das_range": "DAS 91-115", "crit_tmax": 40.0}
         ]
     }
 }
@@ -154,15 +240,48 @@ class CropHeatEngine:
         stage_name_mr = stage_info["stage_name_mr"]
         das = stage_info["days_after_sowing"]
 
-        # Supported stages list
-        species_spec = CROP_SPECIES_PHYSIOLOGY.get(crop_code, CROP_SPECIES_PHYSIOLOGY["soybean"])
-        supported_stages = species_spec["stages"]
+        # Persist farmer-confirmed stage to active crop cycle
+        if request.farmer_confirmed_stage and crop_cycle and stage_info.get("stage_code"):
+            crop_cycle.current_stage_code = stage_info["stage_code"]
+            db.commit()
 
-        # 3. Retrieve thresholds
-        base_temp = species_spec.get("base_temp_c", 10.0)
-        opt_min = species_spec.get("optimal_min", 24.0)
-        opt_max = species_spec.get("optimal_max", 30.0)
-        night_crit = species_spec.get("night_crit_c", 22.0)
+        # Supported stages list
+        if crop_code in CROP_SPECIES_PHYSIOLOGY:
+            species_spec = CROP_SPECIES_PHYSIOLOGY[crop_code]
+            supported_stages = species_spec["stages"]
+            base_temp = species_spec.get("base_temp_c", 10.0)
+            opt_min = species_spec.get("optimal_min", 24.0)
+            opt_max = species_spec.get("optimal_max", 30.0)
+            night_crit = species_spec.get("night_crit_c", 22.0)
+        else:
+            # Query db for stages
+            db_stages = db.query(CropStageReferenceModel).filter(
+                CropStageReferenceModel.crop_code == crop_code
+            ).order_by(CropStageReferenceModel.sequence_order).all()
+            if db_stages:
+                supported_stages = [
+                    {
+                        "stage_code": s.stage_code,
+                        "stage_name": s.stage_name_en,
+                        "stage_name_en": s.stage_name_en,
+                        "stage_name_mr": s.stage_name_mr,
+                        "das_range": f"DAS {s.das_start_typical}-{s.das_end_typical}",
+                        "crit_tmax": 38.0 if s.heat_sensitivity in ["high", "critical"] else 40.0
+                    }
+                    for s in db_stages
+                ]
+                base_temp = 10.0
+                opt_min = 22.0
+                opt_max = 32.0
+                night_crit = 22.0
+            else:
+                # Unsupported crop with no scientific stage calibrations in DB
+                supported_stages = []
+                base_temp = 10.0
+                opt_min = 25.0
+                opt_max = 30.0
+                crit_tmax = 36.0
+                night_crit = 22.0
 
         # Stage specific critical max
         crit_tmax = 36.0
@@ -367,25 +486,84 @@ class CropHeatEngine:
                             category="VERIFIED_AGRONOMIC"
                         )
                     )
-                elif crop_code == "soybean":
-                    interventions.append(
-                        CropHeatIntervention(
-                            intervention_id="INTERV_SOYBEAN_HEAT_DEFENSE",
-                            title_en="Foliar Spray of 1.0% Potassium Sulfate (0-0-50) for Soybean",
-                            title_mr="सोयाबीनसाठी पोटॅशियम सल्फेट फवारणी",
-                            description_en="Apply foliar spray of 1% potassium sulfate (100g / 10L water) during early morning to preserve pollen viability and prevent flower abortion under temperature exceedance.",
-                            description_mr="फुलोरा गळ रोखण्यासाठी सकाळी पोटॅशियम सल्फेटची फवारणी करावी.",
-                            why_appropriate="Potassium activates heat shock proteins and osmoregulation in soybean flowers, maintaining pollen tube viability.",
-                            evidence_citation="ICAR-Indian Institute of Soybean Research (IISR) Indore",
-                            source_page_or_table="IISR Package of Practices for Central & Western India, Section 6.3, Page 29",
-                            agronomist_reviewer="Dr. S. D. Billore (Principal Scientist - Agronomy, ICAR-IISR)",
-                            application_method="Foliar application before 9:00 AM",
-                            application_dose="100g K2SO4 in 10L water (1% solution)",
-                            infrastructure_requirements="Knapsack sprayer with flat fan nozzle",
-                            trigger_condition="Soybean flowering or pod set heat exceedance (> 35°C)",
-                            category="VERIFIED_AGRONOMIC"
+                elif crop_code == "soybean" and not (is_season_expired and not confirmed_stage):
+                    norm_st = (stage_code or "").lower()
+                    if "matur" in norm_st or "harvest" in norm_st or "r7" in norm_st:
+                        interventions.append(
+                            CropHeatIntervention(
+                                intervention_id="INTERV_SOYBEAN_HARVEST_TIMING",
+                                title_en="Early Morning Harvesting to Minimize Pod Shattering",
+                                title_mr="शेंगा तडकणे टाळण्यासाठी सकाळी लवकर काढणी",
+                                description_en="Harvest standing soybean strictly during morning hours (6:00 AM - 10:00 AM) when ambient humidity is higher and pods retain 14-16% moisture, avoiding severe afternoon pod shattering.",
+                                description_mr="दुपारच्या कोरड्या उष्णतेमुळे शेंगा तडकून दाणे जमिनीवर गळतात, म्हणून काढणी सकाळी १० पूर्वीच करावी.",
+                                why_appropriate="Soybean pods become brittle and dehisce rapidly above 38°C; morning harvesting prevents up to 15-20% field harvest loss.",
+                                evidence_citation="Mahatma Phule Krishi Vidyapeeth (MPKV) Rahuri",
+                                source_page_or_table="MPKV Kharif Crop Production Technology Bulletin, Chapter 4, Page 38",
+                                agronomist_reviewer="MPKV Harvest Technology Panel",
+                                application_method="Manual sickle harvesting or morning combine operation",
+                                application_dose="Harvest at physiological maturity (leaves yellowed, 95% brown pods)",
+                                infrastructure_requirements="Standard sickle or reaper",
+                                trigger_condition="Soybean harvest maturity under high heat (> 40°C)",
+                                category="VERIFIED_AGRONOMIC"
+                            )
                         )
-                    )
+                    elif "pod" in norm_st or "seed" in norm_st or "r3" in norm_st:
+                        interventions.append(
+                            CropHeatIntervention(
+                                intervention_id="INTERV_SOYBEAN_POD_FILL",
+                                title_en="Foliar Spray of 0.5% Boron + 1.0% KNO3 for Pod Filling",
+                                title_mr="शेंगा भरण्याच्या अवस्थेत सूक्ष्म अन्नद्रव्य फवारणी",
+                                description_en="Spray 0.5% solubor (boron) combined with 1.0% potassium nitrate during morning hours to prevent seed shriveling and abortion under elevated temperatures.",
+                                description_mr="उष्णतेमुळे दाणे बारीक न पडण्यासाठी बोरॉन व पोटॅशियम नायट्रेट फवारावे.",
+                                why_appropriate="Boron and potassium facilitate sucrose transport from source leaves to developing soybean pods during high-temperature stress.",
+                                evidence_citation="ICAR-IISR Technical Bulletin 52",
+                                source_page_or_table="Soybean Abiotic Stress Mitigation Guide, Page 14",
+                                agronomist_reviewer="Dr. A. N. Sharma (Head of Crop Production, ICAR-IISR)",
+                                application_method="Foliar mist spray",
+                                application_dose="50g Solubor + 100g KNO3 per 10L water",
+                                infrastructure_requirements="Knapsack or battery sprayer",
+                                trigger_condition="Soybean pod filling thermal stress (> 36.5°C)",
+                                category="VERIFIED_AGRONOMIC"
+                            )
+                        )
+                    elif "flower" in norm_st or "anthesis" in norm_st or "r1" in norm_st:
+                        interventions.append(
+                            CropHeatIntervention(
+                                intervention_id="INTERV_SOYBEAN_HEAT_DEFENSE",
+                                title_en="Foliar Spray of 1.0% Potassium Sulfate (0-0-50) for Pollen Protection",
+                                title_mr="सोयाबीनसाठी पोटॅशियम सल्फेट फवारणी",
+                                description_en="Apply foliar spray of 1% potassium sulfate (100g / 10L water) during early morning to preserve pollen viability and prevent flower abortion under temperature exceedance.",
+                                description_mr="फुलोरा गळ रोखण्यासाठी सकाळी पोटॅशियम सल्फेटची फवारणी करावी.",
+                                why_appropriate="Potassium activates heat shock proteins and osmoregulation in soybean flowers, maintaining pollen tube viability.",
+                                evidence_citation="ICAR-Indian Institute of Soybean Research (IISR) Indore",
+                                source_page_or_table="IISR Package of Practices for Central & Western India, Section 6.3, Page 29",
+                                agronomist_reviewer="Dr. S. D. Billore (Principal Scientist - Agronomy, ICAR-IISR)",
+                                application_method="Foliar application before 9:00 AM",
+                                application_dose="100g K2SO4 in 10L water (1% solution)",
+                                infrastructure_requirements="Knapsack sprayer with flat fan nozzle",
+                                trigger_condition="Soybean flowering or pod set heat exceedance (> 35°C)",
+                                category="VERIFIED_AGRONOMIC"
+                            )
+                        )
+                    else:
+                        interventions.append(
+                            CropHeatIntervention(
+                                intervention_id="INTERV_SOYBEAN_VEG_MULCH",
+                                title_en="Inter-Row Soil Mulching & Moisture Conservation",
+                                title_mr="ओलावा टिकवण्यासाठी आंतरमशागत व आच्छादन",
+                                description_en="Perform shallow hoeing to create a soil dust mulch and conserve sub-soil moisture during early vegetative growth under elevated temperatures.",
+                                description_mr="वाफेतील ओलावा टिकवण्यासाठी हलकी कोळपणी करून जमिनीवर धूळ आच्छादन तयार करावे.",
+                                why_appropriate="Dust mulching breaks soil capillary pores and reduces evaporation loss by 30-40% under vegetative heat.",
+                                evidence_citation="MPKV Rahuri / ICAR-IISR",
+                                source_page_or_table="IISR Bulletin 44, Moisture Conservation, Page 22",
+                                agronomist_reviewer="MPKV Agronomy Division",
+                                application_method="Inter-row cultivation with blade harrow",
+                                application_dose="1 shallow pass between rows",
+                                infrastructure_requirements="Bullock or mini-tractor drawn blade harrow",
+                                trigger_condition="Vegetative heat exposure (> 38°C)",
+                                category="PREVENTATIVE_MANAGEMENT"
+                            )
+                        )
                 elif crop_code == "cotton":
                     interventions.append(
                         CropHeatIntervention(

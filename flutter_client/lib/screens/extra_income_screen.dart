@@ -26,6 +26,10 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
   List<String> _interests = ['composting', 'livestock', 'nursery'];
   String _riskTolerance = 'moderate';
   String _selectedCategory = 'all'; // all, zero_cash, very_low_cost, moderate_enterprise, crop_diversification, group_external
+  String _ageRange = '36_to_45';
+  String _workPreference = 'active_physical';
+  String _paybackHorizon = 'within_1_year';
+  String _familyManagementRole = 'personal_direct';
 
   List<ScoredOpportunityItem> _discoveredOpportunities = [];
   ScoredOpportunityItem? _selectedOpportunity;
@@ -693,9 +697,111 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                     ),
                   ),
                 ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showFarmerQaBottomSheet(context, item),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1B5E20),
+                    side: const BorderSide(color: Color(0xFF2E7D32)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  icon: const Icon(Icons.help_outline, size: 14),
+                  label: const Text('Farmer Summary (6 Plain Questions)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showFarmerQaBottomSheet(BuildContext context, ScoredOpportunityItem item) {
+    final qa = item.farmerSummaryQa ?? {
+      'what_is_it': item.opportunity.summary,
+      'why_suits_my_farm': item.matchingResources.isNotEmpty ? item.matchingResources.join(' · ') : 'Matches your farm profile resources.',
+      'what_will_i_need': 'Initial investment: ${_formatCurrency(item.opportunity.minInvestmentInr)} · Space: ${item.opportunity.requiredSpaceType} · Daily labor: ${item.opportunity.dailyLaborHours} hrs/day',
+      'how_will_i_earn_or_save': item.opportunity.isCostSaving ? 'Saves ~${_formatCurrency(item.opportunity.potentialAnnualSavingsInr)}/year in farm inputs' : 'Earns ~${_formatCurrency(item.opportunity.potentialAnnualProfitInr)}/year in net cash income',
+      'when_will_i_receive_money': 'Expected returns in ~${item.opportunity.paybackPeriodMonths} months based on regional crop and market cycle.',
+      'what_to_be_careful_about': item.limitingFactors.isNotEmpty ? item.limitingFactors.first : 'Manage input hygiene and market linkage timing carefully.',
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (_, controller) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: ListView(
+                controller: controller,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.help_outline, color: Color(0xFF1B5E20), size: 26),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Plain Farmer Summary: ${item.opportunity.title}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20)),
+                        ),
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  _buildQaItem('1. What is it?', qa['what_is_it'] ?? ''),
+                  _buildQaItem('2. Why does it suit my farm?', qa['why_suits_my_farm'] ?? ''),
+                  _buildQaItem('3. What will I need to start?', qa['what_will_i_need'] ?? ''),
+                  _buildQaItem('4. How will I earn or save money?', qa['how_will_i_earn_or_save'] ?? ''),
+                  _buildQaItem('5. When will I receive money?', qa['when_will_i_receive_money'] ?? ''),
+                  _buildQaItem('6. What should I be careful about?', qa['what_to_be_careful_about'] ?? '', isWarning: true),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B5E20),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Back to Opportunities'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildQaItem(String question, String answer, {bool isWarning = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isWarning ? const Color(0xFFFFF3E0) : const Color(0xFFF9FBE7).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isWarning ? const Color(0xFFFFB74D) : const Color(0xFFDCEDC8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(question, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isWarning ? const Color(0xFFE65100) : const Color(0xFF1B5E20))),
+          const SizedBox(height: 4),
+          Text(answer, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3)),
+        ],
       ),
     );
   }
@@ -1174,6 +1280,83 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                     ),
                     const Divider(),
                     const SizedBox(height: 8),
+
+                    // Age Range
+                    const Text('Your Age Range (Optional):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _ageRange,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'under_25', child: Text('Under 25 years')),
+                        DropdownMenuItem(value: '25_to_35', child: Text('25 – 35 years')),
+                        DropdownMenuItem(value: '36_to_45', child: Text('36 – 45 years')),
+                        DropdownMenuItem(value: '46_to_55', child: Text('46 – 55 years')),
+                        DropdownMenuItem(value: '56_to_65', child: Text('56 – 65 years')),
+                        DropdownMenuItem(value: 'above_65', child: Text('Above 65 years')),
+                        DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _ageRange = val);
+                          setState(() => _ageRange = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Work Preference
+                    const Text('Daily Work Preference:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _workPreference,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'active_physical', child: Text('Active Physical Fieldwork (Can do heavy tasks)')),
+                        DropdownMenuItem(value: 'light_physical', child: Text('Light Physical Work (Prefers less strenuous tasks)')),
+                        DropdownMenuItem(value: 'manage_supervise', child: Text('Manage & Supervise (Family/hired labor will do heavy lifting)')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _workPreference = val);
+                          setState(() => _workPreference = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Payback Horizon
+                    const Text('Desired Payback Timeline:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _paybackHorizon,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'few_weeks', child: Text('Within a few weeks (Immediate cash / quick cycle)')),
+                        DropdownMenuItem(value: '3_to_6_months', child: Text('3 to 6 months (Single season crop/poultry cycle)')),
+                        DropdownMenuItem(value: 'within_1_year', child: Text('Within 1 year (Annual farm cycle)')),
+                        DropdownMenuItem(value: 'long_term', child: Text('Longer term (> 1 year, e.g. horticulture/livestock)')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _paybackHorizon = val);
+                          setState(() => _paybackHorizon = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
 
                     // Budget Selector with ZERO CASH default
                     const Text(

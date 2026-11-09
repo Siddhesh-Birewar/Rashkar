@@ -787,38 +787,54 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                     style: TextStyle(fontSize: 11, color: Colors.black54),
                   ),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: c.supportedStages.map((s) {
-                      final isSelected = (_selectedCropStage ?? c.growthStageCode) == s['stage_code'];
-                      final rawName = s['stage_name_en'] ?? s['stage_name'] ?? s['name'];
-                      final stageName = (rawName != null && rawName.toString().trim().isNotEmpty && rawName.toString().trim() != 'null')
-                          ? rawName.toString().trim()
-                          : (s['stage_code']?.toString().replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() ?? 'Stage');
-                      final critTmax = s['crit_tmax'];
-                      final limitLabel = critTmax != null ? ' ($critTmax°C limit)' : '';
-                      return ChoiceChip(
-                        label: Text('$stageName$limitLabel'),
-                        selected: isSelected,
-                        selectedColor: const Color(0xFFE8F5E9),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? const Color(0xFF1B5E20) : Colors.black87,
-                        ),
-                        side: BorderSide(
-                          color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade300,
-                          width: isSelected ? 1.5 : 1.0,
-                        ),
-                        onSelected: (selected) {
-                          if (selected) {
-                            _recalculateCropHeat(s['stage_code']);
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
+                  if (c.supportedStages.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Text(
+                        'General vegetative and thermal thresholds apply. Stage-specific phenological calibrations for this crop will be confirmed by local agronomists.',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: c.supportedStages.map((s) {
+                        final isSelected = (_selectedCropStage ?? c.growthStageCode) == s['stage_code'];
+                        final rawCode = s['stage_code']?.toString().trim();
+                        final safeCode = (rawCode != null && rawCode.isNotEmpty && rawCode != 'null') ? rawCode : 'stage_unknown';
+                        final rawName = s['stage_name_en'] ?? s['stage_name'] ?? s['name'];
+                        final stageName = (rawName != null && rawName.toString().trim().isNotEmpty && rawName.toString().trim() != 'null')
+                            ? rawName.toString().trim()
+                            : (safeCode != 'stage_unknown' ? safeCode.replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() : 'Growth Stage');
+                        final critTmax = s['crit_tmax'];
+                        final limitLabel = critTmax != null ? ' ($critTmax°C limit)' : '';
+                        return ChoiceChip(
+                          label: Text('$stageName$limitLabel'),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFFE8F5E9),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? const Color(0xFF1B5E20) : Colors.black87,
+                          ),
+                          side: BorderSide(
+                            color: isSelected ? const Color(0xFF2E7D32) : Colors.grey.shade300,
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                          onSelected: (selected) {
+                            if (selected && s['stage_code'] != null) {
+                              _recalculateCropHeat(s['stage_code'].toString());
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
                 ],
               ),
             ),

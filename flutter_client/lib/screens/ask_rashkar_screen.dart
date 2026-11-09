@@ -16,6 +16,7 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
   final List<AssistantChatMessage> _messages = [];
   bool _isSending = false;
   String? _sessionId;
+  String _contextChipLabel = 'Using your farm information...';
 
   final List<String> _suggestedPrompts = [
     'How is my crop doing today?',
@@ -29,6 +30,15 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
     super.initState();
     AppState.instance.addListener(_onStateChange);
     _initWelcome();
+    _loadContextChip();
+  }
+
+  Future<void> _loadContextChip() async {
+    final farmId = AppState.instance.activeFarmId ?? 'farm_demo_pune_01';
+    try {
+      final chip = await ApiService.getAssistantContextChip(farmId);
+      if (mounted) setState(() => _contextChipLabel = chip);
+    } catch (_) {}
   }
 
   @override
@@ -149,6 +159,39 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
           constraints: const BoxConstraints(maxWidth: 840),
           child: Column(
             children: [
+              // Grounded farm context chip banner
+              Container(
+                margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFA5D6A7)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified, size: 16, color: Color(0xFF2E7D32)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _contextChipLabel,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1B5E20)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('Ollama AI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+
               // Suggested prompts chips
           Container(
             height: 52,

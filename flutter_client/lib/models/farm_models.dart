@@ -748,12 +748,14 @@ class CropHeatAssessment {
       supportedStages: rawStages.map((s) {
         if (s is Map) {
           final m = Map<String, dynamic>.from(s);
+          final rawCode = m['stage_code']?.toString().trim();
+          final safeCode = (rawCode != null && rawCode.isNotEmpty && rawCode != 'null') ? rawCode : 'stage_unknown';
           final rawName = m['stage_name_en'] ?? m['stage_name'] ?? m['name'];
           final name = (rawName != null && rawName.toString().trim().isNotEmpty && rawName.toString().trim() != 'null')
               ? rawName.toString().trim()
-              : (m['stage_code']?.toString().replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() ?? 'Stage');
+              : (safeCode != 'stage_unknown' ? safeCode.replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() : 'Growth Stage');
           return <String, dynamic>{
-            'stage_code': m['stage_code']?.toString() ?? '',
+            'stage_code': safeCode,
             'stage_name': name,
             'stage_name_en': name,
             'das_range': m['das_range']?.toString() ?? '',
@@ -822,6 +824,10 @@ class FarmerResourceProfile {
   final double? distanceToApmcKm;
   final String riskTolerance;
   final String categoryPreference;
+  final String? ageRange;
+  final String workPreference;
+  final String paybackHorizon;
+  final String familyManagementRole;
 
   FarmerResourceProfile({
     required this.farmId,
@@ -852,6 +858,10 @@ class FarmerResourceProfile {
     this.distanceToApmcKm,
     this.riskTolerance = 'moderate',
     this.categoryPreference = 'all',
+    this.ageRange = '36_to_45',
+    this.workPreference = 'active_physical',
+    this.paybackHorizon = 'within_1_year',
+    this.familyManagementRole = 'personal_direct',
   });
 
   bool get isZeroBudget => availableInvestmentInr <= 0.0 && monthlyOperatingBudgetInr <= 0.0;
@@ -886,6 +896,10 @@ class FarmerResourceProfile {
       distanceToApmcKm: (json['distance_to_apmc_km'] as num?)?.toDouble(),
       riskTolerance: json['risk_tolerance'] ?? 'moderate',
       categoryPreference: json['category_preference'] ?? 'all',
+      ageRange: json['age_range'] ?? '36_to_45',
+      workPreference: json['work_preference'] ?? 'active_physical',
+      paybackHorizon: json['payback_horizon'] ?? 'within_1_year',
+      familyManagementRole: json['family_management_role'] ?? 'personal_direct',
     );
   }
 
@@ -919,6 +933,10 @@ class FarmerResourceProfile {
       if (distanceToApmcKm != null) 'distance_to_apmc_km': distanceToApmcKm,
       'risk_tolerance': riskTolerance,
       'category_preference': categoryPreference,
+      if (ageRange != null) 'age_range': ageRange,
+      'work_preference': workPreference,
+      'payback_horizon': paybackHorizon,
+      'family_management_role': familyManagementRole,
     };
   }
 }
@@ -1086,6 +1104,8 @@ class ScoredOpportunityItem {
   final double estimatedAnnualSavingsInr;
   final double paybackMonths;
   final String marketBenchmarkSummary;
+  final String feasibilityCategory;
+  final Map<String, String>? farmerSummaryQa;
 
   ScoredOpportunityItem({
     required this.opportunity,
@@ -1102,11 +1122,18 @@ class ScoredOpportunityItem {
     this.estimatedAnnualSavingsInr = 0.0,
     this.paybackMonths = 1.0,
     this.marketBenchmarkSummary = '',
+    this.feasibilityCategory = 'CAN_TRY_WITH_WHAT_YOU_HAVE',
+    this.farmerSummaryQa,
   });
 
-  bool get isFeasible => isSuitable && (feasibilityStatus == 'FEASIBLE_NOW' || feasibilityStatus == 'HIGHLY_FEASIBLE');
+  bool get isFeasible => isSuitable && (feasibilityStatus == 'FEASIBLE_NOW' || feasibilityStatus == 'HIGHLY_FEASIBLE' || feasibilityStatus == 'USES_EXISTING_RESOURCES');
 
   factory ScoredOpportunityItem.fromJson(Map<String, dynamic> json) {
+    Map<String, String>? qaMap;
+    if (json['farmer_summary_qa'] is Map) {
+      qaMap = (json['farmer_summary_qa'] as Map).map((k, v) => MapEntry(k.toString(), v.toString()));
+    }
+
     return ScoredOpportunityItem(
       opportunity: IncomeOpportunity.fromJson(json['opportunity'] ?? {}),
       suitabilityScorePct: json['suitability_score_pct'] ?? (json['suitability_score'] as num?)?.toInt() ?? 75,
@@ -1122,6 +1149,80 @@ class ScoredOpportunityItem {
       estimatedAnnualSavingsInr: (json['estimated_annual_savings_inr'] as num?)?.toDouble() ?? 0.0,
       paybackMonths: (json['payback_months'] as num?)?.toDouble() ?? 1.0,
       marketBenchmarkSummary: json['market_benchmark_summary'] ?? '',
+      feasibilityCategory: json['feasibility_category'] ?? 'CAN_TRY_WITH_WHAT_YOU_HAVE',
+      farmerSummaryQa: qaMap,
+    );
+  }
+}
+
+class DashboardIssue {
+  final String issueId;
+  final String domain;
+  final String severity; // URGENT_ATTENTION, NEEDS_ATTENTION, KEEP_AN_EYE_ON, INFORMATION
+  final String title;
+  final String summary;
+  final String recommendedAction;
+  final String actionTargetRoute;
+  final String actionButtonLabel;
+  final Map<String, dynamic> evidence;
+
+  DashboardIssue({
+    required this.issueId,
+    required this.domain,
+    required this.severity,
+    required this.title,
+    required this.summary,
+    required this.recommendedAction,
+    required this.actionTargetRoute,
+    required this.actionButtonLabel,
+    this.evidence = const {},
+  });
+
+  factory DashboardIssue.fromJson(Map<String, dynamic> json) {
+    return DashboardIssue(
+      issueId: json['issue_id'] ?? '',
+      domain: json['domain'] ?? '',
+      severity: json['severity'] ?? 'INFORMATION',
+      title: json['title'] ?? '',
+      summary: json['summary'] ?? '',
+      recommendedAction: json['recommended_action'] ?? '',
+      actionTargetRoute: json['action_target_route'] ?? '/',
+      actionButtonLabel: json['action_button_label'] ?? 'View Details',
+      evidence: Map<String, dynamic>.from(json['evidence'] ?? {}),
+    );
+  }
+}
+
+class DashboardSummaryResponse {
+  final String farmId;
+  final String farmName;
+  final bool hasUrgentIssues;
+  final int totalIssuesCount;
+  final List<DashboardIssue> issues;
+  final String? positiveStatusSummary;
+  final String assessedAt;
+
+  DashboardSummaryResponse({
+    required this.farmId,
+    required this.farmName,
+    required this.hasUrgentIssues,
+    required this.totalIssuesCount,
+    required this.issues,
+    this.positiveStatusSummary,
+    required this.assessedAt,
+  });
+
+  factory DashboardSummaryResponse.fromJson(Map<String, dynamic> json) {
+    return DashboardSummaryResponse(
+      farmId: json['farm_id'] ?? '',
+      farmName: json['farm_name'] ?? 'My Farm',
+      hasUrgentIssues: json['has_urgent_issues'] ?? false,
+      totalIssuesCount: json['total_issues_count'] ?? 0,
+      issues: (json['issues'] as List<dynamic>? ?? [])
+          .map((i) => DashboardIssue.fromJson(i as Map<String, dynamic>))
+          .toList(),
+      positiveStatusSummary: json['positive_status_summary'],
+      assessedAt: json['assessed_at'] ?? '',
     );
   }
 }

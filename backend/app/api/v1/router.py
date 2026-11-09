@@ -9,12 +9,14 @@ from backend.app.api.v1.endpoints import (
     income,
     pmfby,
     assistant,
-    geo
+    geo,
+    dashboard
 )
 
 api_router = APIRouter()
 
 api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(geo.router, prefix="/geo", tags=["Geography & Crops"])
 api_router.include_router(registry.router, prefix="/registry", tags=["Dataset Registry"])
 api_router.include_router(farms.router, prefix="/farms", tags=["Farms & Plots"])

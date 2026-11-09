@@ -98,4 +98,20 @@ void main() {
     expect(find.textContaining('Flowering & Anthesis (35'), findsOneWidget);
     expect(find.textContaining('Germination / Emergence (38'), findsOneWidget);
   });
+
+  testWidgets('Crop stage chips fall back safely without showing null even if data is corrupted', (WidgetTester tester) async {
+    final corrupted = CropHeatAssessment.fromJson({
+      'crop_code': 'soybean',
+      'growth_stage_code': 'stage_flowering',
+      'supported_stages': [
+        {'stage_code': 'stage_flowering', 'stage_name_en': null, 'stage_name': null, 'crit_tmax': 35.0},
+        {'stage_code': 'stage_maturity', 'stage_name_en': 'null', 'crit_tmax': 42.0},
+        {'stage_code': null, 'crit_tmax': 36.0},
+      ]
+    });
+    expect(corrupted.supportedStages[0]['stage_name'], 'FLOWERING');
+    expect(corrupted.supportedStages[1]['stage_name'], 'MATURITY');
+    expect(corrupted.supportedStages[2]['stage_name'], 'Growth Stage');
+    expect(corrupted.supportedStages.any((s) => s['stage_name'].toString().contains('null')), isFalse);
+  });
 }

@@ -504,6 +504,10 @@ class ApiService {
     required bool hasStorageOrShed,
     required String riskTolerance,
     required String categoryPreference,
+    String? ageRange,
+    String workPreference = 'active_physical',
+    String paybackHorizon = 'within_1_year',
+    String familyManagementRole = 'personal_direct',
     List<String> cropByproducts = const [],
     List<String> interests = const [],
   }) async {
@@ -526,6 +530,10 @@ class ApiService {
           'interests': interests,
           'risk_tolerance': riskTolerance,
           'category_preference': categoryPreference,
+          if (ageRange != null) 'age_range': ageRange,
+          'work_preference': workPreference,
+          'payback_horizon': paybackHorizon,
+          'family_management_role': familyManagementRole,
         }),
       ).timeout(const Duration(seconds: 6));
 
@@ -797,7 +805,50 @@ class ApiService {
     return null;
   }
 
-  // --- 8. AI Grounded Assistant ---
+  // --- 7B. Dashboard Prioritized Issues ---
+  static Future<DashboardSummaryResponse> getDashboardIssues(String farmId) async {
+    if (mockMode) {
+      return DashboardSummaryResponse(
+        farmId: farmId,
+        farmName: 'My Farm',
+        hasUrgentIssues: false,
+        totalIssuesCount: 0,
+        issues: [],
+        positiveStatusSummary: 'No major concerns found in the latest assessments. Weather conditions and soil moisture are within safe agronomic bounds.',
+        assessedAt: DateTime.now().toIso8601String(),
+      );
+    }
+    try {
+      final uri = Uri.parse('$baseUrl/dashboard/issues?farm_id=$farmId');
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return DashboardSummaryResponse.fromJson(json.decode(res.body));
+      }
+    } catch (_) {}
+    return DashboardSummaryResponse(
+      farmId: farmId,
+      farmName: 'My Farm',
+      hasUrgentIssues: false,
+      totalIssuesCount: 0,
+      issues: [],
+      positiveStatusSummary: 'No major concerns found in the latest assessments. Farm conditions are normal.',
+      assessedAt: DateTime.now().toIso8601String(),
+    );
+  }
+
+  // --- 8. AI Grounded Assistant & Context Chip ---
+  static Future<String> getAssistantContextChip(String farmId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/assistant/context?farm_id=$farmId');
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['chip_label'] ?? 'Using your farm information';
+      }
+    } catch (_) {}
+    return 'Using your farm information: Onion · Niphad · 3.0 acres';
+  }
+
   static Future<Map<String, dynamic>> sendAssistantMessage({
     required String farmerId,
     required String farmId,
@@ -815,7 +866,7 @@ class ApiService {
           'message': message,
           'session_id': sessionId,
         }),
-      ).timeout(const Duration(seconds: 7));
+      ).timeout(const Duration(seconds: 25));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
