@@ -46,6 +46,8 @@ credentials.json
 *.sqlite
 *.sqlite3
 *.db-journal
+*.db.bak*
+*.bak
 
 # Testing & Coverage
 .pytest_cache/
