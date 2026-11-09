@@ -20,12 +20,35 @@ The Rashkar ecosystem is architected into modular agricultural subsystems. This 
 | Module / Subsystem | Capability & Scope | Lead Author / Contributor | Implementation Branch | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **🌾 Soil Testing & Crop Recommendation System (CropNet AI)** | Location-based digital soil mapping, physical lab OCR, BIS IS 11624:2019 water chemistry, Sentinel-2 pure canopy vegetation radiometry, deterministic ICAR/MPKV crop feasibility, and guardrailed bilingual LLM advisory | **Siddhesh Birewar** (`siddheshbirewar77@gmail.com`) | [`integration/consolidated-workstreams`](https://github.com/Vernit185/Rashkar/tree/integration/consolidated-workstreams) | **Production-Ready / Phase 6.1 Pilot Validated** |
-| **🌱 Additional Rashkar Platform Modules** | Comprehensive farm parcel management, crop life-cycle monitoring, and logistics | Vernit & Rashkar Team | `main` | *In Active Development* |
+| **🌡️ Personalized Farm-Level Heat-Risk AI (Pillar 1)** | 0–6h Liljegren (2008) WBGT occupational screening (ACGIH/ISO 7243), Rothfusz Heat Index, Steadman Apparent Temp, UTCI, topographic lapse downscaling (-6.5°C/1000m), phenological heat hazard across 38 crops, and predictive ML (Random Forest 96.35%, XGBoost $R^2=0.9981$, PyTorch LSTM) | **Vernit & Rashkar Team** | [`yeild-and-heat-risk-feature`](https://github.com/Vernit185/Rashkar/tree/yeild-and-heat-risk-feature) | **Complete / 52 Automated Tests Verified** |
+| **🛰️ Plot-Level PMFBY Crop-Loss Verification (Pillar 2)** | Sentinel-2 10m optical NDVI/NDWI deficit tracking, YOLOv8 damage localization, U-Net segmentation, ViT loss severity, and dedicated Insurer Dashboard with 48h SLA claim timers | **Vernit & Rashkar Team** | [`yeild-and-heat-risk-feature`](https://github.com/Vernit185/Rashkar/tree/yeild-and-heat-risk-feature) | **Complete / 52 Automated Tests Verified** |
+| **📈 Yield Intelligence & Income Diversification** | Multi-scenario yield benchmarking (APY 1997–2021 + AgERA5/IMD normals) and NABARD FY 26-27 unit cost enterprise models (dairy, goat rearing, poultry, sericulture, apiary, shade net) | **Vernit & Rashkar Team** | [`yeild-and-heat-risk-feature`](https://github.com/Vernit185/Rashkar/tree/yeild-and-heat-risk-feature) | **Complete / 52 Automated Tests Verified** |
+| **🌱 Core Platform Shell & Local AI Assistant** | Comprehensive farm parcel management, grounded local Ollama assistant (`qwen3:8b`) with deterministic rule fallbacks, and Flutter Web frontend | **Vernit & Rashkar Team** | `main` | *In Active Integration* |
 
 > [!IMPORTANT]
 > **Source Code & Implementation Access**:  
-> The complete working source code, database migrations, 242 automated backend tests, 150 mobile tests, and production Flutter Web application for the **Soil Testing & Crop Recommendation System** reside in the active integration branch:  
-> 👉 **[`integration/consolidated-workstreams`](https://github.com/Vernit185/Rashkar/tree/integration/consolidated-workstreams)**
+> - For **Soil Testing & Crop Recommendation System**: Complete working code, database migrations, 242 backend tests, and 150 mobile tests reside in 👉 **[`integration/consolidated-workstreams`](https://github.com/Vernit185/Rashkar/tree/integration/consolidated-workstreams)**.
+> - For **Heat-Risk AI, PMFBY Crop-Loss Verification, Yield Intelligence & Income Diversification**: Complete source code, FastAPI services, scientific models, 52 passing backend tests, and Flutter Web UI reside in 👉 **[`yeild-and-heat-risk-feature`](https://github.com/Vernit185/Rashkar/tree/yeild-and-heat-risk-feature)**.
+
+---
+
+## 🏛️ Official Hackathon Product Pillars (Active in `yeild-and-heat-risk-feature`)
+
+### Pillar 1: Personalized Farm-Level Heat-Risk AI
+- **Worker Heat Safety**: Physics-based 0–6 hour Wet-Bulb Globe Temperature (WBGT) screening calibrated to ACGIH 2023 TLVs and ISO 7243:2017 action limits with sun vs. shade micro-climate modeling, signed threshold exceedance alerts, shift duration limitations, and clinically reviewed triage.
+- **Topographic Downscaling**: Elevation lapse-rate adjustment (-6.5°C / 1000m) for hyper-local parcel temperature modeling.
+- **Crop Phenological Heat Hazard**: Dynamic vulnerability tracking across 38 Maharashtra crops based on Days After Sowing (DAS) and reproductive sensitivity (flowering/anthesis sterility vs vegetative stress).
+- **Predictive ML Suite**: Random Forest heat event classifier (96.35% accuracy), XGBoost effective temperature regressor ($R^2 = 0.9981$), and PyTorch LSTM sequence forecast ($\text{MAE} = 0.308^\circ\text{C}$).
+
+### Pillar 2: Plot-Level PMFBY Crop-Loss Verification
+- **Satellite Spectral Deficit**: Sentinel-2 10m resolution band tracking for pre- and post-event NDVI and NDWI vegetation health deficits.
+- **Multimodal Field Computer Vision**: YOLOv8 damage detection, U-Net area segmentation, and Vision Transformer (ViT) loss severity assessment.
+- **Insurer Claim Triage Dashboard (`/insurer-dashboard`)**: Complete workflow featuring 48-hour mandatory PMFBY claim SLA timers, evidence verification dossiers, confidence scoring, and approval/rejection actions.
+
+### Supporting Capabilities
+- **Yield Intelligence & Yield Risk**: Multi-scenario yield benchmarking and climate risk analysis combining historical APY crop records (1997–2021) with agro-climatic normal distributions (1991–2020 IMD normal baseline and 2010–2024 AgERA5 reanalysis).
+- **Income Diversification**: Practical farm enterprise additions (dairy, indigenous goat rearing, desi poultry, sericulture, apiary, shade net polyhouse) with realistic CAPEX, recurring OPEX, net margins, and water requirements calibrated to NABARD FY 2026-27 unit cost norms.
+- **AI Agricultural Assistant**: Grounded, contextual advice powered by local Ollama models (`qwen3:8b`) with transparent fallback to deterministic rule engines when AI runtimes are offline.
 
 ---
 

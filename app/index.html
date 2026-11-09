@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Doctor AI - Plant Pathology Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .hero-bg {
+            background-image: linear-gradient(to bottom, rgba(6, 78, 59, 0.75), rgba(4, 47, 46, 0.85)), url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=1920');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+    </style>
+</head>
+<body class="hero-bg min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="bg-emerald-900/80 backdrop-blur-md text-white shadow-lg py-4 px-6 flex items-center justify-between border-b border-emerald-700/50">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-600 p-2 rounded-xl text-white shadow-md">
+                <i class="fa-solid fa-seedling text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-wide">Crop Doctor AI</h1>
+                <p class="text-xs text-emerald-200">Smart Agricultural Diagnosis Assistant</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-xl w-full mx-auto p-4 md:p-6 my-auto">
+        
+        <!-- Intro Card -->
+        <div class="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 p-6 md:p-8 mb-6">
+            <div class="text-center mb-6">
+                <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2">Instant Disease Detection</span>
+                <h2 class="text-2xl font-black text-slate-900 mb-2">Protect Your Crops</h2>
+                <p class="text-sm text-slate-600">Upload a clear photo of your plant's leaf below to instantly diagnose diseases and get expert treatment steps.</p>
+            </div>
+
+            <!-- Drag & Drop / File Selector Form -->
+            <form id="uploadForm" class="space-y-4">
+                <div class="border-2 border-dashed border-emerald-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition-all cursor-pointer relative bg-emerald-50/50 group" id="dropZone">
+                    <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    <div id="uploadPrompt" class="space-y-2 pointer-events-none">
+                        <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform shadow-sm">
+                            <i class="fa-solid fa-camera text-2xl"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">Click to upload or drag & drop leaf photo</p>
+                        <p class="text-xs text-slate-400">Supports Tomato, Potato, Corn, Apple & more</p>
+                    </div>
+                    <div id="previewContainer" class="hidden flex-col items-center space-y-2 relative z-20">
+                        <img id="imagePreview" class="h-44 object-contain rounded-xl shadow-md border border-slate-200 bg-white p-1" alt="Preview">
+                        <p id="fileName" class="text-xs text-slate-600 font-semibold bg-emerald-100 px-3 py-1 rounded-full"></p>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-emerald-600/30 flex items-center justify-center space-x-2 text-base">
+                    <i class="fa-solid fa-stethoscope"></i>
+                    <span>Analyze Plant Leaf Now</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 p-8 text-center space-y-3 mb-6">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                <i class="fa-solid fa-seedling text-xl"></i>
+            </div>
+            <p class="text-sm font-bold text-slate-700">Analyzing leaf pathology patterns...</p>
+            <p class="text-xs text-slate-400">Our AI model is examining the health indicators.</p>
+        </div>
+
+        <!-- Results Card -->
+        <div id="resultsCard" class="hidden bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 p-6 md:p-8 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Diagnosis Result</span>
+                    <h3 id="diagnosisLabel" class="text-xl font-black text-slate-900 mt-0.5">--</h3>
+                </div>
+                <div id="statusBadge" class="px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">--</div>
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                    <span>Model Confidence Score</span>
+                    <span id="confidenceText" class="text-emerald-700">--%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 shadow-inner">
+                    <div id="confidenceBar" class="bg-gradient-to-r from-emerald-500 to-teal-600 h-full rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+                    <span>Recommended Treatment & Action</span>
+                </h4>
+                <ul id="adviceList" class="space-y-2.5 text-sm text-slate-700 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                    <!-- Dynamic bullet items inserted here -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Error Alert Box -->
+        <div id="errorAlert" class="hidden bg-rose-50/95 backdrop-blur-xl border border-rose-200 text-rose-700 p-4 rounded-2xl text-sm mb-6 flex items-start space-x-3 shadow-lg">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 text-rose-500 text-lg"></i>
+            <div id="errorText">Error connecting to server.</div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-emerald-100/80 font-medium bg-emerald-950/40 backdrop-blur-sm border-t border-emerald-800/30">
+        Crop Doctor AI &bull; Empowering Farmers with AI Technology
+    </footer>
+
+    <!-- Frontend Interactive Script -->
+    <script>
+        const API_URL = "http://127.0.0.1:8000/api/predict";
+
+        const imageInput = document.getElementById('imageInput');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileName = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsCard = document.getElementById('resultsCard');
+        const errorAlert = document.getElementById('errorAlert');
+
+        let selectedFile = null;
+
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                fileName.textContent = file.name;
+                imagePreview.src = URL.createObjectURL(file);
+                uploadPrompt.classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+                errorAlert.classList.add('hidden');
+            }
+        });
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!selectedFile) {
+                showError("Please select or drop an image first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            loadingIndicator.classList.remove('hidden');
+            resultsCard.classList.add('hidden');
+            errorAlert.classList.add('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderResults(data);
+            } catch (err) {
+                showError("Failed to connect to the backend server. Make sure your FastAPI server is running in your terminal.");
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+
+        function renderResults(data) {
+            document.getElementById('diagnosisLabel').textContent = data.diagnosis.replace(/___/g, ' - ');
+            
+            const badge = document.getElementById('statusBadge');
+            if (data.is_healthy) {
+                badge.className = "px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm bg-emerald-100 text-emerald-800 border border-emerald-200";
+                badge.textContent = "Healthy Crop 🌱";
+            } else {
+                badge.className = "px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm bg-amber-100 text-amber-800 border border-amber-200";
+                badge.textContent = "Disease Detected ⚠️";
+            }
+
+            const confVal = parseFloat(data.confidence) || 95;
+            document.getElementById('confidenceText').textContent = data.confidence;
+            document.getElementById('confidenceBar').style.width = `${confVal}%`;
+
+            const adviceList = document.getElementById('adviceList');
+            adviceList.innerHTML = '';
+            data.actionable_advice.forEach(tip => {
+                const li = document.createElement('li');
+                li.className = "flex items-start space-x-2.5";
+                li.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mt-1 shrink-0"></i><span class="leading-relaxed">${tip}</span>`;
+                adviceList.appendChild(li);
+            });
+
+            resultsCard.classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            document.getElementById('errorText').textContent = msg;
+            errorAlert.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
