@@ -78,7 +78,6 @@ class _SchemesListScreenState extends State<SchemesListScreen> {
         governmentLevel: _selectedLevel,
         state: _selectedState,
         status: 'ACTIVE',
-        verificationStatus: 'VERIFIED',
       );
       if (!mounted) return;
       setState(() {
