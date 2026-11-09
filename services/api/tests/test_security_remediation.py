@@ -48,19 +48,20 @@ class TestConfigSecurity:
         assert "glnpmpagajfurpmlinvd" not in content, "Live project ref found in config.py defaults!"
 
         # Fresh Settings instance without env file override
-        s = Settings()
+        s = Settings(_env_file=None)
         assert s.DATABASE_URL is None
         assert s.SYNC_DATABASE_URL is None
 
     def test_opt_in_dev_auth_bypass_default_is_false(self):
         """ALLOW_DEV_AUTH_BYPASS must default to False (fail-closed)."""
-        s = Settings()
+        s = Settings(_env_file=None)
         assert s.ALLOW_DEV_AUTH_BYPASS is False
 
     def test_production_rejects_dev_auth_bypass_at_startup(self):
         """Settings validation must raise error if ALLOW_DEV_AUTH_BYPASS=True in production."""
         with pytest.raises((ValidationError, ValueError)):
             Settings(
+                _env_file=None,
                 ENVIRONMENT="production",
                 ALLOW_DEV_AUTH_BYPASS=True,
                 CORS_ORIGINS=["https://app.cropnet.ai"],
@@ -69,7 +70,7 @@ class TestConfigSecurity:
 
     def test_database_urls_require_environment_variables_not_defaults(self):
         """Database URLs must default to None and require explicit environment variable injection."""
-        s = Settings()
+        s = Settings(_env_file=None)
         assert s.DATABASE_URL is None
         assert s.SYNC_DATABASE_URL is None
         # When environment variables are provided, they are correctly accepted
