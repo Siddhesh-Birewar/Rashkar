@@ -1,16 +1,58 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --brand: #1b5e20;
-  --brand-leaf: #2e7d32;
-  --accent: #e65100;
-  --surface: #f9fbf9;
-  --border: #e0e0e0;
+@theme {
+  --color-forest: #1b5e20;
+  --color-leaf: #2e7d32;
+  --color-accent: #e65100;
+  --color-soil: #5d4037;
+  --color-canvas: #f9fbf9;
+  --color-ink: #17351e;
+  --color-muted: #68786b;
+  --color-line: #dfe8e0;
+  --color-calm: #3977a8;
+  --color-deep: #153c2b;
+  --font-sans: "Inter", "Aptos", "Segoe UI", sans-serif;
+  --radius-card: 1.35rem;
 }
 
-body {
-  background-color: var(--surface);
-  color: #0f172a;
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    background: #f9fbf9;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 92% 4%, rgb(46 125 50 / 7%), transparent 24rem), #f9fbf9;
+    color: #17351e;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: #c8e6c9;
+    color: #153c2b;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgb(230 81 0 / 28%);
+    outline-offset: 2px;
+  }
+}
+
+@utility safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@utility text-balance {
+  text-wrap: balance;
 }
