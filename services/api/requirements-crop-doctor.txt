@@ -1,0 +1,9 @@
+# Optional Crop Doctor ML runtime (image-based crop disease recognition).
+# Install separately from the core API requirements:
+#   python3 -m pip install -r services/api/requirements-crop-doctor.txt
+# The model weights (neghani/plantvillage-mobilenetv2, 38 PlantVillage classes)
+# are downloaded from Hugging Face on first use and cached locally.
+torch>=2.6
+torchvision>=0.21
+transformers>=4.40
+pillow>=10.0
