@@ -1,0 +1,131 @@
+"""
+Pydantic schemas for Sentinel-2 Satellite-Based Vegetation Intelligence.
+"""
+from datetime import datetime
+from enum import Enum
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class SatelliteObservationQuality(str, Enum):
+    VALID_OBSERVATION = "VALID_OBSERVATION"
+    VALID_OBSERVATION_WITH_MASKED_PIXELS = "VALID_OBSERVATION_WITH_MASKED_PIXELS"
+    LOW_VALID_PIXEL_COVERAGE = "LOW_VALID_PIXEL_COVERAGE"
+    INSUFFICIENT_VEGETATION_PIXELS = "INSUFFICIENT_VEGETATION_PIXELS"
+    NO_USABLE_OBSERVATION = "NO_USABLE_OBSERVATION"
+    UNVERIFIED_RADIOMETRY = "UNVERIFIED_RADIOMETRY"
+    CLOUD_OBSTRUCTED = "CLOUD_OBSTRUCTED"
+    INSUFFICIENT_PIXELS = "INSUFFICIENT_PIXELS"
+    SMALL_FARM_WARNING = "SMALL_FARM_WARNING"
+    NO_IMAGERY_AVAILABLE = "NO_IMAGERY_AVAILABLE"
+
+
+class SatelliteObservationItem(BaseModel):
+    id: str
+    farm_id: str
+    observation_date: datetime
+    product_id: str
+    tile_id: Optional[str] = None
+    sensor: str = "Sentinel-2 L2A"
+    mean_ndvi: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    median_ndvi: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    min_ndvi: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    max_ndvi: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    std_ndvi: Optional[float] = None
+    mean_ndmi: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    valid_pixel_count: int
+    total_pixel_count: int
+    farm_coverage_percent: float
+    cloud_masked_percent: float
+    spatial_resolution_meters: float = 10.0
+    quality_status: SatelliteObservationQuality
+    quality_notes: Optional[str] = None
+    is_small_farm_warning: bool = False
+
+    # SCL Class-Segregated Statistics
+    vegetation_pixel_count: Optional[int] = None
+    bare_soil_pixel_count: Optional[int] = None
+    water_pixel_count: Optional[int] = None
+    vegetation_coverage_percent: Optional[float] = None
+    bare_soil_coverage_percent: Optional[float] = None
+    water_coverage_percent: Optional[float] = None
+
+    # Vegetation-Only Canopy Metrics (Class 4)
+    vegetation_mean_ndvi: Optional[float] = None
+    vegetation_mean_ndmi: Optional[float] = None
+
+    # Bare-Soil Surface Metrics (Class 5)
+    bare_soil_mean_ndvi: Optional[float] = None
+
+    # Spatial Discretization & Data Lineage
+    polygon_area_hectares: Optional[float] = None
+    raster_discretized_area_hectares: Optional[float] = None
+    radiometric_conversion_provenance: Optional[str] = None
+    data_attribution: str = "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84."
+
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SatelliteSyncRequest(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    max_cloud_cover_percent: float = Field(default=50.0, ge=0.0, le=100.0)
+
+
+class SatelliteSyncResponse(BaseModel):
+    success: bool
+    farm_id: str
+    synced_observations_count: int
+    latest_observation: Optional[SatelliteObservationItem] = None
+    copernicus_provider_status: str
+    message: str
+
+
+class VegetationTimeSeriesPoint(BaseModel):
+    date: datetime
+    mean_ndvi: Optional[float] = None
+    median_ndvi: Optional[float] = None
+    mean_ndmi: Optional[float] = None
+    valid_pixels: int = 0
+    cloud_masked_percent: float = 0.0
+    quality_status: str = "VALID_OBSERVATION"
+    vegetation_pixel_count: Optional[int] = None
+    bare_soil_pixel_count: Optional[int] = None
+    vegetation_coverage_percent: Optional[float] = None
+    bare_soil_coverage_percent: Optional[float] = None
+    vegetation_mean_ndvi: Optional[float] = None
+    vegetation_mean_ndmi: Optional[float] = None
+
+
+class VegetationTimeSeriesResponse(BaseModel):
+    farm_id: str
+    farm_area_hectares: float
+    is_small_farm: bool
+    total_observations: int
+    series: List[VegetationTimeSeriesPoint]
+    vegetation_interpretation: str
+    scientific_disclaimer: str
+
+
+class SatelliteSpatialMetadataResponse(BaseModel):
+    farm_id: str
+    product_id: str
+    observation_date: datetime
+    bounds: List[float]  # [min_lon, min_lat, max_lon, max_lat]
+    width: int
+    height: int
+    spatial_resolution_meters: float = 10.0
+    b11_native_resolution_meters: float = 20.0
+    vegetation_pixel_count: int = 0
+    bare_soil_pixel_count: int = 0
+    water_pixel_count: int = 0
+    cloud_masked_pixel_count: int = 0
+    boundary_masked_pixel_count: int = 0
+    total_pixel_count: int = 0
+    ndvi_map_url: str
+    ndmi_map_url: str
+    scl_map_url: str
+    legend: Dict[str, Any]
+    scientific_disclosure: str

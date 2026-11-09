@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: cropnet_postgis
+    restart: always
+    environment:
+      POSTGRES_USER: cropnet_user
+      POSTGRES_PASSWORD: cropnet_password
+      POSTGRES_DB: cropnet_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init_postgis.sql:/docker-entrypoint-initdb.d/init_postgis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cropnet_user -d cropnet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

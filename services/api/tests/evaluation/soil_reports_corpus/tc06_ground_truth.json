@@ -1,0 +1,50 @@
+{
+  "document_id": "TC-06",
+  "document_filename": "tc06_handwritten_soil_card.pdf",
+  "expected_document_type": "scanned_pdf",
+  "expected_metadata": {
+    "laboratory_name": "Baramati Rural Soil Testing Camp",
+    "sample_id": "CAMP-BAR-044",
+    "farmer_name": "Babasaheb Ghadge",
+    "report_date": "2024-02-14",
+    "sample_depth": "0-15 cm"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 8.4,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.65,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.35,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 160.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_phosphorus": {
+      "value": 11.2,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 260.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "zinc": {
+      "value": 0.38,
+      "unit": "ppm",
+      "is_ambiguous": true
+    }
+  },
+  "expected_ambiguity_count": 1
+}

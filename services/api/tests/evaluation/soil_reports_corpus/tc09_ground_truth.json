@@ -1,0 +1,55 @@
+{
+  "document_id": "TC-09",
+  "document_filename": "tc09_oxide_notation_report.jpg",
+  "expected_document_type": "image_jpeg",
+  "expected_metadata": {
+    "laboratory_name": "Maharashtra Agro Chemical Testing Laboratory",
+    "sample_id": "MAC-2024-8890",
+    "farmer_name": "Gorakhnath Patil",
+    "report_date": "2024-06-25",
+    "sample_depth": "0-15 cm"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 7.5,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.34,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.6,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 230.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_phosphorus": {
+      "value": 15.5,
+      "unit": "kg/ha",
+      "is_ambiguous": true
+    },
+    "available_potassium": {
+      "value": 325.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "sulphur": {
+      "value": 12.5,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "zinc": {
+      "value": 0.68,
+      "unit": "ppm",
+      "is_ambiguous": false
+    }
+  },
+  "expected_ambiguity_count": 1
+}

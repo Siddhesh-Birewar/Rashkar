@@ -1,0 +1,29 @@
+name: cropnet_mobile
+description: "CropNet AI — Soil Intelligence & Optimal Crop Selection Mobile Application"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  go_router: ^14.8.1
+  http: ^1.2.2
+  supabase_flutter: ^2.18.3
+  file_picker: ^13.3.2
+  http_parser: ^4.1.2
+  file_picker_web: ^4.2.0
+  web: ^1.1.1
+  cross_file: ^0.3.5+5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

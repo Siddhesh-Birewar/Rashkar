@@ -1,0 +1,66 @@
+name: PostgreSQL 17 + PostGIS Migration Lifecycle Test
+
+on:
+  push:
+    branches: [ Soil-testing-and-crop-reccomendation, main ]
+  pull_request:
+    branches: [ Soil-testing-and-crop-reccomendation, main ]
+  workflow_dispatch:
+
+jobs:
+  postgres-17-migration-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_DB: cropnet_isolated_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cropnet_isolated_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install psycopg2-binary "psycopg[binary]"
+          pip install -r services/api/requirements.txt
+
+      - name: Setup PYTHONPATH link
+        run: |
+          # Ensure 'cropnet' package resolution works from workspace root or repo root
+          ln -s . cropnet || true
+
+      - name: Run PostgreSQL 17 + PostGIS Migration Lifecycle Test
+        env:
+          DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
+          SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
+          POSTGRES_TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
+          PYTHONPATH: .
+        run: |
+          python infra/db/tests/test_postgres_17_migration_lifecycle.py
+
+      - name: Run Pytest Test Suite
+        env:
+          DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
+          SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/cropnet_isolated_test
+          PYTHONPATH: .
+        run: |
+          pytest services/api/tests/ -v

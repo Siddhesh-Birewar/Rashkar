@@ -1,0 +1,52 @@
+{
+  "document_id": "TC-08",
+  "document_filename": "tc08_total_nitrogen_report.pdf",
+  "expected_document_type": "text_pdf",
+  "expected_metadata": {
+    "laboratory_name": "State Agricultural Research Institute Lab",
+    "sample_id": "SARI-RES-2024-819",
+    "farmer_name": "Kisanrao Shinde",
+    "report_date": "2024-05-02",
+    "sample_depth": "0-15 cm"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 7.2,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.25,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.72,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "total_nitrogen": {
+      "value": 0.08,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": null,
+      "unit": null,
+      "extraction_status": "NOT_REPORTED"
+    },
+    "available_phosphorus": {
+      "value": 24.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 420.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    }
+  },
+  "safeguard_checks": [
+    "Safeguard 3: Available Nitrogen must remain NOT_REPORTED"
+  ]
+}

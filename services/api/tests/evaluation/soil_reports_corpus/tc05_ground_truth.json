@@ -1,0 +1,45 @@
+{
+  "document_id": "TC-05",
+  "document_filename": "tc05_lab_report_glare.png",
+  "expected_document_type": "image_png",
+  "expected_metadata": {
+    "laboratory_name": "Pune Agro Analytical Laboratory",
+    "sample_id": "PAL-2024-338",
+    "farmer_name": "Dnyaneshwar Jagtap",
+    "report_date": "2024-05-18",
+    "sample_depth": "0-15 cm"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 7.9,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.52,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.41,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 210.0,
+      "unit": "kg/ha",
+      "is_ambiguous": true
+    },
+    "available_phosphorus": {
+      "value": 12.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 380.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    }
+  },
+  "expected_ambiguity_count": 1
+}

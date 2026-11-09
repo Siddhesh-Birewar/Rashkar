@@ -1,0 +1,80 @@
+{
+  "document_id": "TC-01",
+  "document_filename": "tc01_shc_pune_digital.pdf",
+  "expected_document_type": "text_pdf",
+  "expected_metadata": {
+    "laboratory_name": "District Soil Testing Laboratory, Pune",
+    "sample_id": "MH-PUN-2024-8841",
+    "farmer_name": "Vitthalrao Patil",
+    "report_date": "2024-04-15",
+    "collection_date": "2024-04-05",
+    "sample_depth": "0-15 cm",
+    "sampling_point": "Plot 4B, North Field",
+    "village": "Baramati",
+    "taluka": "Baramati",
+    "district": "Pune",
+    "state": "Maharashtra"
+  },
+  "expected_parameters": {
+    "soil_ph": {
+      "value": 7.65,
+      "unit": "pH",
+      "is_ambiguous": false
+    },
+    "electrical_conductivity": {
+      "value": 0.38,
+      "unit": "dS/m",
+      "is_ambiguous": false
+    },
+    "organic_carbon": {
+      "value": 0.52,
+      "unit": "%",
+      "is_ambiguous": false
+    },
+    "available_nitrogen": {
+      "value": 195.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_phosphorus": {
+      "value": 16.4,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "available_potassium": {
+      "value": 340.0,
+      "unit": "kg/ha",
+      "is_ambiguous": false
+    },
+    "sulphur": {
+      "value": 8.2,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "zinc": {
+      "value": 0.55,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "iron": {
+      "value": 3.8,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "manganese": {
+      "value": 6.2,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "copper": {
+      "value": 1.4,
+      "unit": "ppm",
+      "is_ambiguous": false
+    },
+    "boron": {
+      "value": 0.45,
+      "unit": "ppm",
+      "is_ambiguous": false
+    }
+  }
+}
