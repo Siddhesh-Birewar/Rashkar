@@ -117,6 +117,13 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
     return const Color(0xFFC62828);
   }
 
+  String _formatCurrency(num amount) {
+    if (amount >= 100000) {
+      return '₹${(amount / 100000).toStringAsFixed(1)} Lakh';
+    }
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = AppState.instance;
@@ -127,44 +134,194 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Income Diversification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text('Extra Farm Income', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             Text(
-              'For ${appState.activeCropName} · ${appState.activeTaluka}, ${appState.activeDistrict}',
+              '${appState.activeTaluka}, ${appState.activeDistrict} · ${appState.activeCropName}',
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _matchOpportunities),
+          IconButton(
+            tooltip: 'Refresh Options',
+            icon: const Icon(Icons.refresh),
+            onPressed: _matchOpportunities,
+          ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00695C)))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // SECTION 1: Interactive Farmer Resource Questionnaire
-                  _buildQuestionnaireCard(),
+                  // SECTION A: Friendly Introduction (Main Card)
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8F5E9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.savings_outlined, color: Color(0xFF1B5E20), size: 28),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Find Extra Income from Your Farm',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Practical enterprises matched to your spare land, budget & water.',
+                                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          // Farm resources summary row
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildResourceMini('Budget', _formatCurrency(_availableInvestment), Icons.account_balance_wallet_outlined),
+                                _buildResourceMini('Spare Land', '${_availableLand.toStringAsFixed(1)} ac', Icons.landscape_outlined),
+                                _buildResourceMini('Water', _getWaterFriendlyName(_waterAvailability), Icons.water_drop_outlined),
+                                _buildResourceMini('Labor', '${_familyLaborHours.toStringAsFixed(0)} h/day', Icons.people_outline),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF2E7D32),
+                                side: const BorderSide(color: Color(0xFF2E7D32)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              icon: const Icon(Icons.tune, size: 18),
+                              label: const Text('Change My Farm Resources', style: TextStyle(fontWeight: FontWeight.bold)),
+                              onPressed: () => _showResourceSettingsBottomSheet(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
-                  // SECTION 2: Scored Opportunities Catalog
-                  _buildScoredOpportunitiesSection(),
+                  // SECTION C: Top Matched Opportunities (Shortlist of cards)
+                  const Text(
+                    'BEST MATCHED ENTERPRISES FOR YOU',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20), letterSpacing: 0.8),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_scoredOpportunities.isEmpty)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Text('No enterprises matched your exact budget/land filter.'),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () => _showResourceSettingsBottomSheet(context),
+                              child: const Text('Adjust Farm Budget or Land'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._scoredOpportunities.take(3).map((s) => _buildFarmerOpportunityCard(s)).toList(),
                   const SizedBox(height: 16),
 
-                  // SECTION 3: 3-Scenario Financial Simulator
-                  if (_scenario != null) _buildFinancialSimulatorCard(),
-                  if (_scenario != null) const SizedBox(height: 16),
+                  // SECTION D: Opportunity Deep-Dive (When tapped / selected)
+                  if (_scenario != null && _selectedScored != null) ...[
+                    _buildOpportunityDeepDiveCard(),
+                    const SizedBox(height: 16),
+                  ],
 
-                  // SECTION 4: Side-by-Side Alternative Comparison Matrix
-                  if (_comparisons.isNotEmpty) _buildComparisonCard(),
-                  if (_comparisons.isNotEmpty) const SizedBox(height: 16),
+                  // SECTION E: Side-by-Side Comparison
+                  if (_comparisons.isNotEmpty) ...[
+                    _buildFarmerComparisonCard(),
+                    const SizedBox(height: 16),
+                  ],
 
-                  // SECTION 5: Local Mandi Benchmark & NABARD Citation
-                  if (_scenario != null) _buildMarketBenchmarkCard(),
+                  // SECTION F: Scientific & Official Sources (Progressive Disclosure)
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.verified_outlined, color: Colors.blueGrey),
+                      title: const Text(
+                        'NABARD FY 2026-27 Official Benchmarks & Mandi Data',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey),
+                      ),
+                      subtitle: const Text('Tap to view official state cost norms & APMC market prices', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_scenario != null) ...[
+                                Text(
+                                  'Local APMC Mandi Benchmark: ${_scenario!.localMandiBenchmark['commodity'] ?? "Livestock/Produce"}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Prevailing Price: ${_scenario!.localMandiBenchmark['benchmark_price'] ?? "Prevailing Modal Price"} · Source: ${_scenario!.localMandiBenchmark['reporting_mandi'] ?? "Agmarknet APMC"}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _scenario?.disclaimer.isNotEmpty == true
+                                      ? _scenario!.disclaimer
+                                      : 'Calibrated using official NABARD Unit Cost Norms for Maharashtra State (FY 2026-27). Cash flow models reflect local agricultural seasonal patterns.',
+                                  style: const TextStyle(fontSize: 11, color: Colors.black54, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -172,188 +329,19 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
     );
   }
 
-  // ==================== SECTION 1: Questionnaire ====================
-  Widget _buildQuestionnaireCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.tune, color: Color(0xFF00695C)),
-                SizedBox(width: 8),
-                Text('Farmer Resource Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
-            const Text(
-              'Customize your resources to rank enterprises by real-world feasibility:',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-            const SizedBox(height: 14),
-
-            // Capital Slider
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Available Investment Capital:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                Text('₹${_availableInvestment.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
-              ],
-            ),
-            Slider(
-              value: _availableInvestment,
-              min: 15000.0,
-              max: 300000.0,
-              divisions: 19,
-              activeColor: const Color(0xFF00695C),
-              label: '₹${_availableInvestment.toStringAsFixed(0)}',
-              onChanged: (val) {
-                setState(() => _availableInvestment = val);
-                _matchOpportunities();
-              },
-            ),
-
-            // Land Slider
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Spare / Unallocated Land:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                Text('${_availableLand.toStringAsFixed(2)} acres', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
-              ],
-            ),
-            Slider(
-              value: _availableLand,
-              min: 0.02,
-              max: 2.0,
-              divisions: 20,
-              activeColor: const Color(0xFF00695C),
-              label: '${_availableLand.toStringAsFixed(2)} acres',
-              onChanged: (val) {
-                setState(() => _availableLand = val);
-                _matchOpportunities();
-              },
-            ),
-
-            // Water Availability Dropdown
-            Row(
-              children: [
-                const Expanded(
-                  flex: 2,
-                  child: Text('Water Source:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _waterAvailability,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'reliable_year_round', child: Text('Borewell / Perennial Canal')),
-                      DropdownMenuItem(value: 'seasonal_canal', child: Text('Seasonal Canal / Farm Pond')),
-                      DropdownMenuItem(value: 'rainfed_limited', child: Text('Rainfed / Scarce')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _waterAvailability = val);
-                        _matchOpportunities();
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Family Labor Hours
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Available Family Labor:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                Text('${_familyLaborHours.toStringAsFixed(1)} hrs/day', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
-              ],
-            ),
-            Slider(
-              value: _familyLaborHours,
-              min: 1.0,
-              max: 6.0,
-              divisions: 10,
-              activeColor: const Color(0xFF00695C),
-              label: '${_familyLaborHours.toStringAsFixed(1)}h',
-              onChanged: (val) {
-                setState(() => _familyLaborHours = val);
-                _matchOpportunities();
-              },
-            ),
-
-            // Category Preference
-            Row(
-              children: [
-                const Expanded(
-                  flex: 2,
-                  child: Text('Enterprise Category:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _categoryPreference,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Opportunities')),
-                      DropdownMenuItem(value: 'livestock', child: Text('Livestock & Small Ruminants')),
-                      DropdownMenuItem(value: 'byproduct_utilization', child: Text('Byproduct & Biomass')),
-                      DropdownMenuItem(value: 'value_addition', child: Text('Processing & Value Addition')),
-                      DropdownMenuItem(value: 'horticulture', child: Text('Horticulture & Nursery')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _categoryPreference = val);
-                        _matchOpportunities();
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== SECTION 2: Scored Opportunities ====================
-  Widget _buildScoredOpportunitiesSection() {
+  // ==================== HELPER WIDGETS ====================
+  Widget _buildResourceMini(String label, String value, IconData icon) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'MATCHED ENTERPRISE OPPORTUNITIES (NABARD FY26-27)',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 0.8),
-        ),
-        const SizedBox(height: 8),
-        if (_scoredOpportunities.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('No enterprises matched your exact budget/land filter. Try adjusting capital slider.'),
-            ),
-          )
-        else
-          ..._scoredOpportunities.map((s) => _buildScoredOpportunityCard(s)).toList(),
+        Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
       ],
     );
   }
 
-  Widget _buildScoredOpportunityCard(ScoredOpportunityItem s) {
+  Widget _buildFarmerOpportunityCard(ScoredOpportunityItem s) {
     final isSelected = _selectedScored?.opportunity.opportunityId == s.opportunity.opportunityId;
     final scoreColor = _getScoreColor(s.suitabilityScorePct);
 
@@ -369,7 +357,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: isSelected ? const Color(0xFF00695C) : Colors.grey.shade200,
+            color: isSelected ? const Color(0xFF1B5E20) : Colors.grey.shade200,
             width: isSelected ? 2.0 : 1.0,
           ),
         ),
@@ -379,16 +367,17 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: scoreColor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${s.suitabilityScorePct}%',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: scoreColor),
+                      '${s.suitabilityScorePct}% Fit',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: scoreColor),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -398,19 +387,20 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                       children: [
                         Text(
                           s.opportunity.title,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
-                        Text(
-                          s.opportunity.tagline.isNotEmpty ? s.opportunity.tagline : s.opportunity.category,
-                          style: const TextStyle(fontSize: 11, color: Colors.black54),
-                        ),
+                        if (s.reasonsWhySuitable.isNotEmpty)
+                          Text(
+                            s.reasonsWhySuitable.first,
+                            style: TextStyle(fontSize: 12, color: Colors.green.shade900, fontWeight: FontWeight.w500),
+                          ),
                       ],
                     ),
                   ),
                   Radio<String>(
                     value: s.opportunity.opportunityId,
                     groupValue: _selectedScored?.opportunity.opportunityId,
-                    activeColor: const Color(0xFF00695C),
+                    activeColor: const Color(0xFF1B5E20),
                     onChanged: (val) {
                       setState(() => _selectedScored = s);
                       _calculateScenario();
@@ -419,35 +409,24 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(s.opportunity.summary, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-              const SizedBox(height: 8),
-
-              // Suitability verdict & reasons
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: s.isSuitable ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Verdict: ${s.suitabilityVerdict}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                        color: s.isSuitable ? const Color(0xFF1B5E20) : Colors.deepOrange,
-                      ),
-                    ),
-                    if (s.reasonsWhySuitable.isNotEmpty)
-                      Text('• ${s.reasonsWhySuitable.first}', style: const TextStyle(fontSize: 11, color: Colors.black87)),
-                    if (s.reasonsWhyUnsuitable.isNotEmpty)
-                      Text('• ${s.reasonsWhyUnsuitable.first}', style: TextStyle(fontSize: 11, color: Colors.red.shade900)),
-                  ],
-                ),
+              const SizedBox(height: 10),
+              // Key highlights grid
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildCardMetric('Initial Cost', _formatCurrency(s.opportunity.minInvestmentInr)),
+                  _buildCardMetric('Expected Profit', '${_formatCurrency(s.opportunity.potentialAnnualProfitInr)} / yr'),
+                  _buildCardMetric('Payback Time', '${s.opportunity.paybackPeriodMonths} months'),
+                  _buildCardMetric('Space Needed', '${s.opportunity.requiredLandAcres} ac'),
+                ],
               ),
+              if (s.reasonsWhyUnsuitable.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '• Note: ${s.reasonsWhyUnsuitable.first}',
+                  style: TextStyle(fontSize: 11, color: Colors.orange.shade900, fontStyle: FontStyle.italic),
+                ),
+              ],
             ],
           ),
         ),
@@ -455,16 +434,28 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
     );
   }
 
-  // ==================== SECTION 3: 3-Scenario Simulator ====================
-  Widget _buildFinancialSimulatorCard() {
+  Widget _buildCardMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1B5E20))),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+      ],
+    );
+  }
+
+  Widget _buildOpportunityDeepDiveCard() {
     final sc = _scenario!;
-    final baseScenario = sc.scenarios['base'];
-    final consScenario = sc.scenarios['conservative'];
-    final optScenario = sc.scenarios['optimistic'];
+    final base = sc.scenarios['base'];
+    final cons = sc.scenarios['conservative'];
+    final opt = sc.scenarios['optimistic'];
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.2),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -472,142 +463,142 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.calculate, color: Color(0xFF00695C)),
+                const Icon(Icons.analytics_outlined, color: Color(0xFF1B5E20), size: 22),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Financial Simulator: ${sc.opportunityTitle}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    'Financial Outlook: ${sc.opportunityTitle}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
                   ),
                 ),
                 if (_isCalculating)
-                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00695C))),
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1B5E20))),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Text(
-              'Capex: ₹${sc.calculatedCapexInr.toStringAsFixed(0)} · Working Capital: ₹${sc.workingCapitalInr.toStringAsFixed(0)} · Total: ₹${sc.totalInitialOutlayInr.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+              'Initial investment needed: ₹${sc.calculatedCapexInr.toStringAsFixed(0)} (plus ₹${sc.workingCapitalInr.toStringAsFixed(0)} operating cash).',
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
             ),
             const SizedBox(height: 14),
 
-            // 3 Scenarios Cards
-            if (baseScenario != null && consScenario != null && optScenario != null)
+            // 3 Earning Scenarios
+            if (base != null && cons != null && opt != null)
               Row(
                 children: [
-                  Expanded(child: _buildScenarioBox('Conservative', consScenario, Colors.orange.shade800)),
+                  Expanded(
+                    child: _buildScenarioPill('Low Estimate', _formatCurrency(cons.netAnnualProfitInr), '${cons.breakEvenMonths.toStringAsFixed(0)} mos payback', Colors.orange.shade800),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildScenarioBox('Base Case', baseScenario, const Color(0xFF00695C), isMain: true)),
+                  Expanded(
+                    child: _buildScenarioPill('Expected / Normal', _formatCurrency(base.netAnnualProfitInr), '${base.breakEvenMonths.toStringAsFixed(0)} mos payback', const Color(0xFF1B5E20), isHighlight: true),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildScenarioBox('Optimistic', optScenario, Colors.green.shade800)),
-                ],
-              ),
-            const SizedBox(height: 14),
-
-            // 12-Month Net Cash Flow Timeline
-            if (baseScenario != null && baseScenario.monthlyNetCashFlowInr.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('12-Month Cash Flow Horizon (Base Case):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: List.generate(baseScenario.monthlyNetCashFlowInr.length, (idx) {
-                        final val = baseScenario.monthlyNetCashFlowInr[idx];
-                        final isNegative = val < 0;
-                        return Container(
-                          width: 55,
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: isNegative ? Colors.red.shade50 : Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: isNegative ? Colors.red.shade200 : Colors.green.shade200),
-                          ),
-                          child: Column(
-                            children: [
-                              Text('M${idx + 1}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${isNegative ? "-" : "+"}₹${val.abs().toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isNegative ? Colors.red.shade800 : Colors.green.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ),
+                  Expanded(
+                    child: _buildScenarioPill('High Estimate', _formatCurrency(opt.netAnnualProfitInr), '${opt.breakEvenMonths.toStringAsFixed(0)} mos payback', Colors.green.shade800),
                   ),
                 ],
               ),
+            const SizedBox(height: 14),
+
+            // 12-Month Net Cash Flow Horizon
+            if (base != null && base.monthlyNetCashFlowInr.isNotEmpty) ...[
+              const Text('12-Month Earning Timeline:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(base.monthlyNetCashFlowInr.length, (idx) {
+                    final val = base.monthlyNetCashFlowInr[idx];
+                    final isNegative = val < 0;
+                    return Container(
+                      width: 52,
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isNegative ? Colors.red.shade50 : Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: isNegative ? Colors.red.shade200 : Colors.green.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Text('M${idx + 1}', style: const TextStyle(fontSize: 9, color: Colors.black54)),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${isNegative ? "-" : "+"}₹${val.abs().toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isNegative ? Colors.red.shade800 : Colors.green.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildScenarioBox(String title, FinancialScenarioDetail d, Color col, {bool isMain = false}) {
+  Widget _buildScenarioPill(String title, String profit, String payback, Color color, {bool isHighlight = false}) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: col.withOpacity(0.08),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: col, width: isMain ? 1.5 : 0.8),
+        border: Border.all(color: color, width: isHighlight ? 1.5 : 0.8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: col)),
-          const SizedBox(height: 6),
-          Text('₹${d.netAnnualProfitInr.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: col)),
-          const Text('Net Profit/yr', style: TextStyle(fontSize: 9, color: Colors.black54)),
-          const SizedBox(height: 6),
-          Text('${d.breakEvenMonths.toStringAsFixed(1)} mos', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          const Text('Break-even', style: TextStyle(fontSize: 9, color: Colors.black54)),
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: color)),
+          const SizedBox(height: 4),
+          Text(profit, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+          const Text('per year', style: TextStyle(fontSize: 9, color: Colors.black54)),
+          const SizedBox(height: 4),
+          Text(payback, style: const TextStyle(fontSize: 9, color: Colors.black87, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
-  // ==================== SECTION 4: Side-by-Side Comparison ====================
-  Widget _buildComparisonCard() {
+  Widget _buildFarmerComparisonCard() {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Enterprise Comparison Matrix', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const Text('Compare Top Choices Side by Side', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                columnSpacing: 16,
+                columnSpacing: 14,
+                headingRowHeight: 36,
+                dataRowHeight: 40,
                 columns: const [
-                  DataColumn(label: Text('Enterprise', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Net Profit/yr', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Payback', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Land', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Water', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Verdict', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Enterprise', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                  DataColumn(label: Text('Yearly Profit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                  DataColumn(label: Text('Payback', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                  DataColumn(label: Text('Space', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                  DataColumn(label: Text('Water Needs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                 ],
                 rows: _comparisons.map((c) {
                   return DataRow(
                     cells: [
-                      DataCell(Text(c.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
-                      DataCell(Text('₹${c.netAnnualProfitInr.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00695C)))),
-                      DataCell(Text('${c.paybackMonths.toStringAsFixed(0)} mos')),
-                      DataCell(Text('${c.landRequiredAcres} ac')),
-                      DataCell(Text(c.waterNeeds)),
-                      DataCell(Text(c.suitabilityVerdict, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(c.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11))),
+                      DataCell(Text('₹${c.netAnnualProfitInr.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20), fontSize: 11))),
+                      DataCell(Text('${c.paybackMonths.toStringAsFixed(0)} mos', style: const TextStyle(fontSize: 11))),
+                      DataCell(Text('${c.landRequiredAcres} ac', style: const TextStyle(fontSize: 11))),
+                      DataCell(Text(c.waterNeeds, style: const TextStyle(fontSize: 11))),
                     ],
                   );
                 }).toList(),
@@ -619,50 +610,159 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
     );
   }
 
-  // ==================== SECTION 5: Mandi Benchmark & Citation ====================
-  Widget _buildMarketBenchmarkCard() {
-    final sc = _scenario!;
-    final mandi = sc.localMandiBenchmark;
+  String _getWaterFriendlyName(String code) {
+    switch (code) {
+      case 'reliable_year_round':
+        return 'Borewell / Good';
+      case 'seasonal_canal':
+        return 'Seasonal';
+      case 'rainfed_limited':
+        return 'Rainfed / Scarce';
+      default:
+        return code;
+    }
+  }
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.storefront, color: Colors.blueGrey),
-                SizedBox(width: 8),
-                Text('Local APMC Mandi Benchmark', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Commodity: ${mandi['commodity'] ?? "Local Commodity"} · Benchmark: ${mandi['benchmark_price'] ?? "Prevailing Modal Price"}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-            Text(
-              'Reporting Source: ${mandi['reporting_mandi'] ?? "Agmarknet APMC"}',
-              style: const TextStyle(fontSize: 11, color: Colors.black54),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                sc.disclaimer.isNotEmpty ? sc.disclaimer : 'Financial models calibrated with official NABARD Maharashtra unit costs.',
-                style: const TextStyle(fontSize: 10, color: Colors.black54),
-              ),
-            ),
-          ],
-        ),
+  void _showResourceSettingsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Adjust My Farm Resources', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    // Capital / Budget
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Starting Investment Budget:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('₹${_availableInvestment.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                      ],
+                    ),
+                    Slider(
+                      value: _availableInvestment,
+                      min: 15000.0,
+                      max: 300000.0,
+                      divisions: 19,
+                      activeColor: const Color(0xFF1B5E20),
+                      label: '₹${_availableInvestment.toStringAsFixed(0)}',
+                      onChanged: (val) {
+                        setModalState(() => _availableInvestment = val);
+                        setState(() => _availableInvestment = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Spare Land
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Available Spare Land:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('${_availableLand.toStringAsFixed(2)} acres', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                      ],
+                    ),
+                    Slider(
+                      value: _availableLand,
+                      min: 0.02,
+                      max: 2.0,
+                      divisions: 20,
+                      activeColor: const Color(0xFF1B5E20),
+                      label: '${_availableLand.toStringAsFixed(2)} ac',
+                      onChanged: (val) {
+                        setModalState(() => _availableLand = val);
+                        setState(() => _availableLand = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Water Availability
+                    const Text('Water Source Available:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _waterAvailability,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'reliable_year_round', child: Text('Borewell / Perennial Canal (Good all year)')),
+                        DropdownMenuItem(value: 'seasonal_canal', child: Text('Seasonal Canal / Farm Pond')),
+                        DropdownMenuItem(value: 'rainfed_limited', child: Text('Rainfed / Scarce')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _waterAvailability = val);
+                          setState(() => _waterAvailability = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Family Labor Hours
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Daily Family Labor Time:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('${_familyLaborHours.toStringAsFixed(1)} hrs/day', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                      ],
+                    ),
+                    Slider(
+                      value: _familyLaborHours,
+                      min: 1.0,
+                      max: 6.0,
+                      divisions: 10,
+                      activeColor: const Color(0xFF1B5E20),
+                      label: '${_familyLaborHours.toStringAsFixed(1)}h',
+                      onChanged: (val) {
+                        setModalState(() => _familyLaborHours = val);
+                        setState(() => _familyLaborHours = val);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _matchOpportunities();
+                        },
+                        child: const Text('Update & Recalculate Opportunities', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

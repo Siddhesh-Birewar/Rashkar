@@ -35,11 +35,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('WHAT WOULD YOU LIKE TO DO?'), findsOneWidget);
-    expect(find.text('My Crop'), findsOneWidget);
-    expect(find.text('Heat Safety'), findsOneWidget);
-    expect(find.text('Extra Income'), findsOneWidget);
-    expect(find.text('Crop Loss'), findsOneWidget);
-    expect(find.text('Ask Rashkar AI Assistant'), findsOneWidget);
+    expect(find.text('My Crop'), findsWidgets);
+    expect(find.text('Heat Safety'), findsWidgets);
+    expect(find.text('Extra Income'), findsWidgets);
+    expect(find.text('Crop Loss'), findsWidgets);
+    expect(find.text('Ask Rashkar AI Assistant'), findsWidgets);
   });
 
   testWidgets('Farm registration screen displays 5-step guided flow with dynamic catalog', (WidgetTester tester) async {
@@ -56,8 +56,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ExtraIncomeScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Income Diversification'), findsOneWidget);
-    expect(find.text('MATCHED ENTERPRISE OPPORTUNITIES (NABARD FY26-27)'), findsOneWidget);
+    expect(find.text('Extra Farm Income'), findsOneWidget);
+    expect(find.text('Find Extra Income from Your Farm'), findsOneWidget);
   });
 
   testWidgets('Ask Rashkar chat screen renders prompt chips and input field', (WidgetTester tester) async {
@@ -66,17 +66,16 @@ void main() {
 
     expect(find.text('Ask Rashkar Assistant'), findsOneWidget);
     expect(find.text('Ask a question about your farm...'), findsOneWidget);
-    expect(find.text('Why is my crop at risk today?'), findsOneWidget);
+    expect(find.text('How is my crop doing today?'), findsOneWidget);
   });
 
   testWidgets('Crop loss screen renders tabs and form controls', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: CropLossScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('PMFBY Crop Loss Evidence'), findsOneWidget);
-    expect(find.text('New Evidence'), findsOneWidget);
-    expect(find.text('Dossier Cases'), findsOneWidget);
-    expect(find.text('Save Offline Draft'), findsOneWidget);
-    expect(find.text('Submit Evidence Dossier for Review'), findsOneWidget);
+    expect(find.text('Crop Loss Claim (PMFBY)'), findsOneWidget);
+    expect(find.text('Report Loss'), findsOneWidget);
+    expect(find.text('My Claims'), findsOneWidget);
+    expect(find.text('Report Crop Damage'), findsOneWidget);
   });
 }

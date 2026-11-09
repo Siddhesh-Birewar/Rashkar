@@ -16,21 +16,42 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
   List<CropLossCase> _cases = [];
   bool _isLoading = true;
 
-  // Form State
+  // Wizard / Form State
+  int _currentStep = 0;
   String _cropCode = 'soybean';
   String _perilType = 'unseasonal_rainfall';
   double _damagePct = 40.0;
   double _affectedAcres = 2.0;
-  DateTime _eventDate = DateTime.now().subtract(const Duration(days: 2));
+  DateTime _eventDate = DateTime.now().subtract(const Duration(days: 1));
   bool _isSubmitting = false;
 
-  final List<String> _perils = [
-    'unseasonal_rainfall',
-    'hailstorm',
-    'dry_spell_drought',
-    'post_harvest_cyclone',
-    'inundation_waterlogging'
-  ];
+  final Map<String, Map<String, dynamic>> _perilOptions = {
+    'unseasonal_rainfall': {
+      'title': 'Unseasonal Rain / Flood',
+      'icon': Icons.water_drop_outlined,
+      'color': Colors.blue,
+    },
+    'hailstorm': {
+      'title': 'Hailstorm Damage',
+      'icon': Icons.ac_unit_outlined,
+      'color': Colors.teal,
+    },
+    'dry_spell_drought': {
+      'title': 'Drought / Dry Spell',
+      'icon': Icons.wb_sunny_outlined,
+      'color': Colors.deepOrange,
+    },
+    'post_harvest_cyclone': {
+      'title': 'Heatwave / Extreme Heat',
+      'icon': Icons.local_fire_department_outlined,
+      'color': Colors.red,
+    },
+    'inundation_waterlogging': {
+      'title': 'Pest or Disease Attack',
+      'icon': Icons.bug_report_outlined,
+      'color': Colors.brown,
+    },
+  };
 
   @override
   void initState() {
@@ -38,6 +59,7 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
     _tabController = TabController(length: 2, vsync: this);
     AppState.instance.addListener(_onStateChange);
     _cropCode = AppState.instance.activeCropCode;
+    _affectedAcres = AppState.instance.activeFarm?.totalAreaAcres ?? 2.0;
     _loadCases();
   }
 
@@ -90,12 +112,13 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
       setState(() {
         _cases.insert(0, newCase);
         _isSubmitting = false;
-        _tabController.animateTo(1); // switch to history tab
+        _currentStep = 0; // reset wizard
+        _tabController.animateTo(1); // view past claims
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isDraft ? 'Draft saved offline.' : 'Evidence dossier submitted for human review.'),
+          content: Text(isDraft ? 'Draft saved offline.' : 'Crop loss claim submitted successfully!'),
           backgroundColor: isDraft ? Colors.blueGrey : const Color(0xFF1B5E20),
         ),
       );
@@ -112,239 +135,372 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('PMFBY Crop Loss Evidence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text('Crop Loss Claim (PMFBY)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             Text(
               '${appState.activeFarm?.farmName ?? "Farm"} · ${appState.activeTaluka}, ${appState.activeDistrict}',
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF4527A0),
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.admin_panel_settings),
-            tooltip: 'Open Insurer & Reviewer Queue',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()),
-              );
-            },
+            tooltip: 'Refresh Claims',
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCases,
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadCases),
         ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
+          indicatorWeight: 3.0,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
-            Tab(icon: Icon(Icons.add_photo_alternate_outlined), text: 'New Evidence'),
-            Tab(icon: Icon(Icons.folder_shared_outlined), text: 'Dossier Cases'),
+            Tab(icon: Icon(Icons.note_add_outlined), text: 'Report Loss'),
+            Tab(icon: Icon(Icons.history_outlined), text: 'My Claims'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFormTab(),
-          _buildHistoryTab(),
+          _buildGuidedReportLossTab(),
+          _buildFarmerClaimsTab(),
         ],
       ),
     );
   }
 
-  Widget _buildFormTab() {
+  // ==================== SECTION A & B: Guided Report Loss Tab ====================
+  Widget _buildGuidedReportLossTab() {
     final appState = AppState.instance;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Active Farm Indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEDE7F6),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFB39DDB)),
+          // Header Card
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.shield_outlined, color: Color(0xFF1B5E20), size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Report Crop Damage',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'File damage details within 72 hours for prompt insurance claim verification.',
+                              style: TextStyle(fontSize: 12, color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.shield_outlined, size: 16, color: Color(0xFF4527A0)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Filing for: ${appState.activeFarm?.farmName ?? "Active Farm"} (${appState.activeCropName}) in ${appState.activeDistrict}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4527A0)),
+          ),
+          const SizedBox(height: 16),
+
+          // Guided Step-by-Step Stepper
+          Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                    primary: const Color(0xFF1B5E20),
+                  ),
+            ),
+            child: Stepper(
+              physics: const NeverScrollableScrollPhysics(),
+              currentStep: _currentStep,
+              onStepTapped: (step) => setState(() => _currentStep = step),
+              onStepContinue: () {
+                if (_currentStep < 4) {
+                  setState(() => _currentStep += 1);
+                } else {
+                  _submitCase(isDraft: false);
+                }
+              },
+              onStepCancel: () {
+                if (_currentStep > 0) {
+                  setState(() => _currentStep -= 1);
+                }
+              },
+              controlsBuilder: (context, details) {
+                final isLast = _currentStep == 4;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Row(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _isSubmitting ? null : details.onStepContinue,
+                        child: _isSubmitting
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Text(isLast ? 'Submit Loss Claim' : 'Continue', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 10),
+                      if (_currentStep > 0)
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: details.onStepCancel,
+                          child: const Text('Back'),
+                        ),
+                      if (isLast) ...[
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => _submitCase(isDraft: true),
+                          child: const Text('Save as Draft', style: TextStyle(color: Colors.black54)),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+              steps: [
+                // STEP 1: Which Field & Crop
+                Step(
+                  title: const Text('Farm Plot & Crop', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${appState.activeFarm?.farmName ?? "Farm"} · ${appState.activeCropName}'),
+                  isActive: _currentStep >= 0,
+                  content: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Plot: ${appState.activeFarm?.farmName ?? "My Farm"}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 2),
+                        Text('Location: ${appState.activeTaluka}, ${appState.activeDistrict}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                        const SizedBox(height: 2),
+                        Text('Total Acreage: ${appState.activeFarm?.totalAreaAcres ?? 2.0} acres', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                        const SizedBox(height: 8),
+                        Text('Registered Crop: ${appState.activeCropName.toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1B5E20))),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // STEP 2: What Happened (Peril Selection)
+                Step(
+                  title: const Text('What Happened?', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(_perilOptions[_perilType]?['title'] ?? _perilType),
+                  isActive: _currentStep >= 1,
+                  content: Column(
+                    children: _perilOptions.entries.map((entry) {
+                      final key = entry.key;
+                      final data = entry.value;
+                      final isSelected = _perilType == key;
+                      final col = data['color'] as Color;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: isSelected ? col.withOpacity(0.08) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(
+                              color: isSelected ? col : Colors.grey.shade300,
+                              width: isSelected ? 2.0 : 1.0,
+                            ),
+                          ),
+                          child: RadioListTile<String>(
+                            value: key,
+                            groupValue: _perilType,
+                            activeColor: col,
+                            title: Text(
+                              data['title'],
+                              style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+                            ),
+                            secondary: Icon(data['icon'] as IconData, color: col),
+                            onChanged: (val) {
+                              if (val != null) setState(() => _perilType = val);
+                            },
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                // STEP 3: When & How Much Damage
+                Step(
+                  title: const Text('Date & Damage Extent', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${_eventDate.day}/${_eventDate.month}/${_eventDate.year} · ${_damagePct.toInt()}% affected'),
+                  isActive: _currentStep >= 2,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Date selector button
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.calendar_today, size: 18, color: Color(0xFF1B5E20)),
+                        label: Text(
+                          'Event Date: ${_eventDate.day}/${_eventDate.month}/${_eventDate.year} (Tap to change)',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                        ),
+                        onPressed: () async {
+                          final d = await showDatePicker(
+                            context: context,
+                            initialDate: _eventDate,
+                            firstDate: DateTime(2024, 1, 1),
+                            lastDate: DateTime.now(),
+                          );
+                          if (d != null) setState(() => _eventDate = d);
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Damage percentage slider
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Estimated Damage:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('${_damagePct.toInt()}% of crop damaged', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                        ],
+                      ),
+                      Slider(
+                        value: _damagePct,
+                        min: 5,
+                        max: 100,
+                        divisions: 19,
+                        activeColor: const Color(0xFF1B5E20),
+                        label: '${_damagePct.toInt()}%',
+                        onChanged: (val) => setState(() => _damagePct = val),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Affected Area Acres
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Affected Area:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('${_affectedAcres.toStringAsFixed(1)} acres', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                        ],
+                      ),
+                      Slider(
+                        value: _affectedAcres,
+                        min: 0.5,
+                        max: 10.0,
+                        divisions: 19,
+                        activeColor: const Color(0xFF1B5E20),
+                        label: '${_affectedAcres.toStringAsFixed(1)} ac',
+                        onChanged: (val) => setState(() => _affectedAcres = val),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // STEP 4: Field Photos
+                Step(
+                  title: const Text('Field Photos', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Geotagged proof helps faster verification'),
+                  isActive: _currentStep >= 3,
+                  content: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      children: const [
+                        Icon(Icons.camera_alt_outlined, color: Color(0xFF1B5E20), size: 36),
+                        SizedBox(height: 6),
+                        Text('1 Geotagged Field Photo Attached', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        SizedBox(height: 2),
+                        Text('GPS Coordinates and timestamp embedded automatically.', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // STEP 5: Review & Submit
+                Step(
+                  title: const Text('Review & Submit', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Confirm all details before submitting claim'),
+                  isActive: _currentStep >= 4,
+                  content: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Claim Summary:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
+                        const Divider(height: 16),
+                        Text('• Peril: ${_perilOptions[_perilType]?['title'] ?? _perilType}', style: const TextStyle(fontSize: 12)),
+                        Text('• Crop: ${appState.activeCropName}', style: const TextStyle(fontSize: 12)),
+                        Text('• Date: ${_eventDate.day}/${_eventDate.month}/${_eventDate.year}', style: const TextStyle(fontSize: 12)),
+                        Text('• Damage: ${_damagePct.toInt()}% over ${_affectedAcres.toStringAsFixed(1)} acres', style: const TextStyle(fontSize: 12)),
+                        Text('• Evidence: Geotagged photo + Sentinel-2 satellite cross-check', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Note: Your submission will be verified against Sentinel-2 satellite vegetation indices within 48 hours.',
+                          style: TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          const Text(
-            'RECORD CROP LOSS INCIDENT',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-          ),
-          const SizedBox(height: 12),
-
-          // Peril Type Selector
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select Peril / Hazard Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _perilType,
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                    items: _perils.map((p) {
-                      return DropdownMenuItem(
-                        value: p,
-                        child: Text(p.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(fontSize: 13)),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _perilType = val);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Incident Date
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: ListTile(
-              title: const Text('Date of Weather Event', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Text('${_eventDate.day}/${_eventDate.month}/${_eventDate.year}'),
-              trailing: const Icon(Icons.calendar_today, color: Color(0xFF4527A0)),
-              onTap: () async {
-                final d = await showDatePicker(
-                  context: context,
-                  initialDate: _eventDate,
-                  firstDate: DateTime(2024, 1, 1),
-                  lastDate: DateTime.now(),
+          // Insurance Reviewer link
+          Center(
+            child: TextButton.icon(
+              icon: const Icon(Icons.admin_panel_settings_outlined, size: 16, color: Colors.blueGrey),
+              label: const Text('Insurance Surveyor or Official? Open Review Portal', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()),
                 );
-                if (d != null) setState(() => _eventDate = d);
               },
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Damage Estimate Slider
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Estimated Crop Damage:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('${_damagePct.toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4527A0))),
-                    ],
-                  ),
-                  Slider(
-                    value: _damagePct,
-                    min: 5,
-                    max: 100,
-                    divisions: 19,
-                    activeColor: const Color(0xFF4527A0),
-                    onChanged: (val) => setState(() => _damagePct = val),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Photo Upload Mock Card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Field Photos (with GPS & Timestamp)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 100,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.camera_alt_outlined, color: Colors.black45, size: 32),
-                          SizedBox(height: 6),
-                          Text('1 geotagged photo attached (simulated)', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Action Buttons
-          if (_isSubmitting)
-            const Center(child: CircularProgressIndicator(color: Color(0xFF4527A0)))
-          else ...[
-            SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () => _submitCase(isDraft: false),
-                icon: const Icon(Icons.send_rounded),
-                label: const Text('Submit Evidence Dossier for Review', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4527A0),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () => _submitCase(isDraft: true),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.black87,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Save Offline Draft'),
-            ),
-          ],
-          const SizedBox(height: 16),
-
-          // Mandatory PMFBY Disclaimers
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade400),
-            ),
-            child: const Text(
-              'Statutory PMFBY Notice: Rashkar is a decision-support and evidence gathering platform. Submission here compiles an evidentiary dossier under PMFBY Clause 11/12 guidelines. It does NOT constitute final official claim settlement, which is governed exclusively by designated insurance companies and government authorities.',
-              style: TextStyle(fontSize: 11, color: Color(0xFF5D4037)),
             ),
           ),
           const SizedBox(height: 20),
@@ -353,13 +509,29 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildHistoryTab() {
+  // ==================== SECTION C: My Past Claims Tab ====================
+  Widget _buildFarmerClaimsTab() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF4527A0)));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)));
     }
     if (_cases.isEmpty) {
-      return const Center(
-        child: Text('No loss cases recorded yet. Use the New Evidence tab to start.'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.assignment_outlined, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text('No crop loss claims recorded yet.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 4),
+            const Text('Use the "Report Loss" tab to submit evidence.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white),
+              onPressed: () => _tabController.animateTo(0),
+              child: const Text('Start Loss Report'),
+            ),
+          ],
+        ),
       );
     }
 
@@ -369,18 +541,12 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
       itemBuilder: (context, idx) {
         final c = _cases[idx];
         final isDraft = c.dossierStatus == 'draft';
-        final eventDt = DateTime.tryParse(c.eventDate) ?? DateTime.now();
-        final hoursSince = DateTime.now().difference(eventDt).inHours;
-        final within72 = hoursSince <= 72;
-
         final fusion = c.multimodalFusionSummary;
-        final sat = c.satelliteEvidenceSummary;
-        final vis = c.visionEvidenceSummary;
         final verifiedLoss = (fusion['verified_damage_pct'] as num?)?.toDouble() ?? c.damageEstimatePct;
         final confidence = (fusion['confidence_score'] as num?)?.toDouble() ?? 85.0;
 
         return Card(
-          elevation: 2,
+          elevation: 1,
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Padding(
@@ -393,20 +559,20 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
                   children: [
                     Text(
                       c.caseId.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF4527A0)),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isDraft ? Colors.grey.shade200 : const Color(0xFFEDE7F6),
+                        color: isDraft ? Colors.grey.shade200 : const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        isDraft ? 'OFFLINE DRAFT' : c.dossierStatus.toUpperCase(),
+                        isDraft ? 'DRAFT' : 'UNDER VERIFICATION',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isDraft ? Colors.black54 : const Color(0xFF4527A0),
+                          color: isDraft ? Colors.black54 : const Color(0xFF1B5E20),
                         ),
                       ),
                     ),
@@ -414,76 +580,50 @@ class _CropLossScreenState extends State<CropLossScreen> with SingleTickerProvid
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Peril: ${c.perilType.replaceAll('_', ' ').toUpperCase()} · ${c.cropCode.toUpperCase()}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  '${c.cropCode.toUpperCase()} · ${c.perilType.replaceAll('_', ' ').toUpperCase()}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  'Reported Event Date: ${c.eventDate} · Claimed Damage: ${c.damageEstimatePct.toInt()}%',
-                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  'Date: ${c.eventDate} · Claimed Loss: ${c.damageEstimatePct.toInt()}%',
+                  style: const TextStyle(fontSize: 12, color: Colors.black87),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
-                // AI Multimodal Verification Box
+                // Verification details box
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'AI Verified Loss: ${verifiedLoss.toStringAsFixed(1)}%',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade900),
-                          ),
-                          Text(
-                            'Confidence: ${confidence.toStringAsFixed(1)}%',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green.shade900),
-                          ),
+                          const Text('Satellite Cross-Check', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                          Text('${verifiedLoss.toStringAsFixed(1)}% drop', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1B5E20))),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sentinel-2 NDVI Drop: ${sat['vegetation_loss_pct'] ?? 45.4}% · Vision AI: ${vis['primary_damage_type'] ?? "Canopy damage"}',
-                        style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('AI Confidence', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                          Text('${confidence.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1B5E20))),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Target Turnaround: 24-48 Hours (SLA: ${c.slaRemainingHours.toStringAsFixed(1)}h remaining)',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Verification SLA', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                          Text('${c.slaRemainingHours.toStringAsFixed(0)}h remaining', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.deepOrange)),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 8),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '72h Window Status: ${hoursSince}h elapsed (${within72 ? "Compliant" : "Exceeds 72h"})',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: within72 ? Colors.green.shade800 : Colors.red.shade800,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.arrow_forward, size: 14),
-                      label: const Text('View Insurer Queue', style: TextStyle(fontSize: 11)),
-                    ),
-                  ],
                 ),
               ],
             ),

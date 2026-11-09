@@ -640,7 +640,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildLargeFeatureButton(
                 icon: Icons.grass,
                 title: 'My Crop',
-                subtitle: 'Health & Yield',
+                subtitle: 'Health & Expected Yield',
                 color: const Color(0xFF2E7D32),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const MyCropScreen()));
@@ -652,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildLargeFeatureButton(
                 icon: Icons.wb_sunny_outlined,
                 title: 'Heat Safety',
-                subtitle: 'Worker & Crop',
+                subtitle: 'Worker & Crop Protection',
                 color: const Color(0xFFD84315),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const HeatSafetyScreen()));
@@ -668,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildLargeFeatureButton(
                 icon: Icons.savings_outlined,
                 title: 'Extra Income',
-                subtitle: 'Agri-Enterprises',
+                subtitle: 'Practical New Enterprises',
                 color: const Color(0xFF00695C),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraIncomeScreen()));
@@ -680,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildLargeFeatureButton(
                 icon: Icons.assignment_late_outlined,
                 title: 'Crop Loss',
-                subtitle: 'PMFBY Evidence',
+                subtitle: 'Report Damage for PMFBY',
                 color: const Color(0xFF4527A0),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const CropLossScreen()));
@@ -690,14 +690,32 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        _buildLargeFeatureButton(
-          icon: Icons.admin_panel_settings_outlined,
-          title: 'PMFBY Insurer & Surveyor Queue',
-          subtitle: 'Multimodal AI Loss Verification • 48-Hour SLA Protocol',
-          color: Colors.blue.shade900,
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()));
-          },
+        _buildAskRashkarBanner(),
+        const SizedBox(height: 16),
+        // Secondary Reviewer Access (progressive disclosure, outside primary farmer path)
+        Card(
+          elevation: 0,
+          color: Colors.grey.shade50,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade300),
+          ),
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.verified_user_outlined, color: Colors.blue.shade800),
+            title: const Text(
+              'Surveyor & Insurer Claim Review Portal',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text(
+              'For official insurance claim verification and 48-hour SLA triage',
+              style: TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black45),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const InsurerDashboardScreen()));
+            },
+          ),
         ),
       ],
     );
@@ -718,10 +736,10 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -731,19 +749,19 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 20,
-              backgroundColor: color.withOpacity(0.12),
-              child: Icon(icon, color: color, size: 24),
+              radius: 22,
+              backgroundColor: color.withValues(alpha: 0.12),
+              child: Icon(icon, color: color, size: 26),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20)),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1B5E20)),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
             ),
           ],
         ),
@@ -805,42 +823,77 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildAlertItem(Map<String, dynamic> alert) {
     final urgency = alert['urgency'] ?? 'medium';
     final Color badgeColor = urgency == 'high' ? Colors.red.shade700 : const Color(0xFFE65100);
+    final title = (alert['title'] ?? 'Alert').toString();
+    final msg = (alert['message'] ?? '').toString();
+    final lowerCombined = '$title $msg'.toLowerCase();
+
+    final isHeat = lowerCombined.contains('heat') || lowerCombined.contains('temp') || lowerCombined.contains('wbgt');
+    final isCrop = lowerCombined.contains('crop') || lowerCombined.contains('stage') || lowerCombined.contains('growth') || lowerCombined.contains('water');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: badgeColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: badgeColor.withValues(alpha: 0.4), width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.warning_amber_rounded, color: badgeColor, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    alert['title'] ?? 'Alert',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: badgeColor),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: badgeColor, size: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: badgeColor),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        msg,
+                        style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.3),
+                      ),
+                      if (alert['source'] != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Source: ${alert['source']}',
+                          style: const TextStyle(fontSize: 12, color: Colors.black45, fontStyle: FontStyle.italic),
+                        ),
+                      ]
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    alert['message'] ?? '',
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                  if (alert['source'] != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Source: ${alert['source']}',
-                      style: const TextStyle(fontSize: 11, color: Colors.black45, fontStyle: FontStyle.italic),
-                    ),
-                  ]
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  if (isHeat) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HeatSafetyScreen()));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MyCropScreen()));
+                  }
+                },
+                icon: Icon(isHeat ? Icons.wb_sunny_outlined : Icons.grass, size: 16),
+                label: Text(
+                  isHeat ? 'View Heat Safety' : (isCrop ? 'View My Crop' : 'Check Action'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: badgeColor,
+                  side: BorderSide(color: badgeColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
               ),
             ),
           ],

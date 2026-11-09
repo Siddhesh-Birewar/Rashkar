@@ -18,10 +18,10 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
   String? _sessionId;
 
   final List<String> _suggestedPrompts = [
-    'Why is my crop at risk today?',
-    'What should I check today?',
-    'Explain my farm\'s weather conditions',
-    'How do I protect against heat stress?'
+    'How is my crop doing today?',
+    'Is it safe to work outside right now?',
+    'What should I do on my farm this week?',
+    'How can I earn extra income?',
   ];
 
   @override
@@ -57,7 +57,7 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
     _messages.add(
       AssistantChatMessage(
         sender: 'assistant',
-        text: 'Namaste! I am Rashkar Assistant. I have loaded your farm and weather conditions in $loc ($crop). How can I assist you with weather, agronomic advisories, or heat safety today?',
+        text: 'Namaste! I am Rashkar, your farm assistant. I have checked the live weather and crop status for your $crop in $loc.\n\nType your question below, or tap one of the suggested topics to begin.',
         timestamp: DateTime.now(),
       ),
     );
@@ -158,7 +158,8 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ActionChip(
-                    label: Text(_suggestedPrompts[idx], style: const TextStyle(fontSize: 12)),
+                    avatar: const Icon(Icons.help_outline, size: 16, color: Color(0xFF1B5E20)),
+                    label: Text(_suggestedPrompts[idx], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                     backgroundColor: Colors.white,
                     side: const BorderSide(color: Color(0xFF2E7D32), width: 0.8),
                     onPressed: () => _sendMessage(_suggestedPrompts[idx]),
@@ -191,18 +192,39 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
                 children: [
                   SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1B5E20))),
                   SizedBox(width: 10),
-                  Text('Retrieving farm context & reasoning...', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                  Text('Checking farm data & preparing answer...', style: TextStyle(fontSize: 12, color: Colors.black54)),
                 ],
               ),
             ),
 
-          // Text input box
+          // Text input box with Voice Placeholder
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: Colors.white,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
             child: SafeArea(
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.mic_none, color: Color(0xFF1B5E20)),
+                    tooltip: 'Voice input (Coming soon)',
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Voice input will be enabled in the upcoming Marathi/Hindi speech release.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _textController,
@@ -246,6 +268,7 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
             bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(16),
             bottomLeft: !isUser ? const Radius.circular(0) : const Radius.circular(16),
           ),
+          border: isUser ? null : Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -257,6 +280,17 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!isUser) ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.smart_toy_outlined, size: 16, color: Color(0xFF1B5E20)),
+                  SizedBox(width: 6),
+                  Text('Rashkar Farm Assistant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF1B5E20))),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             Text(
               m.text,
               style: TextStyle(
@@ -267,21 +301,16 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
             ),
             if (!isUser && m.providerUsed != null) ...[
               const SizedBox(height: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Provider: ${m.providerUsed}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Powered by: ${m.providerUsed}',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                ),
               ),
             ]
           ],
