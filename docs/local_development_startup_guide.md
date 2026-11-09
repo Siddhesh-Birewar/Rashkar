@@ -120,8 +120,8 @@ Due to default Supabase free tier email rate limits on open public signup, use t
 
 | Role | Email | Password | User ID (UUID) |
 |---|---|---|---|
-| **Primary Farmer** | `farmer1@cropnet.ai` | `CropNetSecurePass2026!` | `9c7582e5-e915-465e-a887-d32a2f48ee23` |
-| **Secondary Farmer** | `farmer2@cropnet.ai` | `CropNetSecurePass2026!` | `3f4120b4-0a53-47be-9f7e-2e6fe77306f6` |
+| **Primary Farmer** | `farmer1@cropnet.ai` | `[CONFIGURED_TEST_PASSWORD]` | `9c7582e5-e915-465e-a887-d32a2f48ee23` |
+| **Secondary Farmer** | `farmer2@cropnet.ai` | `[CONFIGURED_TEST_PASSWORD]` | `3f4120b4-0a53-47be-9f7e-2e6fe77306f6` |
 
 ---
 

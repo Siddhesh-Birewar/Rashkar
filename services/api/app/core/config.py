@@ -1,7 +1,11 @@
 import os
+import json
+import logging
 from typing import List, Optional, Any, Union
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DEV_CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
@@ -29,11 +33,10 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
-                import json
                 try:
                     return json.loads(v)
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    logger.warning("Failed to parse CORS_ORIGINS as JSON array: %s", exc)
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         elif isinstance(v, (list, tuple, set)):
             return [str(origin).strip() for origin in v if str(origin).strip()]
@@ -41,7 +44,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_cors_security(self) -> "Settings":
-        """Reject wildcard CORS in production environments."""
+        """Reject insecure configurations in production environments."""
         is_production = self.ENVIRONMENT.lower() in ("production", "prod")
         if is_production:
             if any(origin == "*" for origin in self.CORS_ORIGINS):
@@ -53,6 +56,10 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Security violation: CORS_ORIGINS cannot be empty in production environments."
                 )
+            if self.ALLOW_DEV_AUTH_BYPASS:
+                raise ValueError(
+                    "Security violation: ALLOW_DEV_AUTH_BYPASS is strictly prohibited in production environments."
+                )
         return self
 
     # Supabase Configuration
@@ -60,16 +67,45 @@ class Settings(BaseSettings):
     SUPABASE_URL: Optional[str] = None
     SUPABASE_ANON_KEY: Optional[str] = None
     SUPABASE_SECRET_KEY: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
     SUPABASE_JWT_SECRET: Optional[str] = None
     SUPABASE_DB_PASSWORD: Optional[str] = None
     SUPABASE_PROJECT_REF: Optional[str] = None
     
+    # Development Auth Bypass Gate (Strictly opt-in, prohibited in production)
+    ALLOW_DEV_AUTH_BYPASS: bool = False
     DEV_USER_ID: str = "00000000-0000-0000-0000-000000000001"
     DEV_USER_EMAIL: str = "dev@cropnet.local"
 
-    # Database URLs
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:rAO6B8K2yQzFXlw8@db.glnpmpagajfurpmlinvd.supabase.co:5432/postgres"
-    SYNC_DATABASE_URL: str = "postgresql://postgres:rAO6B8K2yQzFXlw8@db.glnpmpagajfurpmlinvd.supabase.co:5432/postgres"
+    # Government Schemes admin authorization.
+    # Comma-separated (or JSON array) of Supabase user emails / IDs permitted to
+    # create, edit, verify, publish and deactivate schemes.
+    ADMIN_EMAILS: List[str] = []
+    ADMIN_USER_IDS: List[str] = []
+
+    @field_validator("ADMIN_EMAILS", "ADMIN_USER_IDS", mode="before")
+    @classmethod
+    def parse_admin_lists(cls, v: Any) -> List[str]:
+        """Parse admin email/user-id lists from JSON array or comma-delimited strings."""
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return [str(item).strip() for item in json.loads(v)]
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    logger.warning("Failed to parse admin list as JSON array: %s", exc)
+            return [item.strip() for item in v.split(",") if item.strip()]
+        elif isinstance(v, (list, tuple, set)):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return []
+
+    # Database URLs (Strictly injected via environment variables; never hardcode credentials)
+    # Credential Rotation: Set DATABASE_URL and SYNC_DATABASE_URL to new rotated credentials
+    # in untracked environment files or container secret injection without source modification.
+    DATABASE_URL: Optional[str] = None
+    SYNC_DATABASE_URL: Optional[str] = None
 
     # Weather Provider (OpenWeather)
     OPENWEATHER_API_KEY: Optional[str] = None

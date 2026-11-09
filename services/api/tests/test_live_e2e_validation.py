@@ -24,8 +24,10 @@ if repo_root not in sys.path:
 from cropnet.services.api.app.core.config import settings
 from cropnet.services.api.app.main import app
 
-SUPABASE_URL = "https://glnpmpagajfurpmlinvd.supabase.co"
-ANON_KEY = "sb_publishable_M1aO22ySn2WBemjQn7YMFw_aufrBj9k"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
+ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "your-anon-key")
+TEST_FARMER1_PASSWORD = os.getenv("TEST_FARMER1_PASSWORD", "mock-password-1")
+TEST_FARMER2_PASSWORD = os.getenv("TEST_FARMER2_PASSWORD", "mock-password-2")
 
 def acquire_tokens():
     with httpx.Client(timeout=10.0) as client:
@@ -33,7 +35,7 @@ def acquire_tokens():
         r1 = client.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             headers={"apikey": ANON_KEY, "Content-Type": "application/json"},
-            json={"email": "farmer1@cropnet.ai", "password": "CropNetSecurePass2026!"}
+            json={"email": "farmer1@cropnet.ai", "password": TEST_FARMER1_PASSWORD}
         )
         assert r1.status_code == 200, f"User 1 login failed: {r1.text}"
         data1 = r1.json()
@@ -42,7 +44,7 @@ def acquire_tokens():
         r2 = client.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             headers={"apikey": ANON_KEY, "Content-Type": "application/json"},
-            json={"email": "farmer2@cropnet.ai", "password": "CropNetSecurePass2026!"}
+            json={"email": "farmer2@cropnet.ai", "password": TEST_FARMER2_PASSWORD}
         )
         assert r2.status_code == 200, f"User 2 login failed: {r2.text}"
         data2 = r2.json()

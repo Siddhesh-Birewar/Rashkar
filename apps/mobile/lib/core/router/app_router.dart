@@ -18,6 +18,10 @@ import 'package:cropnet_mobile/features/soil/presentation/screens/soil_report_up
 import 'package:cropnet_mobile/features/water/presentation/screens/water_workspace_screen.dart';
 import 'package:cropnet_mobile/features/satellite/presentation/screens/satellite_vegetation_screen.dart';
 import 'package:cropnet_mobile/features/farm_health/presentation/screens/farm_health_dashboard_screen.dart';
+import 'package:cropnet_mobile/features/schemes/presentation/screens/schemes_list_screen.dart';
+import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_detail_screen.dart';
+import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_admin_screen.dart';
+import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_editor_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -36,6 +40,8 @@ final GlobalKey<NavigatorState> _shellNavigatorAdvisory =
     GlobalKey<NavigatorState>(debugLabel: 'shellAdvisory');
 final GlobalKey<NavigatorState> _shellNavigatorHistory =
     GlobalKey<NavigatorState>(debugLabel: 'shellHistory');
+final GlobalKey<NavigatorState> _shellNavigatorSchemes =
+    GlobalKey<NavigatorState>(debugLabel: 'shellSchemes');
 
 /// Creates and configures the CropNet AI GoRouter instance.
 GoRouter createCropNetRouter({
@@ -350,6 +356,52 @@ GoRouter createCropNetRouter({
                 path: RoutePaths.history,
                 name: RouteNames.history,
                 builder: (context, state) => const AssessmentHistoryScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 6: Government Schemes
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorSchemes,
+            routes: [
+              GoRoute(
+                path: RoutePaths.schemes,
+                name: RouteNames.schemes,
+                builder: (context, state) => const SchemesListScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'admin',
+                    name: RouteNames.schemesAdmin,
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const SchemeAdminScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'new',
+                        name: RouteNames.schemesAdminNew,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) => const SchemeEditorScreen(),
+                      ),
+                      GoRoute(
+                        path: ':schemeId/edit',
+                        name: RouteNames.schemesAdminEdit,
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) {
+                          final schemeId = state.pathParameters['schemeId'] ?? '';
+                          return SchemeEditorScreen(schemeId: schemeId);
+                        },
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: ':schemeId',
+                    name: RouteNames.schemeDetail,
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) {
+                      final schemeId = state.pathParameters['schemeId'] ?? '';
+                      return SchemeDetailScreen(schemeId: schemeId);
+                    },
+                  ),
+                ],
               ),
             ],
           ),

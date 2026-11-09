@@ -65,4 +65,12 @@ class ApiConstants {
   static const String agricultureFollowUp = '$apiV1Prefix/agriculture/follow-up';
   static const String agricultureExplainDecision = '$apiV1Prefix/agriculture/explain-decision';
   static const String agricultureConversation = '$apiV1Prefix/agriculture/conversation';
+
+  // --- Government Schemes Endpoints ---
+  static const String schemes = '$apiV1Prefix/schemes';
+  static const String schemesFilters = '$apiV1Prefix/schemes/filters';
+  static const String schemesAdminStatus = '$apiV1Prefix/schemes/admin/status';
+  static const String schemesSeed = '$apiV1Prefix/schemes/seed';
+  static String schemeById(String schemeId) => '$apiV1Prefix/schemes/$schemeId';
+  static String schemeStatus(String schemeId) => '$apiV1Prefix/schemes/$schemeId/status';
 }

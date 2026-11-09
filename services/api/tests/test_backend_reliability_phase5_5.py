@@ -151,7 +151,11 @@ def test_concurrent_api_evaluations_throughput():
                 "target_season": "kharif"
             }
         }
-        resp = client.post("/api/v1/agriculture/evaluate-farm", json=payload)
+        resp = client.post(
+            "/api/v1/agriculture/evaluate-farm",
+            json=payload,
+            headers={"X-Dev-User-Id": "00000000-0000-0000-0000-000000000001"}
+        )
         return resp.status_code, resp.json()
 
     with ThreadPoolExecutor(max_workers=5) as executor:

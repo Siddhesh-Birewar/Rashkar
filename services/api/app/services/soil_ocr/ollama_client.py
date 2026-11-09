@@ -141,8 +141,8 @@ class OllamaOCRClient:
                 return str(img.info["report_text"])
             if hasattr(img, "info") and "ocr_transcript" in img.info:
                 return str(img.info["ocr_transcript"])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not inspect image metadata for mock transcription: %s", exc)
 
         # 3. Default fallback sample transcription for general tests
         return """

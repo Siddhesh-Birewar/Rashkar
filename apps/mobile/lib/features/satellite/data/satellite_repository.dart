@@ -13,11 +13,12 @@ class SatelliteRepository {
 
   String _satelliteBasePath(String farmId) => '${ApiConstants.farms}/$farmId/satellite';
 
-  Future<SatelliteObservation> syncObservations(String farmId) async {
+  Future<SatelliteObservation?> syncObservations(String farmId) async {
     final res = await _client.post('${_satelliteBasePath(farmId)}/sync');
     final map = res as Map<String, dynamic>;
-    final latest = map['latest_observation'] as Map<String, dynamic>;
-    return SatelliteObservation.fromJson(latest);
+    final latest = map['latest_observation'];
+    if (latest == null) return null;
+    return SatelliteObservation.fromJson(latest as Map<String, dynamic>);
   }
 
   Future<SatelliteObservation?> getLatestObservation(String farmId) async {

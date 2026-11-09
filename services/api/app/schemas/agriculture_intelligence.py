@@ -61,6 +61,7 @@ class FarmContextInput(BaseModel):
     All parameters support explicit NULLs. Missing parameters are never fabricated.
     """
     farm_id: Optional[str] = Field(None, description="Registered farm UUID if known")
+    user_id: Optional[str] = Field(None, description="Registered user UUID if known")
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, description="Latitude in decimal degrees")
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, description="Longitude in decimal degrees")
     taluka: Optional[str] = Field(None, description="Taluka name (e.g. Baramati, Indapur, Maval, Mulshi)")

@@ -1,9 +1,12 @@
 import uuid
-from typing import List, Optional, Dict
+import logging
+import threading
+from collections import OrderedDict
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point, shape
 
 from cropnet.services.api.app.schemas.farm import FarmCreate, FarmUpdate, FarmResponse
 from cropnet.services.api.app.schemas.soil import (
@@ -24,7 +27,10 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmEvaluationResponse,
     SoilDataProvenance,
 )
-from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
+from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import (
+    DeterministicDecisionEngine,
+    record_decision_owner,
+)
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
@@ -34,11 +40,91 @@ from cropnet.services.api.app.services.spatial_extractor import (
     SpatialSoilService
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 spatial_soil_service = SpatialSoilService()
 
-# Memory cache for fast lookups & test resilience
-_FARM_STORAGE: dict[uuid.UUID, dict] = {}
+
+class BoundedFarmCache:
+    """Thread-safe bounded in-memory LRU cache mirroring authoritative PostgreSQL database."""
+
+    def __init__(self, maxsize: int = 1000):
+        self._cache: OrderedDict[uuid.UUID, dict] = OrderedDict()
+        self._maxsize = maxsize
+        self._lock = threading.Lock()
+
+    def get(self, key: uuid.UUID, default: Optional[dict] = None) -> Optional[dict]:
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                return self._cache[key]
+            return default
+
+    def set(self, key: uuid.UUID, value: dict) -> None:
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            self._cache[key] = value
+            if len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+
+    def pop(self, key: uuid.UUID, default: Any = None) -> Any:
+        with self._lock:
+            return self._cache.pop(key, default)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
+
+    def values(self):
+        with self._lock:
+            return list(self._cache.values())
+
+    def items(self):
+        with self._lock:
+            return list(self._cache.items())
+
+    def __getitem__(self, key: uuid.UUID) -> dict:
+        with self._lock:
+            self._cache.move_to_end(key)
+            return self._cache[key]
+
+    def __setitem__(self, key: uuid.UUID, value: dict) -> None:
+        self.set(key, value)
+
+    def __delitem__(self, key: uuid.UUID) -> None:
+        with self._lock:
+            del self._cache[key]
+
+    def __contains__(self, key: uuid.UUID) -> bool:
+        with self._lock:
+            return key in self._cache
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._cache)
+
+
+# Eviction-managed, bounded in-memory cache mirroring authoritative DB
+_FARM_STORAGE: BoundedFarmCache = BoundedFarmCache(maxsize=1000)
+
+
+def compute_farm_representative_point(geometry_dict: dict) -> tuple[float, float]:
+    """
+    Computes a geometrically valid representative point (latitude, longitude) for a farm boundary.
+    Supports GeoJSON Polygon (with or without interior holes) and MultiPolygon.
+    Uses Shapely centroid with representative_point() fallback to guarantee that the point
+    falls strictly inside the polygon interior even for concave shapes, horseshoes, or polygons with holes.
+    Never alters registered farm geometry or geodesic area.
+    """
+    geom = shape(geometry_dict)
+    centroid = geom.centroid
+    if not geom.contains(centroid):
+        point = geom.representative_point()
+    else:
+        point = centroid
+    return round(point.y, 6), round(point.x, 6)
 
 
 def _build_farm_response_dict(
@@ -98,10 +184,10 @@ async def create_farm(
     now = datetime.utcnow()
 
     # Calculate geodesic area and centroid
-    coords = payload.geometry.coordinates[0]
-    poly = Polygon(coords)
+    geom_dict = payload.geometry.model_dump()
+    poly = shape(geom_dict)
     area_dict = calculate_polygon_area(poly)
-    centroid = poly.centroid
+    c_lat, c_lon = compute_farm_representative_point(geom_dict)
 
     farm_dict = _build_farm_response_dict(
         farm_id=farm_id,
@@ -113,11 +199,11 @@ async def create_farm(
         state=payload.state,
         irrigation_type=payload.irrigation_type,
         water_source=payload.water_source,
-        geometry_dict=payload.geometry.model_dump(),
+        geometry_dict=geom_dict,
         area_hectares=area_dict["hectares"],
         area_acres=area_dict["acres"],
-        centroid_lat=round(centroid.y, 6),
-        centroid_lon=round(centroid.x, 6),
+        centroid_lat=c_lat,
+        centroid_lon=c_lon,
         created_at=now,
         updated_at=now
     )
@@ -137,8 +223,8 @@ async def create_farm(
             geometry_geojson=payload.geometry.model_dump(),
             calculated_area_hectares=area_dict["hectares"],
             calculated_area_acres=area_dict["acres"],
-            centroid_latitude=round(centroid.y, 6),
-            centroid_longitude=round(centroid.x, 6),
+            centroid_latitude=c_lat,
+            centroid_longitude=c_lon,
             created_at=now,
             updated_at=now
         )
@@ -146,6 +232,11 @@ async def create_farm(
         db.commit()
     except Exception as e:
         db.rollback()
+        logger.error("Failed to commit farm creation to database: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database write failure while registering farm"
+        )
 
     _FARM_STORAGE[farm_id] = farm_dict
     return FarmResponse(**farm_dict)
@@ -159,64 +250,13 @@ async def list_farms(
     """
     List all farms belonging to the authenticated user.
     Strictly isolated: users cannot see other users' farms.
+    Uses authoritative database persistence with bounded cache mirror.
     """
     farms_list = []
     try:
         db_farms = db.query(FarmModel).filter(FarmModel.owner_id == str(current_user.user_id)).all()
         for f in db_farms:
-            farms_list.append(FarmResponse(
-                id=uuid.UUID(f.id),
-                owner_id=uuid.UUID(f.owner_id),
-                name=f.name,
-                village=f.village,
-                taluka=f.taluka,
-                district=f.district,
-                state=f.state,
-                irrigation_type=f.irrigation_type,
-                water_source=f.water_source,
-                geometry=f.geometry_geojson,
-                calculated_area_hectares=f.calculated_area_hectares,
-                calculated_area_acres=f.calculated_area_acres,
-                centroid_latitude=f.centroid_latitude or 0.0,
-                centroid_longitude=f.centroid_longitude or 0.0,
-                latitude=f.centroid_latitude or 0.0,
-                longitude=f.centroid_longitude or 0.0,
-                created_at=f.created_at,
-                updated_at=f.updated_at
-            ))
-    except Exception:
-        # Fallback to in-memory store
-        pass
-
-    if not farms_list:
-        user_farms = [
-            f for f in _FARM_STORAGE.values()
-            if f["owner_id"] == current_user.user_id
-        ]
-        farms_list = [FarmResponse(**f) for f in user_farms]
-
-    return farms_list
-
-
-@router.get("/{farm_id}", response_model=FarmResponse)
-async def get_farm(
-    farm_id: uuid.UUID,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Retrieve farm by ID. Enforces strict user ownership check.
-    """
-    # Check DB first
-    try:
-        f = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
-        if f:
-            if f.owner_id != str(current_user.user_id):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You do not have permission to access this farm"
-                )
-            return FarmResponse(
+            resp_item = FarmResponse(
                 id=uuid.UUID(f.id),
                 owner_id=uuid.UUID(f.owner_id),
                 name=f.name,
@@ -236,24 +276,79 @@ async def get_farm(
                 created_at=f.created_at,
                 updated_at=f.updated_at
             )
-    except HTTPException:
-        raise
-    except Exception:
-        pass
-
-    # Fallback to memory store
-    farm = _FARM_STORAGE.get(farm_id)
-    if not farm:
+            farms_list.append(resp_item)
+            _FARM_STORAGE[uuid.UUID(f.id)] = resp_item.model_dump()
+    except Exception as e:
+        logger.error("Failed to list farms from database: %s", str(e))
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Farm {farm_id} not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database read failure while listing farms"
         )
-    if farm["owner_id"] != current_user.user_id:
+
+    return farms_list
+
+
+@router.get("/{farm_id}", response_model=FarmResponse)
+async def get_farm(
+    farm_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve farm by ID. Enforces strict user ownership check.
+    Uses authoritative database persistence with bounded cache mirror.
+    """
+    try:
+        f = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
+    except Exception as e:
+        logger.error("Failed to query farm from database: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database read failure while retrieving farm"
+        )
+
+    if not f:
+        farm = _FARM_STORAGE.get(farm_id)
+        if not farm:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Farm {farm_id} not found"
+            )
+        if farm["owner_id"] != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this farm"
+            )
+        return FarmResponse(**farm)
+
+    if f.owner_id != str(current_user.user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access this farm"
         )
-    return FarmResponse(**farm)
+
+    resp = FarmResponse(
+        id=uuid.UUID(f.id),
+        owner_id=uuid.UUID(f.owner_id),
+        name=f.name,
+        village=f.village,
+        taluka=f.taluka,
+        district=f.district,
+        state=f.state,
+        irrigation_type=f.irrigation_type,
+        water_source=f.water_source,
+        geometry=f.geometry_geojson,
+        calculated_area_hectares=f.calculated_area_hectares,
+        calculated_area_acres=f.calculated_area_acres,
+        centroid_latitude=f.centroid_latitude or 0.0,
+        centroid_longitude=f.centroid_longitude or 0.0,
+        latitude=f.centroid_latitude or 0.0,
+        longitude=f.centroid_longitude or 0.0,
+        created_at=f.created_at,
+        updated_at=f.updated_at
+    )
+    _FARM_STORAGE[farm_id] = resp.model_dump()
+    return resp
 
 
 @router.put("/{farm_id}", response_model=FarmResponse)
@@ -272,8 +367,12 @@ async def update_farm(
     db_farm = None
     try:
         db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Failed to query farm for update from database: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database read failure while updating farm"
+        )
 
     if not existing_farm and not db_farm:
         raise HTTPException(
@@ -307,15 +406,12 @@ async def update_farm(
     
     # Check if geometry updated
     if payload.geometry:
-        coords = payload.geometry.coordinates[0]
-        poly = Polygon(coords)
-        area_dict = calculate_polygon_area(poly)
-        centroid = poly.centroid
         geom_dict = payload.geometry.model_dump()
+        poly = shape(geom_dict)
+        area_dict = calculate_polygon_area(poly)
+        c_lat, c_lon = compute_farm_representative_point(geom_dict)
         area_ha = area_dict["hectares"]
         area_ac = area_dict["acres"]
-        c_lat = round(centroid.y, 6)
-        c_lon = round(centroid.x, 6)
     else:
         geom_dict = db_farm.geometry_geojson if db_farm else existing_farm["geometry"]
         area_ha = db_farm.calculated_area_hectares if db_farm else existing_farm["calculated_area_hectares"]
@@ -342,8 +438,13 @@ async def update_farm(
             db_farm.centroid_longitude = c_lon
             db_farm.updated_at = now
             db.commit()
-        except Exception:
+        except Exception as e:
             db.rollback()
+            logger.error("Failed to commit farm update to database: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database write failure while updating farm"
+            )
 
     updated_dict = _build_farm_response_dict(
         farm_id=farm_id,
@@ -380,8 +481,12 @@ async def delete_farm(
     db_farm = None
     try:
         db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_id)).first()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Failed to query farm for deletion from database: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database read failure while deleting farm"
+        )
 
     if not existing_farm and not db_farm:
         raise HTTPException(
@@ -411,6 +516,7 @@ async def delete_farm(
             db.commit()
         except Exception as e:
             db.rollback()
+            logger.error("Failed to delete farm from database: %s", str(e))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to delete farm from database: {str(e)}"
@@ -439,12 +545,21 @@ def _get_farm_and_verify_owner(farm_id: uuid.UUID, current_user: CurrentUser, db
                     "taluka": db_farm.taluka,
                     "district": db_farm.district,
                     "state": db_farm.state,
+                    "irrigation_type": db_farm.irrigation_type,
+                    "water_source": db_farm.water_source,
                     "geometry": db_farm.geometry_geojson,
                     "calculated_area_hectares": db_farm.calculated_area_hectares,
                     "calculated_area_acres": db_farm.calculated_area_acres,
+                    "centroid_latitude": db_farm.centroid_latitude,
+                    "centroid_longitude": db_farm.centroid_longitude,
                 }
-        except Exception:
-            pass
+                _FARM_STORAGE[farm_id] = farm
+        except Exception as e:
+            logger.error("Database query failed while verifying farm owner: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database read failure while verifying farm ownership"
+            )
 
     if not farm:
         raise HTTPException(
@@ -720,8 +835,12 @@ def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[U
                 "taluka": db_farm.taluka,
                 "district": db_farm.district,
                 "state": db_farm.state,
+                "irrigation_type": db_farm.irrigation_type,
+                "water_source": db_farm.water_source,
                 "calculated_area_hectares": db_farm.calculated_area_hectares,
                 "calculated_area_acres": db_farm.calculated_area_acres,
+                "centroid_latitude": db_farm.centroid_latitude,
+                "centroid_longitude": db_farm.centroid_longitude,
                 "id": db_farm.id,
                 "name": db_farm.name
             }
@@ -732,15 +851,17 @@ def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[U
 
     # Get latest profile or generate one if not yet extracted
     profile = spatial_soil_service.get_latest_profile(db, str(farm_id))
-    if not profile and farm.get("geometry", {}).get("coordinates"):
-        coords = farm["geometry"]["coordinates"][0]
-        poly = Polygon(coords)
-        profile = spatial_soil_service.generate_farm_soil_profile(
-            farm_id=str(farm_id),
-            polygon=poly,
-            taluka=farm.get("taluka"),
-            farm_area_hectares=farm.get("calculated_area_hectares")
-        )
+    if not profile and farm.get("geometry"):
+        try:
+            poly = shape(farm["geometry"])
+            profile = spatial_soil_service.generate_farm_soil_profile(
+                farm_id=str(farm_id),
+                polygon=poly,
+                taluka=farm.get("taluka"),
+                farm_area_hectares=farm.get("calculated_area_hectares")
+            )
+        except Exception as e:
+            logger.warning("Failed to generate soil profile for farm %s: %s", farm_id, e)
 
     fused = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db)
     if fused:
@@ -805,18 +926,38 @@ async def evaluate_farm_advisory(
     """
     farm = _get_farm_and_verify_owner(farm_id, current_user, db)
 
-    coords = farm.get("geometry", {}).get("coordinates", [[]])[0]
-    centroid_lat = sum(c[1] for c in coords) / len(coords) if coords else None
-    centroid_lon = sum(c[0] for c in coords) / len(coords) if coords else None
+    c_lat = farm.get("centroid_latitude")
+    c_lon = farm.get("centroid_longitude")
+    if c_lat is None or c_lon is None:
+        geom = farm.get("geometry")
+        if geom:
+            try:
+                c_lat, c_lon = compute_farm_representative_point(geom)
+            except Exception as e:
+                logger.warning("Failed to derive representative point for farm %s: %s", farm_id, e)
+                c_lat, c_lon = None, None
+
+    # Evidence-grounded irrigation availability check
+    # Available (True), Unavailable (False), or Unknown (None)
+    itype = (farm.get("irrigation_type") or "").strip().lower()
+    wsource = (farm.get("water_source") or "").strip().lower()
+
+    if itype in ("irrigated", "mixed") or wsource in ("canal", "borewell", "well", "drip", "sprinkler"):
+        irrigation_available: Optional[bool] = True
+    elif itype == "rainfed" or wsource == "rainfall":
+        irrigation_available = False
+    else:
+        # Preserve uncertainty when missing or unknown
+        irrigation_available = None
 
     ctx_dict = {
         "farm_id": str(farm_id),
         "taluka": farm.get("taluka"),
         "district": farm.get("district", "Pune"),
-        "latitude": centroid_lat,
-        "longitude": centroid_lon,
-        "irrigation_available": farm.get("irrigation_type") != "rainfed",
-        "irrigation_source": farm.get("water_source"),
+        "latitude": c_lat,
+        "longitude": c_lon,
+        "irrigation_available": irrigation_available,
+        "irrigation_source": farm.get("water_source") if farm.get("water_source") and farm.get("water_source") != "unknown" else None,
     }
 
     if payload:
@@ -884,7 +1025,22 @@ async def evaluate_farm_advisory(
 
     context_input = FarmContextInput(**ctx_dict)
     decision_engine = DeterministicDecisionEngine()
-    return decision_engine.evaluate_farm(ctx=context_input, db=db)
+    resp = decision_engine.evaluate_farm(ctx=context_input, db=db, user_id=str(current_user.user_id))
+    record_decision_owner(resp.decision_id, user_id=str(current_user.user_id), farm_id=str(farm_id))
+    return resp
+
+
+@router.get("/decision/{decision_id}", response_model=FarmEvaluationResponse, tags=["Farm Advisory"])
+def get_farm_decision_alias(
+    decision_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve farm evaluation decision by decision ID with caller and farm ownership verification.
+    """
+    from cropnet.services.api.app.api.v1.endpoints.agriculture import _verify_decision_access
+    return _verify_decision_access(decision_id, current_user, db)
 
 
 # Sub-router for farm-specific weather & climate intelligence

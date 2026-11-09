@@ -5,8 +5,11 @@ and mapping parameters to canonical nutrient keys.
 """
 
 import re
+import logging
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     SoilReportMetadata,
@@ -1009,8 +1012,8 @@ class SoilReportParser:
             try:
                 val = float(match.group(0))
                 return val, True, is_ambiguous, ambiguity_reason
-            except ValueError:
-                pass
+            except ValueError as exc:
+                logger.debug("Regex match float conversion failed: %s", exc)
 
         # If we reach here, unparseable string
         return None, False, True, f"Unparseable numeric value: '{raw_str}'"

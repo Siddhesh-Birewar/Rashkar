@@ -6,7 +6,9 @@ validates sowing moisture prerequisites, and qualifies thermal sensitivities.
 Phase 5.1.2: Hardened evidence boundaries; unverified compendium thresholds
 no longer enforce hard disqualification; all rules carry complete metadata.
 """
+import logging
 from typing import List, Optional, Dict, Any
+from datetime import datetime, date
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmContextInput,
     AppliedRuleRecord,
@@ -16,6 +18,8 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
 )
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse
 from cropnet.services.api.app.services.agriculture_intelligence.evidence_gate import EvidenceGate
+
+logger = logging.getLogger(__name__)
 
 
 class ClimateEvaluationResult:
@@ -186,35 +190,47 @@ class ClimateSuitabilityEvaluator:
                 ))
 
         # -------------------------------------------------------------
-        # 3. Kharif Bajra Sowing Window
+        # 3. Kharif Bajra Sowing Window (MPKV PoP 2023 / ICAR-AICRP)
         # -------------------------------------------------------------
         if crop_id == "bajra" and ctx.target_season == "kharif" and ctx.proposed_sowing_date:
             try:
-                dt = ctx.proposed_sowing_date
-                if "-07-16" <= dt[-5:] or dt[-5:] < "06-15":
-                    warn_b = (
-                        "Kharif Bajra optimum sowing window in Maharashtra is June 15 to July 15. "
-                        "Sowing later than July 15 significantly increases downy mildew susceptibility and shoot fly damage."
-                    )
-                    res.warnings.append(warn_b)
-                    res.applied_rules.append(AppliedRuleRecord(
-                        rule_id="RULE_BAJRA_KHARIF_SOWING_WINDOW",
-                        domain="Weather and Climate Intelligence",
-                        parameter_checked="proposed_sowing_date",
-                        rule_statement="Kharif Bajra sowing window is June 15 to July 15 (MPKV / IIMR)",
-                        condition_met=False,
-                        evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
-                        citation=citation,
-                        claim_verification_status="CONDITIONALLY_SUPPORTED",
-                        source_id="mpkv_pop_2023",
-                        document_title="Package of Practices for Field Crops of Western Maharashtra",
-                        section_or_pages="Compendium requires physical inspection",
-                        supporting_statement="Optimum sowing window for Kharif bajra is June 15 to July 15.",
-                        applicability_conditions="kharif proposed_sowing_date outside 06-15 to 07-15",
-                        enforcement_level=EnforcementLevel.ADVISORY_ONLY,
-                        can_trigger_disqualification=False
-                    ))
-            except Exception:
-                pass
+                raw_d = ctx.proposed_sowing_date
+                sow_date: Optional[date] = None
+                if isinstance(raw_d, (datetime, date)):
+                    sow_date = raw_d.date() if isinstance(raw_d, datetime) else raw_d
+                elif isinstance(raw_d, str):
+                    clean_d = raw_d.strip()
+                    sow_date = datetime.fromisoformat(clean_d[:10]).date()
+
+                if sow_date:
+                    month, day = sow_date.month, sow_date.day
+                    # Approved Kharif Bajra window in Maharashtra: June 15 to July 15 (inclusive)
+                    in_window = ((month == 6 and day >= 15) or (month == 7 and day <= 15))
+
+                    if not in_window:
+                        warn_b = (
+                            "Kharif Bajra optimum sowing window in Maharashtra is June 15 to July 15 (MPKV / ICAR). "
+                            "Sowing outside this window (especially later than July 15) significantly increases downy mildew susceptibility and shoot fly damage."
+                        )
+                        res.warnings.append(warn_b)
+                        res.applied_rules.append(AppliedRuleRecord(
+                            rule_id="RULE_BAJRA_KHARIF_SOWING_WINDOW",
+                            domain="Weather and Climate Intelligence",
+                            parameter_checked="proposed_sowing_date",
+                            rule_statement="Kharif Bajra sowing window is June 15 to July 15 (MPKV / ICAR)",
+                            condition_met=True,
+                            evidence_tier=EvidenceTier.CONDITIONALLY_SUPPORTED,
+                            citation=citation,
+                            claim_verification_status="CONDITIONALLY_SUPPORTED",
+                            source_id="mpkv_pop_2023",
+                            document_title="Package of Practices for Field Crops of Western Maharashtra",
+                            section_or_pages="Pearl Millet (Bajra) Chapter",
+                            supporting_statement="Optimum sowing window for Kharif bajra is June 15 to July 15.",
+                            applicability_conditions="kharif proposed_sowing_date outside 06-15 to 07-15",
+                            enforcement_level=EnforcementLevel.ADVISORY_ONLY,
+                            can_trigger_disqualification=False
+                        ))
+            except Exception as e:
+                logger.warning("Failed to evaluate Bajra sowing window date '%s': %s", ctx.proposed_sowing_date, e)
 
         return res

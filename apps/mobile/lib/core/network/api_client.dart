@@ -34,7 +34,7 @@ class ApiClient {
     http.Client? httpClient,
     this.defaultTimeout = const Duration(seconds: 30),
     this.bearerToken,
-    this.devUserId = ApiConstants.defaultDevUserId,
+    this.devUserId,
     this.authTokenProvider,
   })  : baseUrl = (baseUrl ?? ApiConstants.defaultBaseUrl).replaceAll(RegExp(r'/+$'), ''),
         _httpClient = httpClient ?? http.Client();
@@ -74,8 +74,11 @@ class ApiClient {
     if (provider != null) {
       try {
         token = await provider();
-      } catch (_) {
-        // Fallback to static bearerToken if provider fails
+      } catch (e) {
+        // Return clear unauthenticated state on token acquisition failure. Never silently inject X-Dev-User-Id.
+        throw UnauthorizedException(
+          message: 'Authentication token acquisition failed: $e',
+        );
       }
     }
 
@@ -159,6 +162,25 @@ class ApiClient {
     final requestHeaders = await _buildHeaders(headers);
     return _send<T>(
       () => _httpClient.delete(uri, headers: requestHeaders),
+      timeout: timeout ?? defaultTimeout,
+      fromJson: fromJson,
+    );
+  }
+
+  /// Standard HTTP PATCH
+  Future<T> patch<T>(
+    String path, {
+    dynamic body,
+    Map<String, String>? headers,
+    Map<String, dynamic>? queryParameters,
+    Duration? timeout,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    return _send<T>(
+      () => _httpClient.patch(uri, headers: requestHeaders, body: encodedBody),
       timeout: timeout ?? defaultTimeout,
       fromJson: fromJson,
     );

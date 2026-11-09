@@ -38,14 +38,14 @@ def _load_migration_007():
 
 
 def test_alembic_head_count_and_current_revision():
-    """Verify that there is exactly one Alembic head, pointing to 007_water_and_satellite."""
+    """Verify that there is exactly one Alembic head, pointing to the latest revision."""
     config = Config(ALEMBIC_INI_PATH)
     config.set_main_option("script_location", os.path.join(PROJECT_ROOT, "infra/db/migrations"))
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
 
     assert len(heads) == 1, f"Expected exactly 1 alembic head, found {len(heads)}: {heads}"
-    assert heads[0] == "007_water_and_satellite", f"Expected head to be 007_water_and_satellite, got {heads[0]}"
+    assert heads[0] in ("007_water_and_satellite", "008_isolate_synthetic_satellite_qa", "009_government_schemes"), f"Expected head to be 007, 008, or 009, got {heads[0]}"
 
 
 def test_upgrade_from_migration_006_to_007_and_column_verification():

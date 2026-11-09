@@ -165,8 +165,16 @@ def test_phase5_6_4_full_lifecycle_and_fusion():
         headers={"X-Dev-User-Id": user_id}
     )
     assert upload_resp.status_code == 201, f"Upload failed: {upload_resp.text}"
-    report = upload_resp.json()
-    report_id = report["id"]
+    upload_result = upload_resp.json()
+    report_id = upload_result["id"]
+
+    # Fetch processed report after background extraction completes
+    detail_resp = client.get(
+        f"/api/v1/farms/{qa_farm_id}/soil-reports/{report_id}",
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert detail_resp.status_code == 200
+    report = detail_resp.json()
 
     # Verify report metadata
     assert report["original_filename"] == "lag_sample.pdf"

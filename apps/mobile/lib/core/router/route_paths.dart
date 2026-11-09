@@ -63,6 +63,21 @@ abstract final class RoutePaths {
   /// Unified Farm Health Dashboard: /farms/:farmId/health
   static const String farmHealthDashboard = '/farms/:farmId/health';
 
+  /// Government Schemes catalogue: /schemes
+  static const String schemes = '/schemes';
+
+  /// Government Scheme detail: /schemes/:schemeId
+  static const String schemeDetail = '/schemes/:schemeId';
+
+  /// Government Schemes admin panel: /schemes/admin
+  static const String schemesAdmin = '/schemes/admin';
+
+  /// Government Schemes admin — create: /schemes/admin/new
+  static const String schemesAdminNew = '/schemes/admin/new';
+
+  /// Government Schemes admin — edit: /schemes/admin/:schemeId/edit
+  static const String schemesAdminEdit = '/schemes/admin/:schemeId/edit';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';
@@ -77,4 +92,6 @@ abstract final class RoutePaths {
   static String soilLabHistoryPath(String farmId) => '/soil-testing/$farmId/lab/history';
   static String weatherDetailPath(String farmId) => '/weather/$farmId';
   static String cropDetailPath(String cropId) => '/crop-recommendation/$cropId';
+  static String schemeDetailPath(String schemeId) => '/schemes/$schemeId';
+  static String schemeAdminEditPath(String schemeId) => '/schemes/admin/$schemeId/edit';
 }

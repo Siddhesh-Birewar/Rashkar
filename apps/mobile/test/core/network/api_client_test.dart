@@ -9,7 +9,7 @@ import 'package:cropnet_mobile/core/network/api_exception.dart';
 
 void main() {
   group('ApiClient Tests', () {
-    test('Default headers inject X-Dev-User-Id in development', () async {
+    test('Default headers do not inject X-Dev-User-Id unless explicitly configured', () async {
       late http.Request capturedRequest;
 
       final mockClient = MockClient((request) async {
@@ -25,9 +25,51 @@ void main() {
       final result = await client.get<Map<String, dynamic>>('/api/v1/health');
 
       expect(result['status'], 'ok');
-      expect(capturedRequest.headers[ApiConstants.devUserIdHeader], ApiConstants.defaultDevUserId);
+      expect(capturedRequest.headers.containsKey(ApiConstants.devUserIdHeader), false);
       expect(capturedRequest.headers['Content-Type'], 'application/json; charset=utf-8');
       expect(capturedRequest.headers['Accept'], 'application/json');
+    });
+
+    test('Explicit devUserId injects X-Dev-User-Id header for local dev', () async {
+      late http.Request capturedRequest;
+
+      final mockClient = MockClient((request) async {
+        capturedRequest = request;
+        return http.Response(jsonEncode({'status': 'ok'}), 200);
+      });
+
+      final client = ApiClient(
+        baseUrl: 'http://localhost:8000',
+        httpClient: mockClient,
+        devUserId: ApiConstants.defaultDevUserId,
+      );
+
+      final result = await client.get<Map<String, dynamic>>('/api/v1/health');
+
+      expect(result['status'], 'ok');
+      expect(capturedRequest.headers[ApiConstants.devUserIdHeader], ApiConstants.defaultDevUserId);
+    });
+
+    test('Token acquisition failure throws UnauthorizedException and never injects X-Dev-User-Id', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(jsonEncode({'status': 'ok'}), 200);
+      });
+
+      final client = ApiClient(
+        baseUrl: 'http://localhost:8000',
+        httpClient: mockClient,
+        devUserId: ApiConstants.defaultDevUserId,
+        authTokenProvider: () => throw Exception('Supabase token expired'),
+      );
+
+      expect(
+        () => client.get('/api/v1/health'),
+        throwsA(isA<UnauthorizedException>().having(
+          (e) => e.message,
+          'message',
+          contains('Authentication token acquisition failed'),
+        )),
+      );
     });
 
     test('Bearer token overrides dev user ID when provided', () async {

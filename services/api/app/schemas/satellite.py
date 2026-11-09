@@ -18,13 +18,14 @@ class SatelliteObservationQuality(str, Enum):
     INSUFFICIENT_PIXELS = "INSUFFICIENT_PIXELS"
     SMALL_FARM_WARNING = "SMALL_FARM_WARNING"
     NO_IMAGERY_AVAILABLE = "NO_IMAGERY_AVAILABLE"
+    SYNTHETIC_QA_ISOLATED = "SYNTHETIC_QA_ISOLATED"
 
 
 class SatelliteObservationItem(BaseModel):
     id: str
     farm_id: str
     observation_date: datetime
-    product_id: str
+    product_id: Optional[str] = None
     tile_id: Optional[str] = None
     sensor: str = "Sentinel-2 L2A"
     mean_ndvi: Optional[float] = Field(None, ge=-1.0, le=1.0)

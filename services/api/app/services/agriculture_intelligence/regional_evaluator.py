@@ -122,6 +122,36 @@ class RegionalSuitabilityEvaluator:
                 "Local soil depth, salinity, and water drainage must be tested."
             )
 
+        else:
+            # Locations outside supported pilot talukas in Maharashtra (Baramati, Indapur, Maval, Mulshi)
+            res.regional_decision_state = DecisionState.REQUIRES_REGIONAL_VALIDATION
+            taluka_display = ctx.taluka.strip() if ctx.taluka else "unspecified location"
+            msg = (
+                f"Taluka '{taluka_display}' is outside CropNet AI's supported pilot talukas in Maharashtra "
+                "(Baramati, Indapur, Maval, Mulshi). Agronomic screening cannot be verified and requires localized field validation."
+            )
+            res.warnings.append(msg)
+            res.limiting_factors.append(
+                "Outside supported pilot coverage area (Baramati, Indapur, Maval, Mulshi); localized soil-climate validation required."
+            )
+            res.applied_rules.append(AppliedRuleRecord(
+                rule_id="RULE_OUTSIDE_PILOT_TALUKA",
+                domain="Crop Suitability",
+                parameter_checked="taluka",
+                rule_statement="Locations outside supported pilot talukas require localized regional validation (CropNet Regional Governance Policy)",
+                condition_met=True,
+                evidence_tier=EvidenceTier.VERIFIED,
+                citation=citation,
+                claim_verification_status="GOVERNANCE_POLICY",
+                source_id="cropnet_governance",
+                document_title="CropNet Regional Governance & Agroecological Zonation Policy",
+                section_or_pages="Pilot Coverage Specification",
+                supporting_statement="Locations outside approved pilot talukas must not default to regional screening approval.",
+                applicability_conditions="taluka not in ('baramati', 'indapur', 'maval', 'mulshi')",
+                enforcement_level=EnforcementLevel.CONDITIONAL_CONSTRAINT,
+                can_trigger_disqualification=False
+            ))
+
         # -------------------------------------------------------------
         # 2. Contextual Inapplicability Guard
         # -------------------------------------------------------------
