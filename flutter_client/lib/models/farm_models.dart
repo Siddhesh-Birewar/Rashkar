@@ -793,51 +793,247 @@ class CropHeatAssessment {
 
 // ==================== INCOME DIVERSIFICATION MODELS ====================
 
+class FarmerResourceProfile {
+  final String farmId;
+  final String farmerId;
+  final double availableInvestmentInr;
+  final double monthlyOperatingBudgetInr;
+  final double? maxRiskCapitalInr;
+  final bool willingToBorrow;
+  final double? totalFarmAcres;
+  final double? cultivatedAcres;
+  final double availableLandAcres;
+  final double unusedLandAcres;
+  final bool fieldBundsAvailable;
+  final bool hasAnimalShed;
+  final bool hasStorageRoom;
+  final bool hasShadedSpace;
+  final String waterAvailability;
+  final List<dynamic> waterMonthsAvailable;
+  final double familyLaborHoursDay;
+  final bool hiredLaborPossible;
+  final String existingLivestock;
+  final List<String> existingAssets;
+  final List<String> cropByproducts;
+  final bool byproductSurplusAvailable;
+  final List<String> interests;
+  final bool hasTransport;
+  final bool hasFpoAccess;
+  final double? distanceToApmcKm;
+  final String riskTolerance;
+  final String categoryPreference;
+
+  FarmerResourceProfile({
+    required this.farmId,
+    required this.farmerId,
+    this.availableInvestmentInr = 0.0,
+    this.monthlyOperatingBudgetInr = 0.0,
+    this.maxRiskCapitalInr,
+    this.willingToBorrow = false,
+    this.totalFarmAcres,
+    this.cultivatedAcres,
+    this.availableLandAcres = 0.0,
+    this.unusedLandAcres = 0.0,
+    this.fieldBundsAvailable = true,
+    this.hasAnimalShed = false,
+    this.hasStorageRoom = false,
+    this.hasShadedSpace = false,
+    this.waterAvailability = 'seasonal_canal',
+    this.waterMonthsAvailable = const [],
+    this.familyLaborHoursDay = 2.0,
+    this.hiredLaborPossible = false,
+    this.existingLivestock = 'none',
+    this.existingAssets = const [],
+    this.cropByproducts = const [],
+    this.byproductSurplusAvailable = true,
+    this.interests = const [],
+    this.hasTransport = false,
+    this.hasFpoAccess = false,
+    this.distanceToApmcKm,
+    this.riskTolerance = 'moderate',
+    this.categoryPreference = 'all',
+  });
+
+  bool get isZeroBudget => availableInvestmentInr <= 0.0 && monthlyOperatingBudgetInr <= 0.0;
+
+  factory FarmerResourceProfile.fromJson(Map<String, dynamic> json) {
+    return FarmerResourceProfile(
+      farmId: json['farm_id'] ?? '',
+      farmerId: json['farmer_id'] ?? '',
+      availableInvestmentInr: (json['available_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      monthlyOperatingBudgetInr: (json['monthly_operating_budget_inr'] as num?)?.toDouble() ?? 0.0,
+      maxRiskCapitalInr: (json['max_risk_capital_inr'] as num?)?.toDouble(),
+      willingToBorrow: json['willing_to_borrow'] ?? false,
+      totalFarmAcres: (json['total_farm_acres'] as num?)?.toDouble(),
+      cultivatedAcres: (json['cultivated_acres'] as num?)?.toDouble(),
+      availableLandAcres: (json['available_land_acres'] as num?)?.toDouble() ?? 0.0,
+      unusedLandAcres: (json['unused_land_acres'] as num?)?.toDouble() ?? 0.0,
+      fieldBundsAvailable: json['field_bunds_available'] ?? true,
+      hasAnimalShed: json['has_animal_shed'] ?? false,
+      hasStorageRoom: json['has_storage_room'] ?? false,
+      hasShadedSpace: json['has_shaded_space'] ?? false,
+      waterAvailability: json['water_availability'] ?? 'seasonal_canal',
+      waterMonthsAvailable: List<dynamic>.from(json['water_months_available'] ?? []),
+      familyLaborHoursDay: (json['family_labor_hours_day'] as num?)?.toDouble() ?? 2.0,
+      hiredLaborPossible: json['hired_labor_possible'] ?? false,
+      existingLivestock: json['existing_livestock'] ?? 'none',
+      existingAssets: List<String>.from(json['existing_assets'] ?? []),
+      cropByproducts: List<String>.from(json['crop_byproducts'] ?? []),
+      byproductSurplusAvailable: json['byproduct_surplus_available'] ?? true,
+      interests: List<String>.from(json['interests'] ?? []),
+      hasTransport: json['has_transport'] ?? false,
+      hasFpoAccess: json['has_fpo_access'] ?? false,
+      distanceToApmcKm: (json['distance_to_apmc_km'] as num?)?.toDouble(),
+      riskTolerance: json['risk_tolerance'] ?? 'moderate',
+      categoryPreference: json['category_preference'] ?? 'all',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'farm_id': farmId,
+      'farmer_id': farmerId,
+      'available_investment_inr': availableInvestmentInr,
+      'monthly_operating_budget_inr': monthlyOperatingBudgetInr,
+      if (maxRiskCapitalInr != null) 'max_risk_capital_inr': maxRiskCapitalInr,
+      'willing_to_borrow': willingToBorrow,
+      if (totalFarmAcres != null) 'total_farm_acres': totalFarmAcres,
+      if (cultivatedAcres != null) 'cultivated_acres': cultivatedAcres,
+      'available_land_acres': availableLandAcres,
+      'unused_land_acres': unusedLandAcres,
+      'field_bunds_available': fieldBundsAvailable,
+      'has_animal_shed': hasAnimalShed,
+      'has_storage_room': hasStorageRoom,
+      'has_shaded_space': hasShadedSpace,
+      'water_availability': waterAvailability,
+      'water_months_available': waterMonthsAvailable,
+      'family_labor_hours_day': familyLaborHoursDay,
+      'hired_labor_possible': hiredLaborPossible,
+      'existing_livestock': existingLivestock,
+      'existing_assets': existingAssets,
+      'crop_byproducts': cropByproducts,
+      'byproduct_surplus_available': byproductSurplusAvailable,
+      'interests': interests,
+      'has_transport': hasTransport,
+      'has_fpo_access': hasFpoAccess,
+      if (distanceToApmcKm != null) 'distance_to_apmc_km': distanceToApmcKm,
+      'risk_tolerance': riskTolerance,
+      'category_preference': categoryPreference,
+    };
+  }
+}
+
+class SavedIncomePlan {
+  final String planId;
+  final String farmId;
+  final String opportunityId;
+  final String opportunityTitle;
+  final String category;
+  final double plannedInvestmentInr;
+  final double expectedAnnualIncomeInr;
+  final double expectedAnnualSavingsInr;
+  final double breakEvenMonths;
+  final String status;
+  final List<String> actionPlanSteps;
+  final String notes;
+  final String createdAt;
+
+  SavedIncomePlan({
+    required this.planId,
+    required this.farmId,
+    required this.opportunityId,
+    required this.opportunityTitle,
+    required this.category,
+    required this.plannedInvestmentInr,
+    required this.expectedAnnualIncomeInr,
+    required this.expectedAnnualSavingsInr,
+    required this.breakEvenMonths,
+    this.status = 'active',
+    this.actionPlanSteps = const [],
+    this.notes = '',
+    required this.createdAt,
+  });
+
+  factory SavedIncomePlan.fromJson(Map<String, dynamic> json) {
+    return SavedIncomePlan(
+      planId: json['plan_id'] ?? '',
+      farmId: json['farm_id'] ?? '',
+      opportunityId: json['opportunity_id'] ?? '',
+      opportunityTitle: json['opportunity_title'] ?? '',
+      category: json['category'] ?? '',
+      plannedInvestmentInr: (json['planned_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      expectedAnnualIncomeInr: (json['expected_annual_income_inr'] as num?)?.toDouble() ?? 0.0,
+      expectedAnnualSavingsInr: (json['expected_annual_savings_inr'] as num?)?.toDouble() ?? 0.0,
+      breakEvenMonths: (json['break_even_months'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] ?? 'active',
+      actionPlanSteps: List<String>.from(json['action_plan_steps'] ?? []),
+      notes: json['notes'] ?? '',
+      createdAt: json['created_at'] ?? '',
+    );
+  }
+}
+
 class IncomeOpportunity {
   final String opportunityId;
   final String title;
   final String category;
+  final bool isCostSaving;
   final String tagline;
   final List<String> targetCrops;
   final List<String> requiredResources;
   final double minInvestmentInr;
   final double maxInvestmentInr;
+  final double workingCapitalRequiredInr;
   final double requiredLandAcres;
+  final String requiredSpaceType;
   final String waterRequirement;
   final double dailyLaborHours;
   final int paybackPeriodMonths;
   final double potentialAnnualProfitInr;
+  final double potentialAnnualSavingsInr;
   final String riskLevel;
   final String summary;
   final String marketCommodity;
   final String marketBenchmarkPrice;
   final String marketSource;
+  final bool marketVerified;
   final List<String> keyAssumptions;
   final List<String> keyRisks;
   final String sourceAttribution;
+  final String minimumViableUnitDescription;
+  final int productionCycleDays;
+  final int revenueDelayMonths;
 
   IncomeOpportunity({
     required this.opportunityId,
     required this.title,
     required this.category,
+    this.isCostSaving = false,
     this.tagline = '',
     this.targetCrops = const [],
     this.requiredResources = const [],
     required this.minInvestmentInr,
     required this.maxInvestmentInr,
+    this.workingCapitalRequiredInr = 0.0,
     this.requiredLandAcres = 0.25,
+    this.requiredSpaceType = 'field',
     this.waterRequirement = 'low',
     this.dailyLaborHours = 2.0,
     required this.paybackPeriodMonths,
     required this.potentialAnnualProfitInr,
+    this.potentialAnnualSavingsInr = 0.0,
     required this.riskLevel,
     required this.summary,
     this.marketCommodity = '',
     this.marketBenchmarkPrice = '',
     this.marketSource = '',
+    this.marketVerified = true,
     required this.keyAssumptions,
     required this.keyRisks,
     required this.sourceAttribution,
+    this.minimumViableUnitDescription = '',
+    this.productionCycleDays = 90,
+    this.revenueDelayMonths = 3,
   });
 
   factory IncomeOpportunity.fromJson(Map<String, dynamic> json) {
@@ -845,24 +1041,32 @@ class IncomeOpportunity {
       opportunityId: json['opportunity_id'] ?? '',
       title: json['title'] ?? '',
       category: json['category'] ?? '',
+      isCostSaving: json['is_cost_saving'] ?? false,
       tagline: json['tagline'] ?? '',
       targetCrops: List<String>.from(json['target_crops'] ?? []),
       requiredResources: List<String>.from(json['required_resources'] ?? []),
       minInvestmentInr: (json['min_investment_inr'] as num?)?.toDouble() ?? 0.0,
       maxInvestmentInr: (json['max_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      workingCapitalRequiredInr: (json['working_capital_required_inr'] as num?)?.toDouble() ?? 0.0,
       requiredLandAcres: (json['required_land_acres'] as num?)?.toDouble() ?? 0.25,
+      requiredSpaceType: json['required_space_type'] ?? 'field',
       waterRequirement: json['water_requirement'] ?? 'low',
       dailyLaborHours: (json['daily_labor_hours'] as num?)?.toDouble() ?? 2.0,
       paybackPeriodMonths: json['payback_period_months'] ?? 6,
       potentialAnnualProfitInr: (json['potential_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      potentialAnnualSavingsInr: (json['potential_annual_savings_inr'] as num?)?.toDouble() ?? 0.0,
       riskLevel: json['risk_level'] ?? 'moderate',
       summary: json['summary'] ?? '',
       marketCommodity: json['market_commodity'] ?? '',
       marketBenchmarkPrice: json['market_benchmark_price'] ?? '',
       marketSource: json['market_source'] ?? '',
+      marketVerified: json['market_verified'] ?? true,
       keyAssumptions: List<String>.from(json['key_assumptions'] ?? []),
       keyRisks: List<String>.from(json['key_risks'] ?? []),
       sourceAttribution: json['source_attribution'] ?? '',
+      minimumViableUnitDescription: json['minimum_viable_unit_description'] ?? '',
+      productionCycleDays: json['production_cycle_days'] ?? 90,
+      revenueDelayMonths: json['revenue_delay_months'] ?? 3,
     );
   }
 }
@@ -874,6 +1078,14 @@ class ScoredOpportunityItem {
   final String suitabilityVerdict;
   final List<String> reasonsWhySuitable;
   final List<String> reasonsWhyUnsuitable;
+  final String feasibilityStatus;
+  final double capitalGapInr;
+  final List<String> limitingFactors;
+  final List<String> matchingResources;
+  final double estimatedAnnualProfitInr;
+  final double estimatedAnnualSavingsInr;
+  final double paybackMonths;
+  final String marketBenchmarkSummary;
 
   ScoredOpportunityItem({
     required this.opportunity,
@@ -882,16 +1094,34 @@ class ScoredOpportunityItem {
     required this.suitabilityVerdict,
     required this.reasonsWhySuitable,
     required this.reasonsWhyUnsuitable,
+    this.feasibilityStatus = 'FEASIBLE_NOW',
+    this.capitalGapInr = 0.0,
+    this.limitingFactors = const [],
+    this.matchingResources = const [],
+    this.estimatedAnnualProfitInr = 0.0,
+    this.estimatedAnnualSavingsInr = 0.0,
+    this.paybackMonths = 1.0,
+    this.marketBenchmarkSummary = '',
   });
+
+  bool get isFeasible => isSuitable && (feasibilityStatus == 'FEASIBLE_NOW' || feasibilityStatus == 'HIGHLY_FEASIBLE');
 
   factory ScoredOpportunityItem.fromJson(Map<String, dynamic> json) {
     return ScoredOpportunityItem(
       opportunity: IncomeOpportunity.fromJson(json['opportunity'] ?? {}),
-      suitabilityScorePct: json['suitability_score_pct'] ?? 75,
-      isSuitable: json['is_suitable'] ?? true,
-      suitabilityVerdict: json['suitability_verdict'] ?? 'Suitable',
-      reasonsWhySuitable: List<String>.from(json['reasons_why_suitable'] ?? []),
-      reasonsWhyUnsuitable: List<String>.from(json['reasons_why_unsuitable'] ?? []),
+      suitabilityScorePct: json['suitability_score_pct'] ?? (json['suitability_score'] as num?)?.toInt() ?? 75,
+      isSuitable: json['is_suitable'] ?? json['is_feasible'] ?? true,
+      suitabilityVerdict: json['suitability_verdict'] ?? json['feasibility_status'] ?? 'Suitable',
+      reasonsWhySuitable: List<String>.from(json['reasons_why_suitable'] ?? json['matching_resources'] ?? []),
+      reasonsWhyUnsuitable: List<String>.from(json['reasons_why_unsuitable'] ?? json['limiting_factors'] ?? []),
+      feasibilityStatus: json['feasibility_status'] ?? 'FEASIBLE_NOW',
+      capitalGapInr: (json['capital_gap_inr'] as num?)?.toDouble() ?? 0.0,
+      limitingFactors: List<String>.from(json['limiting_factors'] ?? []),
+      matchingResources: List<String>.from(json['matching_resources'] ?? []),
+      estimatedAnnualProfitInr: (json['estimated_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      estimatedAnnualSavingsInr: (json['estimated_annual_savings_inr'] as num?)?.toDouble() ?? 0.0,
+      paybackMonths: (json['payback_months'] as num?)?.toDouble() ?? 1.0,
+      marketBenchmarkSummary: json['market_benchmark_summary'] ?? '',
     );
   }
 }
@@ -1009,27 +1239,35 @@ class OpportunityComparisonItem {
   final String opportunityId;
   final String title;
   final String category;
+  final bool isCostSaving;
   final double initialInvestmentInr;
+  final double workingCapitalInr;
   final double netAnnualProfitInr;
+  final double annualSavingsInr;
   final double paybackMonths;
   final double landRequiredAcres;
   final String waterNeeds;
   final double dailyLaborHours;
   final String riskLevel;
   final String suitabilityVerdict;
+  final String marketBenchmark;
 
   OpportunityComparisonItem({
     required this.opportunityId,
     required this.title,
     required this.category,
+    this.isCostSaving = false,
     required this.initialInvestmentInr,
+    this.workingCapitalInr = 0.0,
     required this.netAnnualProfitInr,
+    this.annualSavingsInr = 0.0,
     required this.paybackMonths,
     required this.landRequiredAcres,
     required this.waterNeeds,
     required this.dailyLaborHours,
     required this.riskLevel,
     required this.suitabilityVerdict,
+    this.marketBenchmark = '',
   });
 
   factory OpportunityComparisonItem.fromJson(Map<String, dynamic> json) {
@@ -1037,14 +1275,18 @@ class OpportunityComparisonItem {
       opportunityId: json['opportunity_id'] ?? '',
       title: json['title'] ?? '',
       category: json['category'] ?? '',
+      isCostSaving: json['is_cost_saving'] ?? false,
       initialInvestmentInr: (json['initial_investment_inr'] as num?)?.toDouble() ?? 0.0,
+      workingCapitalInr: (json['working_capital_inr'] as num?)?.toDouble() ?? 0.0,
       netAnnualProfitInr: (json['net_annual_profit_inr'] as num?)?.toDouble() ?? 0.0,
+      annualSavingsInr: (json['annual_savings_inr'] as num?)?.toDouble() ?? 0.0,
       paybackMonths: (json['payback_months'] as num?)?.toDouble() ?? 0.0,
       landRequiredAcres: (json['land_required_acres'] as num?)?.toDouble() ?? 0.0,
       waterNeeds: json['water_needs'] ?? '',
       dailyLaborHours: (json['daily_labor_hours'] as num?)?.toDouble() ?? 0.0,
       riskLevel: json['risk_level'] ?? '',
       suitabilityVerdict: json['suitability_verdict'] ?? '',
+      marketBenchmark: json['market_benchmark'] ?? '',
     );
   }
 }

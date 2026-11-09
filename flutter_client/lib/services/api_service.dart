@@ -504,6 +504,8 @@ class ApiService {
     required bool hasStorageOrShed,
     required String riskTolerance,
     required String categoryPreference,
+    List<String> cropByproducts = const [],
+    List<String> interests = const [],
   }) async {
     try {
       final uri = Uri.parse('$baseUrl/income/match-opportunities');
@@ -512,13 +514,16 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'available_investment_inr': availableInvestmentInr,
-          'working_capital_inr': workingCapitalInr,
+          'monthly_operating_budget_inr': workingCapitalInr,
           'available_land_acres': availableLandAcres,
           'unused_land_acres': unusedLandAcres,
           'water_availability': waterAvailability,
           'family_labor_hours_day': familyLaborHoursDay,
           'existing_livestock': existingLivestock,
-          'has_storage_or_shed': hasStorageOrShed,
+          'has_storage_room': hasStorageOrShed,
+          'has_animal_shed': hasStorageOrShed,
+          'crop_byproducts': cropByproducts,
+          'interests': interests,
           'risk_tolerance': riskTolerance,
           'category_preference': categoryPreference,
         }),
@@ -527,6 +532,85 @@ class ApiService {
       if (response.statusCode == 200) {
         final List list = json.decode(response.body);
         return list.map((item) => ScoredOpportunityItem.fromJson(item)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<FarmerResourceProfile> getFarmResourceProfile(String farmId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/farms/$farmId/profile');
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        return FarmerResourceProfile.fromJson(json.decode(response.body));
+      }
+    } catch (_) {}
+    return FarmerResourceProfile(farmId: farmId, farmerId: 'farmer_demo_01');
+  }
+
+  static Future<FarmerResourceProfile?> saveFarmResourceProfile(FarmerResourceProfile profile) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/farms/${profile.farmId}/profile');
+      final response = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(profile.toJson()),
+      ).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        return FarmerResourceProfile.fromJson(json.decode(response.body));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<List<ScoredOpportunityItem>> discoverFarmOpportunities(
+    String farmId, {
+    double? customBudgetInr,
+  }) async {
+    try {
+      final query = customBudgetInr != null ? '?custom_budget_inr=$customBudgetInr' : '';
+      final uri = Uri.parse('$baseUrl/income/farms/$farmId/discover$query');
+      final response = await http.post(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final List list = json.decode(response.body);
+        return list.map((item) => ScoredOpportunityItem.fromJson(item)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<SavedIncomePlan?> saveIncomePlan({
+    required String farmId,
+    required String opportunityId,
+    required double plannedInvestmentInr,
+    String notes = '',
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/farms/$farmId/plans');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'farm_id': farmId,
+          'opportunity_id': opportunityId,
+          'planned_investment_inr': plannedInvestmentInr,
+          'notes': notes,
+        }),
+      ).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        return SavedIncomePlan.fromJson(json.decode(response.body));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<List<SavedIncomePlan>> getSavedIncomePlans(String farmId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/income/farms/$farmId/plans');
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final List list = json.decode(response.body);
+        return list.map((item) => SavedIncomePlan.fromJson(item)).toList();
       }
     } catch (_) {}
     return [];

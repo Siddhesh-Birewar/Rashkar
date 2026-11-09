@@ -24,7 +24,14 @@ def init_db():
         for stmt in [
             "ALTER TABLE canonical_crops ADD COLUMN support_level VARCHAR(50) DEFAULT 'data_limited'",
             "ALTER TABLE farms ADD COLUMN total_area_acres FLOAT",
-            "ALTER TABLE crop_cycles ADD COLUMN planted_area_acres FLOAT"
+            "ALTER TABLE crop_cycles ADD COLUMN planted_area_acres FLOAT",
+            "ALTER TABLE income_opportunities ADD COLUMN is_cost_saving BOOLEAN DEFAULT 0",
+            "ALTER TABLE income_opportunities ADD COLUMN tagline VARCHAR(200) DEFAULT ''",
+            "ALTER TABLE income_opportunities ADD COLUMN working_capital_required_inr FLOAT DEFAULT 0.0",
+            "ALTER TABLE income_opportunities ADD COLUMN potential_annual_savings_inr FLOAT DEFAULT 0.0",
+            "ALTER TABLE income_opportunities ADD COLUMN market_commodity VARCHAR(100)",
+            "ALTER TABLE income_opportunities ADD COLUMN market_benchmark_price VARCHAR(100)",
+            "ALTER TABLE income_opportunities ADD COLUMN market_source VARCHAR(255)"
         ]:
             try:
                 conn.execute(text(stmt))
@@ -48,7 +55,8 @@ def init_db():
             seed_advisories(db)
         if db.query(FarmerModel).count() == 0:
             seed_demo_farmer_and_farm(db)
-        if db.query(IncomeOpportunityModel).count() == 0:
+        if db.query(IncomeOpportunityModel).count() < 10:
+            db.query(IncomeOpportunityModel).delete()
             seed_income_opportunities(db)
     finally:
         db.close()
@@ -763,76 +771,34 @@ def seed_demo_farmer_and_farm(db):
     db.commit()
 
 def seed_income_opportunities(db):
-    opps = [
-        IncomeOpportunityModel(
-            opportunity_id="OPP_VERMICOMPOST_01",
-            title="Farm-Scale Vermicomposting from Crop Residues",
-            category="byproduct_utilization",
-            target_crops=["soybean", "cotton", "sugarcane"],
-            required_resources=["crop_residue", "cow_dung", "shade_net", "water"],
-            min_investment_inr=18000.0,
-            max_investment_inr=35000.0,
-            payback_period_months=4,
-            potential_annual_profit_inr=54000.0,
-            risk_level="low",
-            summary="Convert harvested crop biomass into high-value organic vermicompost for self-farm nutrition and local nursery sales.",
-            key_assumptions=[
-                "Biomass availability: 2-3 tonnes per season",
-                "Compost cycle time: 60-75 days",
-                "Local bulk sales price: ₹6 to ₹8 per kg"
-            ],
-            key_risks=[
-                "Moisture management during peak summer heat",
-                "Termite infestation if bed is dry"
-            ],
-            source_attribution="KVK Baramati & ICAR-NIASM Baramati Agri-Allied Practice"
-        ),
-        IncomeOpportunityModel(
-            opportunity_id="OPP_OSMANABADI_GOAT_01",
-            title="Osmanabadi Goat Rearing Unit (10+1)",
-            category="livestock",
-            target_crops=["soybean", "jowar", "bajra"],
-            required_resources=["shed", "fodder", "fencing"],
-            min_investment_inr=85000.0,
-            max_investment_inr=140000.0,
-            payback_period_months=12,
-            potential_annual_profit_inr=95000.0,
-            risk_level="moderate",
-            summary="Hardy drought-tolerant indigenous breed reared on farm-grown dry fodders and pulse husks with high meat market demand.",
-            key_assumptions=[
-                "Twinning rate: ~60-70% for Osmanabadi breed",
-                "Kid marketing at 8-10 months (25-30 kg live weight)",
-                "Live weight price: ₹300-340 per kg"
-            ],
-            key_risks=[
-                "PPR and enterotoxemia disease outbreaks if vaccinations are missed",
-                "Green fodder shortage in April-May"
-            ],
-            source_attribution="MPKV Rahuri Goat & Sheep Directorate / Pune District KVK"
-        ),
-        IncomeOpportunityModel(
-            opportunity_id="OPP_SOLAR_DRYER_01",
-            title="Solar Conduction Dryer for Onion & Chillies",
-            category="value_addition",
-            target_crops=["onion", "tomato"],
-            required_resources=["direct_sunlight", "grading_area", "packaging"],
-            min_investment_inr=45000.0,
-            max_investment_inr=85000.0,
-            payback_period_months=8,
-            potential_annual_profit_inr=65000.0,
-            risk_level="moderate",
-            summary="Prevents distress sales during market gluts by dehydrating surplus produce into shelf-stable flakes and powders.",
-            key_assumptions=[
-                "Processing capacity: 15-20 kg per batch",
-                "Dehydration ratio: 8:1 for onions",
-                "Dry onion flake market price: ₹220-280 per kg"
-            ],
-            key_risks=[
-                "Unseasonal cloudy weather or rain during Kharif drying cycles",
-                "Moisture-proof packing requirements"
-            ],
-            source_attribution="ICAR-DOGR (Directorate of Onion and Garlic Research), Rajgurunagar, Pune"
+    from backend.app.services.income_knowledge_catalog import get_income_catalog
+    catalog_items = get_income_catalog()
+    opps = []
+    for item in catalog_items:
+        opps.append(
+            IncomeOpportunityModel(
+                opportunity_id=item.opportunity_id,
+                title=item.title,
+                category=item.category,
+                is_cost_saving=item.is_cost_saving,
+                tagline=item.tagline,
+                target_crops=item.target_crops,
+                required_resources=getattr(item, "required_resources", []),
+                min_investment_inr=item.min_investment_inr,
+                max_investment_inr=item.max_investment_inr,
+                working_capital_required_inr=item.working_capital_required_inr,
+                payback_period_months=item.payback_period_months,
+                potential_annual_profit_inr=item.potential_annual_profit_inr,
+                potential_annual_savings_inr=item.potential_annual_savings_inr,
+                risk_level=item.risk_level,
+                summary=item.summary,
+                market_commodity=item.market_commodity,
+                market_benchmark_price=item.market_benchmark_price,
+                market_source=item.market_source,
+                key_assumptions=item.key_assumptions,
+                key_risks=item.key_risks,
+                source_attribution=item.source_attribution
+            )
         )
-    ]
     db.add_all(opps)
     db.commit()
