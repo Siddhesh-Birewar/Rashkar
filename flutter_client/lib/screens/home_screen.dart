@@ -190,41 +190,46 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildGreetingCard(summary),
-                        const SizedBox(height: 16),
-                        _buildFarmGlanceCard(summary),
-                        const SizedBox(height: 16),
-                        _buildWeatherSummaryCard(summary),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'WHAT WOULD YOU LIKE TO DO?',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 840),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildGreetingCard(summary),
+                            const SizedBox(height: 16),
+                            _buildFarmGlanceCard(summary),
+                            const SizedBox(height: 16),
+                            _buildWeatherSummaryCard(summary),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'WHAT WOULD YOU LIKE TO DO?',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildFeatureGrid(),
+                            const SizedBox(height: 20),
+                            _buildAskRashkarBanner(),
+                            const SizedBox(height: 16),
+                            if (summary.activeAlerts.isNotEmpty) ...[
+                              const Text(
+                                "TODAY'S IMPORTANT ADVISORIES",
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
+                              ),
+                              const SizedBox(height: 8),
+                              ...summary.activeAlerts.map((a) => _buildAlertItem(a)),
+                              const SizedBox(height: 16),
+                            ],
+                            Center(
+                              child: Text(
+                                'Data updated: ${summary.dataLastUpdated}',
+                                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        _buildFeatureGrid(),
-                        const SizedBox(height: 20),
-                        _buildAskRashkarBanner(),
-                        const SizedBox(height: 16),
-                        if (summary.activeAlerts.isNotEmpty) ...[
-                          const Text(
-                            "TODAY'S IMPORTANT ADVISORIES",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333), letterSpacing: 0.8),
-                          ),
-                          const SizedBox(height: 8),
-                          ...summary.activeAlerts.map((a) => _buildAlertItem(a)).toList(),
-                          const SizedBox(height: 16),
-                        ],
-                        Center(
-                          child: Text(
-                            'Data updated: ${summary.dataLastUpdated}',
-                            style: const TextStyle(fontSize: 12, color: Colors.black54),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                      ),
                     ),
                   ),
                 ),

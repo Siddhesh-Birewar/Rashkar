@@ -223,10 +223,13 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // SECTION A: Today's Outdoor Work Conditions (Main Card)
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // SECTION A: Today's Outdoor Work Conditions (Main Card)
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -613,8 +616,10 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
               ],
             ),
           ),
-          const SizedBox(height: 20),
-        ],
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -647,10 +652,13 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // SECTION A: Crop Heat Status (Main Card)
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // SECTION A: Crop Heat Status (Main Card)
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -918,8 +926,10 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
               ],
             ),
           ),
-          const SizedBox(height: 20),
-        ],
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

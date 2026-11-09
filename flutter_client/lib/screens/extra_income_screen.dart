@@ -155,10 +155,13 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // SECTION A: Friendly Introduction (Main Card)
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // SECTION A: Friendly Introduction (Main Card)
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -326,6 +329,8 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                 ],
               ),
             ),
+          ),
+        ),
     );
   }
 

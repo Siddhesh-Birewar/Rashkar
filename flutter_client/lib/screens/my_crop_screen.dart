@@ -131,33 +131,38 @@ class _MyCropScreenState extends State<MyCropScreen> {
                   ? const Center(child: Text('Unable to load crop assessment.'))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // A. My Crop Card
-                          _buildCropSummaryCard(),
-                          const SizedBox(height: 16),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 840),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // A. My Crop Card
+                              _buildCropSummaryCard(),
+                              const SizedBox(height: 16),
 
-                          // B. Crop Condition Card
-                          _buildConditionCard(),
-                          const SizedBox(height: 16),
+                              // B. Crop Condition Card
+                              _buildConditionCard(),
+                              const SizedBox(height: 16),
 
-                          // C. Main Concerns
-                          _buildMainConcernsCard(),
-                          const SizedBox(height: 16),
+                              // C. Main Concerns
+                              _buildMainConcernsCard(),
+                              const SizedBox(height: 16),
 
-                          // D. What Should I Do? (Actionable Steps)
-                          _buildRecommendationsCard(),
-                          const SizedBox(height: 16),
+                              // D. What Should I Do? (Actionable Steps)
+                              _buildRecommendationsCard(),
+                              const SizedBox(height: 16),
 
-                          // E. Past District Crop Performance
-                          _buildPastPerformanceCard(),
-                          const SizedBox(height: 16),
+                              // E. Past District Crop Performance
+                              _buildPastPerformanceCard(),
+                              const SizedBox(height: 16),
 
-                          // F. Progressive Disclosure: Technical & Scientific Details
-                          _buildTechnicalDetailsExpansion(),
-                          const SizedBox(height: 24),
-                        ],
+                              // F. Progressive Disclosure: Technical & Scientific Details
+                              _buildTechnicalDetailsExpansion(),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
     );

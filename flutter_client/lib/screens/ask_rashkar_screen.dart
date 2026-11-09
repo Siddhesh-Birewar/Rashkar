@@ -144,9 +144,12 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
-      body: Column(
-        children: [
-          // Suggested prompts chips
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: Column(
+            children: [
+              // Suggested prompts chips
           Container(
             height: 52,
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -245,15 +248,17 @@ class _AskRashkarScreenState extends State<AskRashkarScreen> {
                       icon: const Icon(Icons.send, color: Colors.white, size: 20),
                       onPressed: () => _sendMessage(_textController.text),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildMessageBubble(AssistantChatMessage m, bool isUser) {
     return Align(
