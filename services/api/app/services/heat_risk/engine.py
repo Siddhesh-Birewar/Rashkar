@@ -7,6 +7,7 @@ CropNet architecture. Thresholds are the original published values:
 The WBGT solver (Liljegren et al. 2008) and thermal indices live in this package.
 """
 import math
+import re
 from typing import Dict, Any, Optional, List
 
 from cropnet.services.api.app.services.heat_risk.wbgt_solver import calculate_wbgt
@@ -16,7 +17,7 @@ from cropnet.services.api.app.services.heat_risk.thermal_indices import (
 )
 
 # Crop phenological thermal physiology (Rashkar CropHeatEngine baseline table).
-CROP_SPECIES_PHYSIOLOGY: Dict[str, Dict[str, Any]] = {
+CROP_SPECIES_PHYSIOLOGY = {
     "soybean": {
         "common_name": "Soybean",
         "base_temp_c": 10.0,
@@ -24,12 +25,12 @@ CROP_SPECIES_PHYSIOLOGY: Dict[str, Dict[str, Any]] = {
         "optimal_max": 30.0,
         "night_crit_c": 22.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Germination / Emergence", "das_min": 0, "das_max": 10, "crit_tmax": 38.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "das_min": 11, "das_max": 35, "crit_tmax": 39.0},
-            {"stage_code": "stage_flowering", "stage_name": "Flowering & Anthesis", "das_min": 36, "das_max": 55, "crit_tmax": 35.0},
-            {"stage_code": "stage_pod_development", "stage_name": "Pod Formation & Seed Filling", "das_min": 56, "das_max": 85, "crit_tmax": 36.5},
-            {"stage_code": "stage_maturity", "stage_name": "Maturity / Harvest", "das_min": 86, "das_max": 105, "crit_tmax": 42.0},
-        ],
+            {"stage_code": "stage_germination", "stage_name": "Germination / Emergence", "stage_name_en": "Germination / Emergence", "das_range": "DAS 0-10", "crit_tmax": 38.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 11-35", "crit_tmax": 39.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Anthesis", "stage_name_en": "Flowering & Anthesis", "das_range": "DAS 36-55", "crit_tmax": 35.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Formation & Seed Filling", "stage_name_en": "Pod Formation & Seed Filling", "das_range": "DAS 56-85", "crit_tmax": 36.5},
+            {"stage_code": "stage_maturity", "stage_name": "Maturity / Harvest", "stage_name_en": "Maturity / Harvest", "das_range": "DAS 86-105", "crit_tmax": 42.0}
+        ]
     },
     "cotton": {
         "common_name": "Cotton",
@@ -38,12 +39,12 @@ CROP_SPECIES_PHYSIOLOGY: Dict[str, Dict[str, Any]] = {
         "optimal_max": 32.0,
         "night_crit_c": 24.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "das_min": 0, "das_max": 20, "crit_tmax": 40.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Squaring & Vegetative", "das_min": 21, "das_max": 55, "crit_tmax": 39.0},
-            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering", "das_min": 56, "das_max": 90, "crit_tmax": 36.0},
-            {"stage_code": "stage_boll_formation", "stage_name": "Boll Formation & Opening", "das_min": 91, "das_max": 150, "crit_tmax": 38.0},
-            {"stage_code": "stage_maturity", "stage_name": "Bursting & Harvest", "das_min": 151, "das_max": 180, "crit_tmax": 42.0},
-        ],
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-20", "crit_tmax": 40.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Squaring & Vegetative", "stage_name_en": "Squaring & Vegetative", "das_range": "DAS 21-55", "crit_tmax": 39.0},
+            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering", "stage_name_en": "Peak Flowering", "das_range": "DAS 56-90", "crit_tmax": 36.0},
+            {"stage_code": "stage_boll_formation", "stage_name": "Boll Formation & Opening", "stage_name_en": "Boll Formation & Opening", "das_range": "DAS 91-150", "crit_tmax": 38.0},
+            {"stage_code": "stage_maturity", "stage_name": "Bursting & Harvest", "stage_name_en": "Bursting & Harvest", "das_range": "DAS 151-180", "crit_tmax": 42.0}
+        ]
     },
     "jowar": {
         "common_name": "Sorghum (Jowar)",
@@ -52,12 +53,12 @@ CROP_SPECIES_PHYSIOLOGY: Dict[str, Dict[str, Any]] = {
         "optimal_max": 33.0,
         "night_crit_c": 23.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Emergence", "das_min": 0, "das_max": 15, "crit_tmax": 40.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Vegetative / General Growth", "das_min": 16, "das_max": 45, "crit_tmax": 41.0},
-            {"stage_code": "stage_flowering", "stage_name": "Boot & Flowering / Anthesis", "das_min": 46, "das_max": 65, "crit_tmax": 37.0},
-            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "das_min": 66, "das_max": 95, "crit_tmax": 38.5},
-            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "das_min": 96, "das_max": 115, "crit_tmax": 42.0},
-        ],
+            {"stage_code": "stage_germination", "stage_name": "Emergence", "stage_name_en": "Emergence", "das_range": "DAS 0-15", "crit_tmax": 40.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative / General Growth", "stage_name_en": "Vegetative / General Growth", "das_range": "DAS 16-45", "crit_tmax": 41.0},
+            {"stage_code": "stage_flowering", "stage_name": "Boot & Flowering / Anthesis", "stage_name_en": "Boot & Flowering / Anthesis", "das_range": "DAS 46-65", "crit_tmax": 37.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "stage_name_en": "Grain Development / Dough", "das_range": "DAS 66-95", "crit_tmax": 38.5},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 96-115", "crit_tmax": 42.0}
+        ]
     },
     "onion": {
         "common_name": "Onion",
@@ -66,13 +67,115 @@ CROP_SPECIES_PHYSIOLOGY: Dict[str, Dict[str, Any]] = {
         "optimal_max": 28.0,
         "night_crit_c": 20.0,
         "stages": [
-            {"stage_code": "stage_vegetative", "stage_name": "Foliage / Leaf Development", "das_min": 0, "das_max": 40, "crit_tmax": 35.0},
-            {"stage_code": "stage_bulb_initiation", "stage_name": "Bulb Initiation", "das_min": 41, "das_max": 70, "crit_tmax": 33.0},
-            {"stage_code": "stage_bulb_development", "stage_name": "Bulb Development & Enlargement", "das_min": 71, "das_max": 105, "crit_tmax": 34.0},
-            {"stage_code": "stage_maturity", "stage_name": "Neck Fall & Harvest", "das_min": 106, "das_max": 130, "crit_tmax": 38.0},
-        ],
+            {"stage_code": "stage_vegetative", "stage_name": "Foliage / Leaf Development", "stage_name_en": "Foliage / Leaf Development", "das_range": "DAS 0-40", "crit_tmax": 35.0},
+            {"stage_code": "stage_bulb_initiation", "stage_name": "Bulb Initiation", "stage_name_en": "Bulb Initiation", "das_range": "DAS 41-70", "crit_tmax": 33.0},
+            {"stage_code": "stage_bulb_development", "stage_name": "Bulb Development & Enlargement", "stage_name_en": "Bulb Development & Enlargement", "das_range": "DAS 71-105", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Neck Fall & Harvest", "stage_name_en": "Neck Fall & Harvest", "das_range": "DAS 106-130", "crit_tmax": 38.0}
+        ]
     },
+    "sugarcane": {
+        "common_name": "Sugarcane",
+        "base_temp_c": 12.0,
+        "optimal_min": 28.0,
+        "optimal_max": 35.0,
+        "night_crit_c": 20.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Sprouting & Tillering", "stage_name_en": "Sprouting & Tillering", "das_range": "DAS 0-60", "crit_tmax": 42.0},
+            {"stage_code": "stage_grand_growth", "stage_name": "Grand Growth & Internode Elongation", "stage_name_en": "Grand Growth & Internode Elongation", "das_range": "DAS 61-240", "crit_tmax": 40.0},
+            {"stage_code": "stage_maturity", "stage_name": "Ripening & Sucrose Accumulation", "stage_name_en": "Ripening & Sucrose Accumulation", "das_range": "DAS 241-360", "crit_tmax": 38.0}
+        ]
+    },
+    "wheat": {
+        "common_name": "Wheat",
+        "base_temp_c": 4.0,
+        "optimal_min": 18.0,
+        "optimal_max": 25.0,
+        "night_crit_c": 18.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Crown Root & Tillering", "stage_name_en": "Crown Root & Tillering", "das_range": "DAS 0-35", "crit_tmax": 30.0},
+            {"stage_code": "stage_flowering", "stage_name": "Booting & Anthesis", "stage_name_en": "Booting & Anthesis", "das_range": "DAS 36-65", "crit_tmax": 32.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Filling & Milk Stage", "stage_name_en": "Grain Filling & Milk Stage", "das_range": "DAS 66-95", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 96-115", "crit_tmax": 37.0}
+        ]
+    },
+    "gram": {
+        "common_name": "Chickpea (Gram)",
+        "base_temp_c": 8.0,
+        "optimal_min": 20.0,
+        "optimal_max": 28.0,
+        "night_crit_c": 18.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 0-30", "crit_tmax": 35.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Pod Initiation", "stage_name_en": "Flowering & Pod Initiation", "das_range": "DAS 31-60", "crit_tmax": 32.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Filling & Seed Growth", "stage_name_en": "Pod Filling & Seed Growth", "das_range": "DAS 61-90", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Pod Maturity & Harvest", "stage_name_en": "Pod Maturity & Harvest", "das_range": "DAS 91-110", "crit_tmax": 38.0}
+        ]
+    },
+    "tur": {
+        "common_name": "Pigeon Pea (Tur)",
+        "base_temp_c": 10.0,
+        "optimal_min": 25.0,
+        "optimal_max": 33.0,
+        "night_crit_c": 22.0,
+        "stages": [
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 0-60", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Pod Formation", "stage_name_en": "Flowering & Pod Formation", "das_range": "DAS 61-120", "crit_tmax": 35.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Filling & Seed Hardening", "stage_name_en": "Pod Filling & Seed Hardening", "das_range": "DAS 121-160", "crit_tmax": 36.5},
+            {"stage_code": "stage_maturity", "stage_name": "Maturity & Pod Drydown", "stage_name_en": "Maturity & Pod Drydown", "das_range": "DAS 161-190", "crit_tmax": 40.0}
+        ]
+    },
+    "bajra": {
+        "common_name": "Pearl Millet (Bajra)",
+        "base_temp_c": 12.0,
+        "optimal_min": 28.0,
+        "optimal_max": 36.0,
+        "night_crit_c": 24.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-15", "crit_tmax": 42.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Tillering & Stem Elongation", "stage_name_en": "Tillering & Stem Elongation", "das_range": "DAS 16-35", "crit_tmax": 42.0},
+            {"stage_code": "stage_flowering", "stage_name": "Boot & Anthesis", "stage_name_en": "Boot & Anthesis", "das_range": "DAS 36-55", "crit_tmax": 38.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "stage_name_en": "Grain Development / Dough", "das_range": "DAS 56-75", "crit_tmax": 40.0},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 76-90", "crit_tmax": 44.0}
+        ]
+    },
+    "maize": {
+        "common_name": "Maize",
+        "base_temp_c": 10.0,
+        "optimal_min": 24.0,
+        "optimal_max": 32.0,
+        "night_crit_c": 22.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Early Seedling", "stage_name_en": "Emergence & Early Seedling", "das_range": "DAS 0-15", "crit_tmax": 38.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Knee-High to Tasseling", "stage_name_en": "Knee-High to Tasseling", "das_range": "DAS 16-45", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Silking & Pollination", "stage_name_en": "Silking & Pollination", "das_range": "DAS 46-65", "crit_tmax": 35.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Cob Filling & Grain Hardening", "stage_name_en": "Cob Filling & Grain Hardening", "das_range": "DAS 66-95", "crit_tmax": 37.0},
+            {"stage_code": "stage_maturity", "stage_name": "Black Layer & Harvest", "stage_name_en": "Black Layer & Harvest", "das_range": "DAS 96-115", "crit_tmax": 40.0}
+        ]
+    },
+    "groundnut": {
+        "common_name": "Groundnut",
+        "base_temp_c": 10.0,
+        "optimal_min": 24.0,
+        "optimal_max": 30.0,
+        "night_crit_c": 20.0,
+        "stages": [
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-20", "crit_tmax": 38.0},
+            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering & Pegging", "stage_name_en": "Peak Flowering & Pegging", "das_range": "DAS 21-50", "crit_tmax": 34.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Development & Kernel Filling", "stage_name_en": "Pod Development & Kernel Filling", "das_range": "DAS 51-90", "crit_tmax": 35.0},
+            {"stage_code": "stage_maturity", "stage_name": "Pod Maturity & Harvest", "stage_name_en": "Pod Maturity & Harvest", "das_range": "DAS 91-115", "crit_tmax": 40.0}
+        ]
+    }
 }
+
+def _parse_das_range(value: str):
+    """Parse a 'DAS 0-10' style range into (min, max)."""
+    nums = [int(n) for n in re.findall(r"\d+", str(value))]
+    if len(nums) >= 2:
+        return nums[0], nums[1]
+    if len(nums) == 1:
+        return 0, nums[0]
+    return 0, 9999
+
 
 # ACGIH TLV & ISO 7243:2017 screening action limits (°C WBGT)
 WORKLOAD_THRESHOLDS_ACCLIMATISED = {"light": 31.0, "moderate": 28.0, "heavy": 26.0, "very_heavy": 25.0}
@@ -106,12 +209,20 @@ class CropHeatEngine:
 
         stage = None
         if growth_stage:
-            stage = next((s for s in spec["stages"] if s["stage_code"] == growth_stage), None)
-        if stage is None and days_after_sowing is not None:
+            target = str(growth_stage).strip().lower()
             stage = next(
-                (s for s in spec["stages"] if s["das_min"] <= days_after_sowing <= s["das_max"]),
+                (s for s in spec["stages"]
+                 if s["stage_code"].lower() == target
+                 or target in s["stage_code"].lower()
+                 or s["stage_code"].lower() in target),
                 None,
             )
+        if stage is None and days_after_sowing is not None:
+            for s in spec["stages"]:
+                lo, hi = _parse_das_range(s.get("das_range", ""))
+                if lo <= days_after_sowing <= hi:
+                    stage = s
+                    break
         if stage is None:
             # Default to the most thermally sensitive stage (flowering where present).
             stage = next((s for s in spec["stages"] if "flower" in s["stage_code"]), spec["stages"][0])

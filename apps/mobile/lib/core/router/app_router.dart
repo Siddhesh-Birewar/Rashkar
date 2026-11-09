@@ -45,6 +45,8 @@ final GlobalKey<NavigatorState> _shellNavigatorSchemes =
     GlobalKey<NavigatorState>(debugLabel: 'shellSchemes');
 final GlobalKey<NavigatorState> _shellNavigatorAgri =
     GlobalKey<NavigatorState>(debugLabel: 'shellAgri');
+final GlobalKey<NavigatorState> _shellNavigatorHeatRisk =
+    GlobalKey<NavigatorState>(debugLabel: 'shellHeatRisk');
 
 /// Creates and configures the CropNet AI GoRouter instance.
 GoRouter createCropNetRouter({
@@ -409,7 +411,7 @@ GoRouter createCropNetRouter({
             ],
           ),
 
-          // Branch 7: Consolidated Agri Intelligence (Crop Doctor + Heat Risk)
+          // Branch 7: Consolidated Agri Intelligence (Crop Doctor)
           StatefulShellBranch(
             navigatorKey: _shellNavigatorAgri,
             routes: [
@@ -417,6 +419,18 @@ GoRouter createCropNetRouter({
                 path: RoutePaths.agriIntelligence,
                 name: RouteNames.agriIntelligence,
                 builder: (context, state) => const AgriIntelligenceScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 8: Dedicated Heat Risk workspace
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorHeatRisk,
+            routes: [
+              GoRoute(
+                path: RoutePaths.heatRisk,
+                name: RouteNames.heatRisk,
+                builder: (context, state) => const AgriIntelligenceScreen(initialTab: 1),
               ),
             ],
           ),

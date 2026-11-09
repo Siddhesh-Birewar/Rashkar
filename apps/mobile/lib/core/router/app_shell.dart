@@ -31,6 +31,7 @@ class AppShell extends StatelessWidget {
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: _onDestinationSelected,
               labelType: NavigationRailLabelType.all,
+              scrollable: true,
               leading: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
                 child: Column(
@@ -49,6 +50,11 @@ class AppShell extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1B5E20),
                       ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'v10',
+                      style: TextStyle(fontSize: 8.5, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -105,7 +111,12 @@ class AppShell extends StatelessWidget {
                 NavigationRailDestination(
                   icon: Icon(Icons.eco_outlined),
                   selectedIcon: Icon(Icons.eco),
-                  label: Text('Agri AI'),
+                  label: Text('Crop Doctor'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.thermostat_outlined),
+                  selectedIcon: Icon(Icons.thermostat),
+                  label: Text('Heat Risk'),
                 ),
               ],
             ),
@@ -160,7 +171,12 @@ class AppShell extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Icons.eco_outlined),
             selectedIcon: Icon(Icons.eco),
-            label: 'Agri AI',
+            label: 'Crop Doctor',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.thermostat_outlined),
+            selectedIcon: Icon(Icons.thermostat),
+            label: 'Heat Risk',
           ),
         ],
       ),

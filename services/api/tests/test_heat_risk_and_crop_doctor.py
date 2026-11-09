@@ -6,7 +6,27 @@ def test_heat_risk_supported_crops(test_client):
     res = test_client.get("/api/v1/heat-risk/crops")
     assert res.status_code == 200
     crops = {c["crop_code"] for c in res.json()["crops"]}
-    assert {"soybean", "cotton", "jowar", "onion"} <= crops
+    assert {
+        "soybean", "cotton", "jowar", "onion", "sugarcane", "wheat",
+        "gram", "tur", "bajra", "maize", "groundnut",
+    } <= crops
+
+
+def test_stage_specific_thresholds(test_client):
+    wheat = test_client.post(
+        "/api/v1/heat-risk/crop",
+        json={"crop_code": "wheat", "forecast_tmax_c": 36.0, "forecast_tmin_c": 17.0, "days_after_sowing": 50},
+    )
+    assert wheat.status_code == 200, wheat.text
+    assert wheat.json()["growth_stage_code"] == "stage_flowering"
+    assert wheat.json()["critical_tmax_c"] == 32.0
+
+    groundnut = test_client.post(
+        "/api/v1/heat-risk/crop",
+        json={"crop_code": "groundnut", "forecast_tmax_c": 38.0, "forecast_tmin_c": 21.0, "growth_stage": "stage_flowering"},
+    )
+    assert groundnut.status_code == 200, groundnut.text
+    assert groundnut.json()["critical_tmax_c"] == 34.0
 
 
 def test_crop_heat_assessment(test_client):

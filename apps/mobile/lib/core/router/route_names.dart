@@ -37,4 +37,5 @@ abstract final class RouteNames {
 
   // Consolidated agri-intelligence hub
   static const String agriIntelligence = 'agriIntelligence';
+  static const String heatRisk = 'heatRisk';
 }

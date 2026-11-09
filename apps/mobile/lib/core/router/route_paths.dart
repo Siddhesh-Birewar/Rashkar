@@ -81,6 +81,9 @@ abstract final class RoutePaths {
   /// Consolidated agri-intelligence hub (Crop Doctor + Heat Risk): /agri-intelligence
   static const String agriIntelligence = '/agri-intelligence';
 
+  /// Dedicated Heat Risk workspace: /heat-risk
+  static const String heatRisk = '/heat-risk';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';

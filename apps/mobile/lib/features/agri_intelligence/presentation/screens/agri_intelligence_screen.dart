@@ -16,8 +16,9 @@ import '../../models/agri_models.dart';
 /// (crop heat-stress + worker heat-hazard), backed by the consolidated FastAPI APIs.
 class AgriIntelligenceScreen extends StatefulWidget {
   final AgriIntelligenceRepository? repository;
+  final int initialTab;
 
-  const AgriIntelligenceScreen({super.key, this.repository});
+  const AgriIntelligenceScreen({super.key, this.repository, this.initialTab = 0});
 
   @override
   State<AgriIntelligenceScreen> createState() => _AgriIntelligenceScreenState();
@@ -36,6 +37,20 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
 
   // Crop heat state
   String _cropCode = 'soybean';
+  String? _selectedCropStage;
+  static const Map<String, List<String>> _cropStages = {
+    'soybean': ['stage_germination', 'stage_vegetative', 'stage_flowering', 'stage_pod_development', 'stage_maturity'],
+    'cotton': ['stage_germination', 'stage_vegetative', 'stage_flowering', 'stage_boll_formation', 'stage_maturity'],
+    'jowar': ['stage_germination', 'stage_vegetative', 'stage_flowering', 'stage_grain_filling', 'stage_maturity'],
+    'onion': ['stage_vegetative', 'stage_bulb_initiation', 'stage_bulb_development', 'stage_maturity'],
+    'sugarcane': ['stage_germination', 'stage_grand_growth', 'stage_maturity'],
+    'wheat': ['stage_vegetative', 'stage_flowering', 'stage_grain_filling', 'stage_maturity'],
+    'gram': ['stage_vegetative', 'stage_flowering', 'stage_pod_development', 'stage_maturity'],
+    'tur': ['stage_vegetative', 'stage_flowering', 'stage_pod_development', 'stage_maturity'],
+    'bajra': ['stage_germination', 'stage_vegetative', 'stage_flowering', 'stage_grain_filling', 'stage_maturity'],
+    'maize': ['stage_germination', 'stage_vegetative', 'stage_flowering', 'stage_grain_filling', 'stage_maturity'],
+    'groundnut': ['stage_germination', 'stage_flowering', 'stage_pod_development', 'stage_maturity'],
+  };
   final _tmaxCtrl = TextEditingController(text: '38');
   final _tminCtrl = TextEditingController(text: '23');
   bool _cropHeatLoading = false;
@@ -63,7 +78,7 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
   void initState() {
     super.initState();
     _repo = widget.repository ?? AgriIntelligenceRepository.instance;
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     _loadFarms();
   }
 
@@ -182,6 +197,7 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
         cropCode: _cropCode,
         tmaxC: double.tryParse(_tmaxCtrl.text) ?? 38,
         tminC: double.tryParse(_tminCtrl.text) ?? 23,
+        growthStage: _selectedCropStage,
       );
       if (!mounted) return;
       setState(() {
@@ -357,8 +373,30 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
               DropdownMenuItem(value: 'cotton', child: Text('Cotton')),
               DropdownMenuItem(value: 'jowar', child: Text('Sorghum (Jowar)')),
               DropdownMenuItem(value: 'onion', child: Text('Onion')),
+              DropdownMenuItem(value: 'sugarcane', child: Text('Sugarcane')),
+              DropdownMenuItem(value: 'wheat', child: Text('Wheat')),
+              DropdownMenuItem(value: 'gram', child: Text('Chickpea (Gram)')),
+              DropdownMenuItem(value: 'tur', child: Text('Pigeon Pea (Tur)')),
+              DropdownMenuItem(value: 'bajra', child: Text('Pearl Millet (Bajra)')),
+              DropdownMenuItem(value: 'maize', child: Text('Maize')),
+              DropdownMenuItem(value: 'groundnut', child: Text('Groundnut')),
             ],
-            onChanged: (v) => setState(() => _cropCode = v ?? 'soybean'),
+            onChanged: (v) => setState(() {
+              _cropCode = v ?? 'soybean';
+              _selectedCropStage = null;
+            }),
+          ),
+          AppSpacing.verticalSpaceSM,
+          DropdownButtonFormField<String>(
+            initialValue: _selectedCropStage,
+            decoration: const InputDecoration(
+              labelText: 'Growth stage (optional — auto-derived from DAS if omitted)',
+              border: OutlineInputBorder(),
+            ),
+            items: (_cropStages[_cropCode] ?? const [])
+                .map((s) => DropdownMenuItem<String>(value: s, child: Text(_stageLabel(s))))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedCropStage = v),
           ),
           AppSpacing.verticalSpaceSM,
           Row(
@@ -587,6 +625,12 @@ class _AgriIntelligenceScreenState extends State<AgriIntelligenceScreen>
         ],
       ),
     );
+  }
+
+  String _stageLabel(String code) {
+    final cleaned = code.replaceFirst('stage_', '').replaceAll('_', ' ');
+    if (cleaned.isEmpty) return code;
+    return '${cleaned[0].toUpperCase()}${cleaned.substring(1)}';
   }
 
   Widget _infoBanner(String text) {
