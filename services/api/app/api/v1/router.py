@@ -1,5 +1,8 @@
 from fastapi import APIRouter
-from cropnet.services.api.app.api.v1.endpoints import health, farms, soil, crops, agriculture, farm_health, schemes
+from cropnet.services.api.app.api.v1.endpoints import (
+    health, farms, soil, crops, agriculture, farm_health, schemes,
+    heat_risk, crop_doctor, income,
+)
 
 api_router = APIRouter()
 
@@ -10,3 +13,6 @@ api_router.include_router(soil.router, prefix="/soil", tags=["Soil Intelligence"
 api_router.include_router(crops.router, prefix="/crops", tags=["Crop Knowledge Base"])
 api_router.include_router(agriculture.router, prefix="/agriculture", tags=["Agricultural Reference"])
 api_router.include_router(schemes.router, prefix="/schemes", tags=["Government Schemes"])
+api_router.include_router(heat_risk.router, prefix="/heat-risk", tags=["Heat Risk"])
+api_router.include_router(crop_doctor.router, prefix="/crop-doctor", tags=["Crop Doctor"])
+api_router.include_router(income.router, prefix="/income", tags=["Income Diversification"])
