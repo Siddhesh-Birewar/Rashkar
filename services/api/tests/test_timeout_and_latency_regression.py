@@ -49,7 +49,11 @@ def test_evaluate_farm_latency_regression(client):
 
     # Execute request
     t0 = time.time()
-    response = client.post("/api/v1/agriculture/evaluate-farm", json=payload)
+    response = client.post(
+        "/api/v1/agriculture/evaluate-farm",
+        json=payload,
+        headers={"X-Dev-User-Id": "00000000-0000-0000-0000-000000000001"}
+    )
     elapsed = time.time() - t0
 
     assert response.status_code == 200

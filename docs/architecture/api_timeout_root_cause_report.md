@@ -17,7 +17,7 @@ API Connection Error: minified: Tj: Request Timeout: CropNet server did not resp
 Simultaneously, the interface displayed unverified farm context (`Baramati, Pune: Vertisol black clay soil, pH 7.8, canal irrigation`) even when no farm had been selected or registered.
 
 An end-to-end investigation revealed two intertwined root causes:
-1. **Database WAN Latency Accumulation & Event-Loop Starvation**: During `POST /api/v1/agriculture/evaluate-farm`, the deterministic decision engine iterated over 10 candidate crops, making 8–10 sequential SQL queries per crop to remote Supabase PostgreSQL (`db.glnpmpagajfurpmlinvd.supabase.co:5432`) over public WAN. The resulting 90+ network round-trips caused request execution to take **48.695s to 55.79s**. Because routes were declared `async def` while running blocking synchronous operations, the FastAPI asyncio event loop was completely blocked for ~50s. At 30s, the Flutter Web client's `ApiClient` aborted the connection with a `RequestTimeoutException` (rendered as `minified: Tj` by `dart2js`).
+1. **Database WAN Latency Accumulation & Event-Loop Starvation**: During `POST /api/v1/agriculture/evaluate-farm`, the deterministic decision engine iterated over 10 candidate crops, making 8–10 sequential SQL queries per crop to remote Supabase PostgreSQL (`db.[PROJECT-REF].supabase.co:5432`) over public WAN. The resulting 90+ network round-trips caused request execution to take **48.695s to 55.79s**. Because routes were declared `async def` while running blocking synchronous operations, the FastAPI asyncio event loop was completely blocked for ~50s. At 30s, the Flutter Web client's `ApiClient` aborted the connection with a `RequestTimeoutException` (rendered as `minified: Tj` by `dart2js`).
 2. **Hardcoded State Defaults in Advisory Screen**: `advisory_screen.dart` initialized local state with dummy values (`Baramati`, `7.8`, `canal`) instead of adhering to honest empty state handling when no authenticated farm was chosen.
 
 **Resolution Summary**:
@@ -51,7 +51,7 @@ A latency benchmark script (`scratch/benchmark_eval.py`) traced the execution li
 - For each crop, `KnowledgeRetriever` executed:
   - `get_crop_profile(crop_id)` $\rightarrow$ SQL query to `crop_agronomic_profiles`.
   - `get_citations(crop_id, ...)` $\rightarrow$ Multiple SQL queries to `crop_citations` and `knowledge_sources`.
-- Over WAN to Supabase (`db.glnpmpagajfurpmlinvd.supabase.co:5432`), each sequential query incurred a 300ms–500ms round trip.
+- Over WAN to Supabase (`db.[PROJECT-REF].supabase.co:5432`), each sequential query incurred a 300ms–500ms round trip.
 - Total sequential database queries: **90+ queries**.
 - Measured total duration without caching: **48.695s** to **55.79s**.
 - Because the Flutter web client enforces a 30-second ceiling, the request reliably timed out after 30.00 seconds.

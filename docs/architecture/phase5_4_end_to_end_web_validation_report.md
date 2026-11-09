@@ -163,7 +163,7 @@ During live end-to-end testing, a defect was identified in farm deletion:
 
 | Component | Target Architecture | Current State | Release Readiness |
 |---|---|---|---|
-| **Relational Database** | PostgreSQL 17 + PostGIS 3.5 | Live on Supabase (`db.glnpmpagajfurpmlinvd.supabase.co:5432`) | **READY** |
+| **Relational Database** | PostgreSQL 17 + PostGIS 3.5 | Live on Supabase (`db.[PROJECT-REF].supabase.co:5432`) | **READY** |
 | **Authentication Service** | Supabase GoTrue Auth | Live on Supabase; Admin API functional; Public email rate limited | **READY WITH LIMITATIONS** (Requires custom SMTP) |
 | **Backend API** | FastAPI / Uvicorn | Ready with strict CORS and security middlewares | **READY** |
 | **LLM Inference Service** | Private Hosted vLLM / Cloud Run / Kubernetes | **Running on developer localhost (`http://localhost:11434`)** | **BLOCKER** |

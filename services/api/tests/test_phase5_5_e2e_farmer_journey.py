@@ -126,7 +126,7 @@ def test_complete_farmer_journey_e2e():
             "target_season": "kharif",
             "language": "en"
         }
-        res_eval = client.post("/api/v1/agriculture/evaluate-farm", json=eval_payload)
+        res_eval = client.post("/api/v1/agriculture/evaluate-farm", json=eval_payload, headers=AUTH_HEADERS_USER1)
         assert res_eval.status_code == 200
         eval_data = res_eval.json()
         decision_id = eval_data["decision_id"]
@@ -148,7 +148,7 @@ def test_complete_farmer_journey_e2e():
         }
         with patch("cropnet.services.api.app.services.llm.ollama_client.OllamaClient.chat_completion", return_value=mock_ollama_resp):
             exp_payload_en = {"decision_id": decision_id, "language": "en"}
-            res_exp_en = client.post("/api/v1/agriculture/explain-decision", json=exp_payload_en)
+            res_exp_en = client.post("/api/v1/agriculture/explain-decision", json=exp_payload_en, headers=AUTH_HEADERS_USER1)
             assert res_exp_en.status_code == 200
             exp_en = res_exp_en.json()
             assert exp_en["decision_id"] == decision_id
@@ -159,7 +159,7 @@ def test_complete_farmer_journey_e2e():
             # STEP 8: Bilingual Dialogue in Marathi (Devanagari)
             # -------------------------------------------------------------
             exp_payload_mr = {"decision_id": decision_id, "language": "mr"}
-            res_exp_mr = client.post("/api/v1/agriculture/explain-decision", json=exp_payload_mr)
+            res_exp_mr = client.post("/api/v1/agriculture/explain-decision", json=exp_payload_mr, headers=AUTH_HEADERS_USER1)
             assert res_exp_mr.status_code == 200
             exp_mr = res_exp_mr.json()
             assert exp_mr["language"] == "mr"
@@ -176,7 +176,7 @@ def test_complete_farmer_journey_e2e():
                     "decision_id": decision_id,
                     "answers": {param_key: "clay"}
                 }
-                res_fu = client.post("/api/v1/agriculture/follow-up", json=fu_payload)
+                res_fu = client.post("/api/v1/agriculture/follow-up", json=fu_payload, headers=AUTH_HEADERS_USER1)
                 assert res_fu.status_code == 200
                 fu_data = res_fu.json()
                 assert fu_data["decision_id"] is not None
@@ -189,7 +189,7 @@ def test_complete_farmer_journey_e2e():
                 "message": "Is sugarcane recommended given my canal irrigation?",
                 "language": "en"
             }
-            res_conv = client.post("/api/v1/agriculture/conversation", json=conv_payload)
+            res_conv = client.post("/api/v1/agriculture/conversation", json=conv_payload, headers=AUTH_HEADERS_USER1)
             assert res_conv.status_code == 200
             conv_data = res_conv.json()
             assert "explanation_text" in conv_data
@@ -249,11 +249,11 @@ def test_ollama_offline_resilient_fallback():
         irrigation_source="canal",
         target_season="kharif"
     )
-    eval_resp = engine.evaluate_farm(ctx)
+    eval_resp = engine.evaluate_farm(ctx, user_id=TEST_USER_ID)
 
     with patch("cropnet.services.api.app.services.llm.ollama_client.OllamaClient.chat_completion", side_effect=Exception("Ollama service down")):
         exp_payload = {"decision_id": eval_resp.decision_id, "language": "en"}
-        res = client.post("/api/v1/agriculture/explain-decision", json=exp_payload)
+        res = client.post("/api/v1/agriculture/explain-decision", json=exp_payload, headers=AUTH_HEADERS_USER1)
         assert res.status_code == 200
         data = res.json()
         assert data["generation_source"] == "deterministic_fallback"

@@ -291,7 +291,8 @@ def test_api_endpoints_lifecycle():
         "target_season": "rabi",
         "language": "en"
     }
-    resp1 = client.post("/api/v1/agriculture/evaluate-farm", json=eval_payload)
+    auth_headers = {"X-Dev-User-Id": "00000000-0000-0000-0000-000000000001"}
+    resp1 = client.post("/api/v1/agriculture/evaluate-farm", json=eval_payload, headers=auth_headers)
     assert resp1.status_code == 200
     data1 = resp1.json()
     dec_id = data1["decision_id"]
@@ -302,7 +303,7 @@ def test_api_endpoints_lifecycle():
     assert "governance_notice" in data1
 
     # 2. GET /api/v1/agriculture/decision/{decision_id}
-    resp2 = client.get(f"/api/v1/agriculture/decision/{dec_id}")
+    resp2 = client.get(f"/api/v1/agriculture/decision/{dec_id}", headers=auth_headers)
     assert resp2.status_code == 200
     assert resp2.json()["decision_id"] == dec_id
 
@@ -314,7 +315,7 @@ def test_api_endpoints_lifecycle():
             "drainage": "Well-drained (water clears within 24h)"
         }
     }
-    resp3 = client.post("/api/v1/agriculture/follow-up", json=followup_payload)
+    resp3 = client.post("/api/v1/agriculture/follow-up", json=followup_payload, headers=auth_headers)
     assert resp3.status_code == 200
     data3 = resp3.json()
     assert data3["decision_id"] != dec_id # New updated evaluation ID

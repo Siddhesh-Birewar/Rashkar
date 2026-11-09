@@ -17,8 +17,12 @@ from cropnet.services.api.app.models.soil_and_farm import Base
 import cropnet.services.api.app.models.crops
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.core import database
+from cropnet.services.api.app.core.config import settings
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.main import app
+
+# Enable opt-in dev auth bypass for isolated unit tests
+settings.ALLOW_DEV_AUTH_BYPASS = True
 
 
 # 1. Global in-memory test engine for isolated test suites
@@ -74,12 +78,17 @@ def isolated_test_session():
 
     app.dependency_overrides[get_db] = _override_get_db
 
+    orig_bypass = settings.ALLOW_DEV_AUTH_BYPASS
+    orig_env = settings.ENVIRONMENT
+
     yield session
 
     session.close()
     transaction.rollback()
     connection.close()
     app.dependency_overrides.clear()
+    settings.ALLOW_DEV_AUTH_BYPASS = orig_bypass
+    settings.ENVIRONMENT = orig_env
 
 
 @pytest.fixture
