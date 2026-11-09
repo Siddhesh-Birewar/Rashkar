@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point, shape
 
 from cropnet.services.api.app.schemas.farm import FarmCreate, FarmUpdate, FarmResponse
 from cropnet.services.api.app.schemas.soil import (
@@ -42,6 +42,23 @@ spatial_soil_service = SpatialSoilService()
 
 # Memory cache for fast lookups & test resilience
 _FARM_STORAGE: dict[uuid.UUID, dict] = {}
+
+
+def compute_farm_representative_point(geometry_dict: dict) -> tuple[float, float]:
+    """
+    Computes a geometrically valid representative point (latitude, longitude) for a farm boundary.
+    Supports GeoJSON Polygon (with or without interior holes) and MultiPolygon.
+    Uses Shapely centroid with representative_point() fallback to guarantee that the point
+    falls strictly inside the polygon interior even for concave shapes, horseshoes, or polygons with holes.
+    Never alters registered farm geometry or geodesic area.
+    """
+    geom = shape(geometry_dict)
+    centroid = geom.centroid
+    if not geom.contains(centroid):
+        point = geom.representative_point()
+    else:
+        point = centroid
+    return round(point.y, 6), round(point.x, 6)
 
 
 def _build_farm_response_dict(
@@ -101,10 +118,10 @@ async def create_farm(
     now = datetime.utcnow()
 
     # Calculate geodesic area and centroid
-    coords = payload.geometry.coordinates[0]
-    poly = Polygon(coords)
+    geom_dict = payload.geometry.model_dump()
+    poly = shape(geom_dict)
     area_dict = calculate_polygon_area(poly)
-    centroid = poly.centroid
+    c_lat, c_lon = compute_farm_representative_point(geom_dict)
 
     farm_dict = _build_farm_response_dict(
         farm_id=farm_id,
@@ -116,11 +133,11 @@ async def create_farm(
         state=payload.state,
         irrigation_type=payload.irrigation_type,
         water_source=payload.water_source,
-        geometry_dict=payload.geometry.model_dump(),
+        geometry_dict=geom_dict,
         area_hectares=area_dict["hectares"],
         area_acres=area_dict["acres"],
-        centroid_lat=round(centroid.y, 6),
-        centroid_lon=round(centroid.x, 6),
+        centroid_lat=c_lat,
+        centroid_lon=c_lon,
         created_at=now,
         updated_at=now
     )
@@ -140,8 +157,8 @@ async def create_farm(
             geometry_geojson=payload.geometry.model_dump(),
             calculated_area_hectares=area_dict["hectares"],
             calculated_area_acres=area_dict["acres"],
-            centroid_latitude=round(centroid.y, 6),
-            centroid_longitude=round(centroid.x, 6),
+            centroid_latitude=c_lat,
+            centroid_longitude=c_lon,
             created_at=now,
             updated_at=now
         )
@@ -310,15 +327,12 @@ async def update_farm(
     
     # Check if geometry updated
     if payload.geometry:
-        coords = payload.geometry.coordinates[0]
-        poly = Polygon(coords)
-        area_dict = calculate_polygon_area(poly)
-        centroid = poly.centroid
         geom_dict = payload.geometry.model_dump()
+        poly = shape(geom_dict)
+        area_dict = calculate_polygon_area(poly)
+        c_lat, c_lon = compute_farm_representative_point(geom_dict)
         area_ha = area_dict["hectares"]
         area_ac = area_dict["acres"]
-        c_lat = round(centroid.y, 6)
-        c_lon = round(centroid.x, 6)
     else:
         geom_dict = db_farm.geometry_geojson if db_farm else existing_farm["geometry"]
         area_ha = db_farm.calculated_area_hectares if db_farm else existing_farm["calculated_area_hectares"]
@@ -442,9 +456,13 @@ def _get_farm_and_verify_owner(farm_id: uuid.UUID, current_user: CurrentUser, db
                     "taluka": db_farm.taluka,
                     "district": db_farm.district,
                     "state": db_farm.state,
+                    "irrigation_type": db_farm.irrigation_type,
+                    "water_source": db_farm.water_source,
                     "geometry": db_farm.geometry_geojson,
                     "calculated_area_hectares": db_farm.calculated_area_hectares,
                     "calculated_area_acres": db_farm.calculated_area_acres,
+                    "centroid_latitude": db_farm.centroid_latitude,
+                    "centroid_longitude": db_farm.centroid_longitude,
                 }
         except Exception:
             pass
@@ -723,8 +741,12 @@ def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[U
                 "taluka": db_farm.taluka,
                 "district": db_farm.district,
                 "state": db_farm.state,
+                "irrigation_type": db_farm.irrigation_type,
+                "water_source": db_farm.water_source,
                 "calculated_area_hectares": db_farm.calculated_area_hectares,
                 "calculated_area_acres": db_farm.calculated_area_acres,
+                "centroid_latitude": db_farm.centroid_latitude,
+                "centroid_longitude": db_farm.centroid_longitude,
                 "id": db_farm.id,
                 "name": db_farm.name
             }
@@ -735,15 +757,17 @@ def synchronize_farm_soil_profile(db: Session, farm_id: uuid.UUID) -> Optional[U
 
     # Get latest profile or generate one if not yet extracted
     profile = spatial_soil_service.get_latest_profile(db, str(farm_id))
-    if not profile and farm.get("geometry", {}).get("coordinates"):
-        coords = farm["geometry"]["coordinates"][0]
-        poly = Polygon(coords)
-        profile = spatial_soil_service.generate_farm_soil_profile(
-            farm_id=str(farm_id),
-            polygon=poly,
-            taluka=farm.get("taluka"),
-            farm_area_hectares=farm.get("calculated_area_hectares")
-        )
+    if not profile and farm.get("geometry"):
+        try:
+            poly = shape(farm["geometry"])
+            profile = spatial_soil_service.generate_farm_soil_profile(
+                farm_id=str(farm_id),
+                polygon=poly,
+                taluka=farm.get("taluka"),
+                farm_area_hectares=farm.get("calculated_area_hectares")
+            )
+        except Exception as e:
+            logger.warning("Failed to generate soil profile for farm %s: %s", farm_id, e)
 
     fused = _fuse_confirmed_laboratory_measurements(profile, farm_id, farm, db)
     if fused:
@@ -808,18 +832,38 @@ async def evaluate_farm_advisory(
     """
     farm = _get_farm_and_verify_owner(farm_id, current_user, db)
 
-    coords = farm.get("geometry", {}).get("coordinates", [[]])[0]
-    centroid_lat = sum(c[1] for c in coords) / len(coords) if coords else None
-    centroid_lon = sum(c[0] for c in coords) / len(coords) if coords else None
+    c_lat = farm.get("centroid_latitude")
+    c_lon = farm.get("centroid_longitude")
+    if c_lat is None or c_lon is None:
+        geom = farm.get("geometry")
+        if geom:
+            try:
+                c_lat, c_lon = compute_farm_representative_point(geom)
+            except Exception as e:
+                logger.warning("Failed to derive representative point for farm %s: %s", farm_id, e)
+                c_lat, c_lon = None, None
+
+    # Evidence-grounded irrigation availability check
+    # Available (True), Unavailable (False), or Unknown (None)
+    itype = (farm.get("irrigation_type") or "").strip().lower()
+    wsource = (farm.get("water_source") or "").strip().lower()
+
+    if itype in ("irrigated", "mixed") or wsource in ("canal", "borewell", "well", "drip", "sprinkler"):
+        irrigation_available: Optional[bool] = True
+    elif itype == "rainfed" or wsource == "rainfall":
+        irrigation_available = False
+    else:
+        # Preserve uncertainty when missing or unknown
+        irrigation_available = None
 
     ctx_dict = {
         "farm_id": str(farm_id),
         "taluka": farm.get("taluka"),
         "district": farm.get("district", "Pune"),
-        "latitude": centroid_lat,
-        "longitude": centroid_lon,
-        "irrigation_available": farm.get("irrigation_type") != "rainfed",
-        "irrigation_source": farm.get("water_source"),
+        "latitude": c_lat,
+        "longitude": c_lon,
+        "irrigation_available": irrigation_available,
+        "irrigation_source": farm.get("water_source") if farm.get("water_source") and farm.get("water_source") != "unknown" else None,
     }
 
     if payload:
