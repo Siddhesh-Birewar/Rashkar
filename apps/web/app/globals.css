@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #1b5e20;
+  --brand-leaf: #2e7d32;
+  --accent: #e65100;
+  --surface: #f9fbf9;
+  --border: #e0e0e0;
+}
+
+body {
+  background-color: var(--surface);
+  color: #0f172a;
+}
