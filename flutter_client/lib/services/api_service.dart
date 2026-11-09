@@ -407,8 +407,16 @@ class ApiService {
 
     return CropHeatAssessment(
       cropCode: cropCode ?? 'soybean',
-      growthStageCode: stageCode ?? 'Flowering',
-      criticalTmaxThresholdC: 36.0,
+      growthStageCode: stageCode ?? 'stage_flowering',
+      growthStageNameEn: 'Flowering & Anthesis',
+      supportedStages: const [
+        {'stage_code': 'stage_germination', 'stage_name': 'Germination / Emergence', 'stage_name_en': 'Germination / Emergence', 'das_range': 'DAS 0-10', 'crit_tmax': 38.0},
+        {'stage_code': 'stage_vegetative', 'stage_name': 'Vegetative Branching', 'stage_name_en': 'Vegetative Branching', 'das_range': 'DAS 11-35', 'crit_tmax': 39.0},
+        {'stage_code': 'stage_flowering', 'stage_name': 'Flowering & Anthesis', 'stage_name_en': 'Flowering & Anthesis', 'das_range': 'DAS 36-55', 'crit_tmax': 35.0},
+        {'stage_code': 'stage_pod_development', 'stage_name': 'Pod Formation & Seed Filling', 'stage_name_en': 'Pod Formation & Seed Filling', 'das_range': 'DAS 56-85', 'crit_tmax': 36.5},
+        {'stage_code': 'stage_maturity', 'stage_name': 'Maturity / Harvest', 'stage_name_en': 'Maturity / Harvest', 'das_range': 'DAS 86-105', 'crit_tmax': 42.0},
+      ],
+      criticalTmaxThresholdC: 35.0,
       tmaxForecastC: forecastTmax ?? 36.5,
       overallCropHeatRisk: 'moderate',
       evidenceCitation: 'ICAR / MPKV Package of Practices',

@@ -58,3 +58,13 @@ def test_crop_heat_assessment_endpoint(client):
     assert "ICAR-Central Institute for Cotton Research" in data["evidence_citation"]
     assert len(data["recommended_interventions"]) > 0
     assert data["audit_logged"] is True
+
+    # Supported stages assertions (must have non-null, non-empty stage_name_en and stage_code)
+    assert "supported_stages" in data
+    assert len(data["supported_stages"]) > 0
+    for stage in data["supported_stages"]:
+        assert stage.get("stage_code") is not None
+        assert stage.get("stage_name_en") is not None
+        assert len(stage["stage_name_en"].strip()) > 0
+        assert "null" not in stage["stage_name_en"].lower()
+        assert stage.get("crit_tmax") is not None

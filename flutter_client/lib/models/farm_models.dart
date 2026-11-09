@@ -745,7 +745,23 @@ class CropHeatAssessment {
       growthStageCode: json['growth_stage_code'] ?? json['stage_code'],
       growthStageNameEn: json['growth_stage_name_en'] ?? '',
       growthStageNameMr: json['growth_stage_name_mr'] ?? '',
-      supportedStages: List<Map<String, dynamic>>.from(rawStages),
+      supportedStages: rawStages.map((s) {
+        if (s is Map) {
+          final m = Map<String, dynamic>.from(s);
+          final rawName = m['stage_name_en'] ?? m['stage_name'] ?? m['name'];
+          final name = (rawName != null && rawName.toString().trim().isNotEmpty && rawName.toString().trim() != 'null')
+              ? rawName.toString().trim()
+              : (m['stage_code']?.toString().replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() ?? 'Stage');
+          return <String, dynamic>{
+            'stage_code': m['stage_code']?.toString() ?? '',
+            'stage_name': name,
+            'stage_name_en': name,
+            'das_range': m['das_range']?.toString() ?? '',
+            'crit_tmax': (m['crit_tmax'] as num?)?.toDouble() ?? 36.0,
+          };
+        }
+        return <String, dynamic>{};
+      }).where((m) => m.isNotEmpty).toList(),
       farmerConfirmedStage: json['farmer_confirmed_stage'],
       baseTempC: (json['base_temp_c'] as num?)?.toDouble() ?? 10.0,
       optimalTempMinC: (json['optimal_temp_min_c'] as num?)?.toDouble() ?? 24.0,

@@ -792,8 +792,14 @@ class _HeatSafetyScreenState extends State<HeatSafetyScreen> with SingleTickerPr
                     runSpacing: 8,
                     children: c.supportedStages.map((s) {
                       final isSelected = (_selectedCropStage ?? c.growthStageCode) == s['stage_code'];
+                      final rawName = s['stage_name_en'] ?? s['stage_name'] ?? s['name'];
+                      final stageName = (rawName != null && rawName.toString().trim().isNotEmpty && rawName.toString().trim() != 'null')
+                          ? rawName.toString().trim()
+                          : (s['stage_code']?.toString().replaceAll('stage_', '').replaceAll('_', ' ').toUpperCase() ?? 'Stage');
+                      final critTmax = s['crit_tmax'];
+                      final limitLabel = critTmax != null ? ' ($critTmax°C limit)' : '';
                       return ChoiceChip(
-                        label: Text('${s['stage_name_en']} (${s['crit_tmax']}°C limit)'),
+                        label: Text('$stageName$limitLabel'),
                         selected: isSelected,
                         selectedColor: const Color(0xFFE8F5E9),
                         labelStyle: TextStyle(

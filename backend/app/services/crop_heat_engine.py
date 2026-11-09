@@ -33,11 +33,11 @@ CROP_SPECIES_PHYSIOLOGY = {
         "optimal_max": 30.0,
         "night_crit_c": 22.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Germination / Emergence", "das_range": "DAS 0-10", "crit_tmax": 38.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "das_range": "DAS 11-35", "crit_tmax": 39.0},
-            {"stage_code": "stage_flowering", "stage_name": "Flowering & Anthesis", "das_range": "DAS 36-55", "crit_tmax": 35.0},
-            {"stage_code": "stage_pod_development", "stage_name": "Pod Formation & Seed Filling", "das_range": "DAS 56-85", "crit_tmax": 36.5},
-            {"stage_code": "stage_maturity", "stage_name": "Maturity / Harvest", "das_range": "DAS 86-105", "crit_tmax": 42.0}
+            {"stage_code": "stage_germination", "stage_name": "Germination / Emergence", "stage_name_en": "Germination / Emergence", "das_range": "DAS 0-10", "crit_tmax": 38.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative Branching", "stage_name_en": "Vegetative Branching", "das_range": "DAS 11-35", "crit_tmax": 39.0},
+            {"stage_code": "stage_flowering", "stage_name": "Flowering & Anthesis", "stage_name_en": "Flowering & Anthesis", "das_range": "DAS 36-55", "crit_tmax": 35.0},
+            {"stage_code": "stage_pod_development", "stage_name": "Pod Formation & Seed Filling", "stage_name_en": "Pod Formation & Seed Filling", "das_range": "DAS 56-85", "crit_tmax": 36.5},
+            {"stage_code": "stage_maturity", "stage_name": "Maturity / Harvest", "stage_name_en": "Maturity / Harvest", "das_range": "DAS 86-105", "crit_tmax": 42.0}
         ]
     },
     "cotton": {
@@ -46,11 +46,11 @@ CROP_SPECIES_PHYSIOLOGY = {
         "optimal_max": 32.0,
         "night_crit_c": 24.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "das_range": "DAS 0-20", "crit_tmax": 40.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Squaring & Vegetative", "das_range": "DAS 21-55", "crit_tmax": 39.0},
-            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering", "das_range": "DAS 56-90", "crit_tmax": 36.0},
-            {"stage_code": "stage_boll_formation", "stage_name": "Boll Formation & Opening", "das_range": "DAS 91-150", "crit_tmax": 38.0},
-            {"stage_code": "stage_maturity", "stage_name": "Bursting & Harvest", "das_range": "DAS 151-180", "crit_tmax": 42.0}
+            {"stage_code": "stage_germination", "stage_name": "Emergence & Seedling", "stage_name_en": "Emergence & Seedling", "das_range": "DAS 0-20", "crit_tmax": 40.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Squaring & Vegetative", "stage_name_en": "Squaring & Vegetative", "das_range": "DAS 21-55", "crit_tmax": 39.0},
+            {"stage_code": "stage_flowering", "stage_name": "Peak Flowering", "stage_name_en": "Peak Flowering", "das_range": "DAS 56-90", "crit_tmax": 36.0},
+            {"stage_code": "stage_boll_formation", "stage_name": "Boll Formation & Opening", "stage_name_en": "Boll Formation & Opening", "das_range": "DAS 91-150", "crit_tmax": 38.0},
+            {"stage_code": "stage_maturity", "stage_name": "Bursting & Harvest", "stage_name_en": "Bursting & Harvest", "das_range": "DAS 151-180", "crit_tmax": 42.0}
         ]
     },
     "jowar": {
@@ -59,11 +59,11 @@ CROP_SPECIES_PHYSIOLOGY = {
         "optimal_max": 33.0,
         "night_crit_c": 23.0,
         "stages": [
-            {"stage_code": "stage_germination", "stage_name": "Emergence", "das_range": "DAS 0-15", "crit_tmax": 40.0},
-            {"stage_code": "stage_vegetative", "stage_name": "Vegetative / General Growth", "das_range": "DAS 16-45", "crit_tmax": 41.0},
-            {"stage_code": "stage_flowering", "stage_name": "Boot & Flowering / Anthesis", "das_range": "DAS 46-65", "crit_tmax": 37.0},
-            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "das_range": "DAS 66-95", "crit_tmax": 38.5},
-            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "das_range": "DAS 96-115", "crit_tmax": 42.0}
+            {"stage_code": "stage_germination", "stage_name": "Emergence", "stage_name_en": "Emergence", "das_range": "DAS 0-15", "crit_tmax": 40.0},
+            {"stage_code": "stage_vegetative", "stage_name": "Vegetative / General Growth", "stage_name_en": "Vegetative / General Growth", "das_range": "DAS 16-45", "crit_tmax": 41.0},
+            {"stage_code": "stage_flowering", "stage_name": "Boot & Flowering / Anthesis", "stage_name_en": "Boot & Flowering / Anthesis", "das_range": "DAS 46-65", "crit_tmax": 37.0},
+            {"stage_code": "stage_grain_filling", "stage_name": "Grain Development / Dough", "stage_name_en": "Grain Development / Dough", "das_range": "DAS 66-95", "crit_tmax": 38.5},
+            {"stage_code": "stage_maturity", "stage_name": "Physiological Maturity", "stage_name_en": "Physiological Maturity", "das_range": "DAS 96-115", "crit_tmax": 42.0}
         ]
     },
     "onion": {
@@ -72,10 +72,10 @@ CROP_SPECIES_PHYSIOLOGY = {
         "optimal_max": 28.0,
         "night_crit_c": 20.0,
         "stages": [
-            {"stage_code": "stage_vegetative", "stage_name": "Foliage / Leaf Development", "das_range": "DAS 0-40", "crit_tmax": 35.0},
-            {"stage_code": "stage_bulb_initiation", "stage_name": "Bulb Initiation", "das_range": "DAS 41-70", "crit_tmax": 33.0},
-            {"stage_code": "stage_bulb_development", "stage_name": "Bulb Development & Enlargement", "das_range": "DAS 71-105", "crit_tmax": 34.0},
-            {"stage_code": "stage_maturity", "stage_name": "Neck Fall & Harvest", "das_range": "DAS 106-130", "crit_tmax": 38.0}
+            {"stage_code": "stage_vegetative", "stage_name": "Foliage / Leaf Development", "stage_name_en": "Foliage / Leaf Development", "das_range": "DAS 0-40", "crit_tmax": 35.0},
+            {"stage_code": "stage_bulb_initiation", "stage_name": "Bulb Initiation", "stage_name_en": "Bulb Initiation", "das_range": "DAS 41-70", "crit_tmax": 33.0},
+            {"stage_code": "stage_bulb_development", "stage_name": "Bulb Development & Enlargement", "stage_name_en": "Bulb Development & Enlargement", "das_range": "DAS 71-105", "crit_tmax": 34.0},
+            {"stage_code": "stage_maturity", "stage_name": "Neck Fall & Harvest", "stage_name_en": "Neck Fall & Harvest", "das_range": "DAS 106-130", "crit_tmax": 38.0}
         ]
     }
 }
@@ -538,6 +538,15 @@ class CropHeatEngine:
             "methodology": "Environmental Lapse Rate Topographic Downscaling (ICAR/WMO standard)"
         }
 
+        # Defensive normalization of supported stages to guarantee stage_name and stage_name_en
+        normalized_supported_stages = []
+        for s in (supported_stages or []):
+            st_dict = dict(s)
+            name = st_dict.get("stage_name_en") or st_dict.get("stage_name") or st_dict.get("stage_code", "Stage")
+            st_dict["stage_name"] = name
+            st_dict["stage_name_en"] = name
+            normalized_supported_stages.append(st_dict)
+
         return CropHeatAssessmentResponse(
             assessment_id=assessment_id,
             farm_id=farm.farm_id,
@@ -562,7 +571,7 @@ class CropHeatEngine:
             growth_stage_code=stage_code,
             growth_stage_name_en=stage_name_en,
             growth_stage_name_mr=stage_name_mr,
-            supported_stages=supported_stages,
+            supported_stages=normalized_supported_stages,
             farmer_confirmed_stage=confirmed_stage,
             
             base_temp_c=base_temp,

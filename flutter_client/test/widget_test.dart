@@ -8,6 +8,7 @@ import 'package:rashkar_farmer/screens/farm_registration_screen.dart';
 import 'package:rashkar_farmer/screens/extra_income_screen.dart';
 import 'package:rashkar_farmer/screens/crop_loss_screen.dart';
 import 'package:rashkar_farmer/screens/ask_rashkar_screen.dart';
+import 'package:rashkar_farmer/screens/heat_safety_screen.dart';
 
 void main() {
   setUp(() {
@@ -77,5 +78,24 @@ void main() {
     expect(find.text('Report Loss'), findsOneWidget);
     expect(find.text('My Claims'), findsOneWidget);
     expect(find.text('Report Crop Damage'), findsOneWidget);
+  });
+
+  testWidgets('Heat safety screen renders crop stage chips with valid non-null names', (WidgetTester tester) async {
+    await AppState.instance.loadDemoFarm();
+    await tester.pumpWidget(const MaterialApp(home: HeatSafetyScreen()));
+    await tester.pumpAndSettle();
+
+    // Switch to Crop Heat tab
+    final cropTabFinder = find.text('Crop Heat Risk');
+    expect(cropTabFinder, findsOneWidget);
+    await tester.tap(cropTabFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Crop Stage'), findsOneWidget);
+    // Ensure no chip or text contains 'null'
+    expect(find.textContaining('null ('), findsNothing);
+    // Ensure actual stage names are rendered in the ChoiceChips
+    expect(find.textContaining('Flowering & Anthesis (35'), findsOneWidget);
+    expect(find.textContaining('Germination / Emergence (38'), findsOneWidget);
   });
 }
