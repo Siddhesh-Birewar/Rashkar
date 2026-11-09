@@ -5,6 +5,7 @@ Coordinates input validation, knowledge retrieval, modular constraint evaluation
 decision aggregation, and clinical follow-up question selection.
 """
 import uuid
+import re
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -33,6 +34,41 @@ logger = logging.getLogger(__name__)
 # In-memory store for evaluated decisions (session history)
 _DECISION_STORE: Dict[str, FarmEvaluationResponse] = {}
 _CONTEXT_STORE: Dict[str, FarmContextInput] = {}
+
+DEVANAGARI_DIGIT_MAP = str.maketrans("०१२३४५६७८९", "0123456789")
+
+
+def extract_temperature_from_text(text: str) -> Optional[float]:
+    """
+    Extract numeric temperature in Celsius supporting English and Marathi numerals,
+    decimals, negative values, and various degree symbols / words.
+    Maps Devanagari numerals (०१२३४५६७८९) to ASCII (0123456789).
+    Guarantees 35°C ("३५ अंश", "35°c", "35 degree") is never interpreted as 37°C.
+    """
+    if not text:
+        return None
+    # Normalize Devanagari numerals to ASCII
+    norm = text.translate(DEVANAGARI_DIGIT_MAP).lower()
+
+    # Pattern for numbers followed by degree/celsius/centigrade/अंश
+    pattern = r"(-?\d+(?:\.\d+)?)\s*(?:°\s*c(?:elsius)?|celsius|centigrade|degrees?\s*(?:c(?:elsius)?)?|अंश(?:\s*सेल्सिअस)?|\s*°\s*|(?<=\d)\s*c\b)"
+    match = re.search(pattern, norm)
+    if match:
+        try:
+            return float(match.group(1))
+        except (ValueError, TypeError):
+            pass
+
+    # Pattern for temperature keyword preceding number (e.g. "temperature is 35", "तापमान ३५.५", "कमाल तापमान ३५")
+    pattern_prefix = r"(?:temp(?:erature)?|कमाल\s*तापमान|तापमान)\s*(?:is|of|around|जवळपास|:)?\s*(-?\d+(?:\.\d+)?)"
+    match_pref = re.search(pattern_prefix, norm)
+    if match_pref:
+        try:
+            return float(match_pref.group(1))
+        except (ValueError, TypeError):
+            pass
+
+    return None
 
 
 class DeterministicDecisionEngine:
@@ -102,15 +138,29 @@ class DeterministicDecisionEngine:
 
         # Reproductive temperature sensitivity for chickpea
         if ctx.reproductive_temp_max_c is None:
-            if "37°c" in q or "37 °c" in q or "37c" in q or "37 degree" in q or "३५ अंश" in q or "35°c" in q or "35 degree" in q:
-                updates["reproductive_temp_max_c"] = 37.0
-            elif "36°c" in q:
-                updates["reproductive_temp_max_c"] = 36.0
+            parsed_temp = extract_temperature_from_text(q)
+            if parsed_temp is not None:
+                updates["reproductive_temp_max_c"] = parsed_temp
             elif ("फुले" in q and ("गळ" in q or "गळत" in q)) or (("flower drop" in q or "flowers dropping" in q) and ("heat" in q or "temp" in q)):
                 updates["reproductive_temp_max_c"] = 36.0
 
         if ctx.reproductive_temp_mean_c is None:
-            if ("maximum is 20°c" in q and "minimum is 8°c" in q) or "14°c" in q or "(20 + 8) / 2" in q:
+            norm_q = q.translate(DEVANAGARI_DIGIT_MAP).lower()
+            mean_match = re.search(r"(?:mean|average|सरासरी)\s*(?:is|temp|तापमान)?\s*(-?\d+(?:\.\d+)?)", norm_q)
+            if mean_match:
+                try:
+                    updates["reproductive_temp_mean_c"] = float(mean_match.group(1))
+                except (ValueError, TypeError):
+                    pass
+            elif "maximum is" in norm_q and "minimum is" in norm_q:
+                max_m = re.search(r"maximum\s*(?:is)?\s*(-?\d+(?:\.\d+)?)", norm_q)
+                min_m = re.search(r"minimum\s*(?:is)?\s*(-?\d+(?:\.\d+)?)", norm_q)
+                if max_m and min_m:
+                    try:
+                        updates["reproductive_temp_mean_c"] = (float(max_m.group(1)) + float(min_m.group(1))) / 2.0
+                    except (ValueError, TypeError):
+                        pass
+            elif "14°c" in norm_q or "(20 + 8) / 2" in norm_q:
                 updates["reproductive_temp_mean_c"] = 14.0
 
         if updates:

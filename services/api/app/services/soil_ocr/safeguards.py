@@ -46,7 +46,7 @@ AGRONOMIC_BOUNDARIES = {
 
 VALID_SOIL_UNITS = {
     "ph", "ph units",
-    "ds/m", "ms/cm", "mmhos/cm", "us/cm", "µs/cm",
+    "ds/m", "ms/cm", "mmhos/cm", "us/cm", "µs/cm", "microsiemens/cm",
     "%", "g/kg",
     "kg/ha", "kg/acre",
     "ppm", "mg/kg", "mg/kg soil",
@@ -155,12 +155,22 @@ class ExtractionSafeguards:
         unit_str = m.original_unit.strip().lower()
 
         # 1. EC units: 1 dS/m == 1 mS/cm == 1 mmhos/cm; 1000 uS/cm == 1 dS/m
-        if unit_str in ("ds/m", "ms/cm", "mmhos/cm"):
-            m.normalized_value = m.original_value
-            m.normalized_unit = "dS/m"
-        elif unit_str in ("us/cm", "µs/cm"):
-            m.normalized_value = round(m.original_value / 1000.0, 4)
-            m.normalized_unit = "dS/m"
+        if m.parameter_key == "electrical_conductivity":
+            if unit_str in ("ds/m", "ms/cm", "mmhos/cm"):
+                m.normalized_value = m.original_value
+                m.normalized_unit = "dS/m"
+            elif unit_str in ("us/cm", "µs/cm", "microsiemens/cm"):
+                m.normalized_value = round(m.original_value / 1000.0, 4)
+                m.normalized_unit = "dS/m"
+            else:
+                # Explicit rejection of unsupported units for electrical conductivity
+                m.normalized_value = None
+                m.normalized_unit = m.original_unit
+                m.is_ambiguous = True
+                m.ocr_confidence = min(m.ocr_confidence, 0.40)
+                reason = f"Unsupported unit '{m.original_unit}' for electrical conductivity; must be dS/m, mS/cm, mmhos/cm, or µS/cm."
+                m.ambiguity_reason = f"{m.ambiguity_reason}; {reason}" if m.ambiguity_reason else reason
+                return
 
         # 2. Gravimetric dry soil ppm and mg/kg: 1 ppm == 1 mg/kg
         elif unit_str in ("ppm", "mg/kg", "mg/kg soil"):
@@ -227,16 +237,23 @@ class ExtractionSafeguards:
     def _check_agronomic_boundaries(cls, m: ExtractedSoilMeasurement):
         """
         Safeguard 7: Flags out-of-range readings as ambiguous with lower confidence.
+        Evaluates canonical normalized values against AGRONOMIC_BOUNDARIES (e.g. EC in dS/m).
+        Ensures a 500 µS/cm reading (0.5 dS/m) evaluates 0.5 dS/m and is NOT flagged as out-of-bounds > 30.0.
         """
         if m.original_value is None:
+            return
+
+        # If EC had an unsupported unit (normalized_value is None), it is already flagged as ambiguous
+        if m.parameter_key == "electrical_conductivity" and m.normalized_value is None:
             return
 
         bounds = AGRONOMIC_BOUNDARIES.get(m.parameter_key)
         if bounds:
             min_val, max_val = bounds
-            val = m.original_value
-            if val < min_val or val > max_val:
+            # Evaluate canonical normalized value (e.g. EC in dS/m) when normalized
+            val = m.normalized_value if m.normalized_value is not None else m.original_value
+            if val is not None and (val < min_val or val > max_val):
                 m.is_ambiguous = True
                 m.ocr_confidence = min(m.ocr_confidence, 0.60)
-                reason = f"Value {val} {m.original_unit or ''} is outside plausible agronomic bounds ({min_val}–{max_val})"
+                reason = f"Value {val} {m.normalized_unit or m.original_unit or ''} is outside plausible agronomic bounds ({min_val}–{max_val})"
                 m.ambiguity_reason = f"{m.ambiguity_reason}; {reason}" if m.ambiguity_reason else reason
