@@ -102,6 +102,11 @@ class AppShell extends StatelessWidget {
                   selectedIcon: Icon(Icons.account_balance),
                   label: Text('Schemes'),
                 ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.eco_outlined),
+                  selectedIcon: Icon(Icons.eco),
+                  label: Text('Agri AI'),
+                ),
               ],
             ),
             const VerticalDivider(thickness: 1, width: 1),
@@ -151,6 +156,11 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.account_balance_outlined),
             selectedIcon: Icon(Icons.account_balance),
             label: 'Schemes',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.eco_outlined),
+            selectedIcon: Icon(Icons.eco),
+            label: 'Agri AI',
           ),
         ],
       ),

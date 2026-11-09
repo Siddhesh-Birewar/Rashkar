@@ -34,4 +34,7 @@ abstract final class RouteNames {
   static const String schemesAdmin = 'schemesAdmin';
   static const String schemesAdminNew = 'schemesAdminNew';
   static const String schemesAdminEdit = 'schemesAdminEdit';
+
+  // Consolidated agri-intelligence hub
+  static const String agriIntelligence = 'agriIntelligence';
 }

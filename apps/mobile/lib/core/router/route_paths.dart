@@ -78,6 +78,9 @@ abstract final class RoutePaths {
   /// Government Schemes admin — edit: /schemes/admin/:schemeId/edit
   static const String schemesAdminEdit = '/schemes/admin/:schemeId/edit';
 
+  /// Consolidated agri-intelligence hub (Crop Doctor + Heat Risk): /agri-intelligence
+  static const String agriIntelligence = '/agri-intelligence';
+
   // --- Parameter Path Helper Methods ---
 
   static String farmDetailPath(String farmId) => '/farms/$farmId';

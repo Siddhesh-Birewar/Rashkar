@@ -73,4 +73,11 @@ class ApiConstants {
   static const String schemesSeed = '$apiV1Prefix/schemes/seed';
   static String schemeById(String schemeId) => '$apiV1Prefix/schemes/$schemeId';
   static String schemeStatus(String schemeId) => '$apiV1Prefix/schemes/$schemeId/status';
+
+  // --- Agri Intelligence (Crop Doctor / Heat Risk) ---
+  static const String cropDoctorPredict = '$apiV1Prefix/crop-doctor/predict';
+  static const String cropDoctorStatus = '$apiV1Prefix/crop-doctor/status';
+  static const String heatRiskCrop = '$apiV1Prefix/heat-risk/crop';
+  static const String heatRiskWorker = '$apiV1Prefix/heat-risk/worker';
+  static const String heatRiskCrops = '$apiV1Prefix/heat-risk/crops';
 }

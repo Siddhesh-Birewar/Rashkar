@@ -22,6 +22,7 @@ import 'package:cropnet_mobile/features/schemes/presentation/screens/schemes_lis
 import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_detail_screen.dart';
 import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_admin_screen.dart';
 import 'package:cropnet_mobile/features/schemes/presentation/screens/scheme_editor_screen.dart';
+import 'package:cropnet_mobile/features/agri_intelligence/presentation/screens/agri_intelligence_screen.dart';
 import 'package:cropnet_mobile/main.dart';
 
 // Navigator Keys for Root and Stateful Shell Branches
@@ -42,6 +43,8 @@ final GlobalKey<NavigatorState> _shellNavigatorHistory =
     GlobalKey<NavigatorState>(debugLabel: 'shellHistory');
 final GlobalKey<NavigatorState> _shellNavigatorSchemes =
     GlobalKey<NavigatorState>(debugLabel: 'shellSchemes');
+final GlobalKey<NavigatorState> _shellNavigatorAgri =
+    GlobalKey<NavigatorState>(debugLabel: 'shellAgri');
 
 /// Creates and configures the CropNet AI GoRouter instance.
 GoRouter createCropNetRouter({
@@ -402,6 +405,18 @@ GoRouter createCropNetRouter({
                     },
                   ),
                 ],
+              ),
+            ],
+          ),
+
+          // Branch 7: Consolidated Agri Intelligence (Crop Doctor + Heat Risk)
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorAgri,
+            routes: [
+              GoRoute(
+                path: RoutePaths.agriIntelligence,
+                name: RouteNames.agriIntelligence,
+                builder: (context, state) => const AgriIntelligenceScreen(),
               ),
             ],
           ),
