@@ -9,10 +9,19 @@ from cropnet.services.api.app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _resolve_is_admin(email: str, user_id: uuid.UUID) -> bool:
+    """Determine whether the authenticated user has Government Schemes admin rights."""
+    normalized_email = (email or "").strip().lower()
+    admin_emails = {e.strip().lower() for e in settings.ADMIN_EMAILS if e and e.strip()}
+    admin_ids = {u.strip().lower() for u in settings.ADMIN_USER_IDS if u and u.strip()}
+    return normalized_email in admin_emails or str(user_id).lower() in admin_ids
+
+
 class CurrentUser(BaseModel):
     user_id: uuid.UUID
     email: str
     is_authenticated: bool = True
+    is_admin: bool = False
 
 
 async def get_current_user(
@@ -41,10 +50,13 @@ async def get_current_user(
                     )
                     if resp.status_code == 200:
                         user_data = resp.json()
+                        user_id = uuid.UUID(user_data["id"])
+                        email = user_data.get("email", "")
                         return CurrentUser(
-                            user_id=uuid.UUID(user_data["id"]),
-                            email=user_data.get("email", ""),
-                            is_authenticated=True
+                            user_id=user_id,
+                            email=email,
+                            is_authenticated=True,
+                            is_admin=_resolve_is_admin(email, user_id)
                         )
                     else:
                         raise HTTPException(
@@ -70,10 +82,13 @@ async def get_current_user(
         if x_dev_user_id:
             try:
                 user_uuid = uuid.UUID(x_dev_user_id)
+                # Local development user is treated as admin so the admin UI can be
+                # exercised without a live Supabase project configuration.
                 return CurrentUser(
                     user_id=user_uuid,
                     email=settings.DEV_USER_EMAIL,
-                    is_authenticated=True
+                    is_authenticated=True,
+                    is_admin=True
                 )
             except ValueError:
                 raise HTTPException(
@@ -87,3 +102,15 @@ async def get_current_user(
         detail="Missing or invalid authentication credentials: Missing Authorization Bearer token",
         headers={"WWW-Authenticate": "Bearer"}
     )
+
+
+async def require_admin(
+    current_user: CurrentUser = Depends(get_current_user)
+) -> CurrentUser:
+    """Dependency gate restricting an endpoint to Government Schemes administrators."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges are required for this operation."
+        )
+    return current_user

@@ -167,6 +167,25 @@ class ApiClient {
     );
   }
 
+  /// Standard HTTP PATCH
+  Future<T> patch<T>(
+    String path, {
+    dynamic body,
+    Map<String, String>? headers,
+    Map<String, dynamic>? queryParameters,
+    Duration? timeout,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    final uri = _buildUri(path, queryParameters);
+    final requestHeaders = await _buildHeaders(headers);
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    return _send<T>(
+      () => _httpClient.patch(uri, headers: requestHeaders, body: encodedBody),
+      timeout: timeout ?? defaultTimeout,
+      fromJson: fromJson,
+    );
+  }
+
   /// Execute an HTTP request with error mapping and timeout handling.
   Future<T> _send<T>(
     Future<http.Response> Function() requestFn, {

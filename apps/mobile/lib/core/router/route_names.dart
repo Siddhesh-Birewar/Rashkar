@@ -27,4 +27,11 @@ abstract final class RouteNames {
   static const String farmWater = 'farmWater';
   static const String farmVegetation = 'farmVegetation';
   static const String farmHealthDashboard = 'farmHealthDashboard';
+
+  // Government Schemes names
+  static const String schemes = 'schemes';
+  static const String schemeDetail = 'schemeDetail';
+  static const String schemesAdmin = 'schemesAdmin';
+  static const String schemesAdminNew = 'schemesAdminNew';
+  static const String schemesAdminEdit = 'schemesAdminEdit';
 }

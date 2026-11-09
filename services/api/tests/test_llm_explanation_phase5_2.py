@@ -43,9 +43,10 @@ engine = DeterministicDecisionEngine()
 # Test Helpers & Fixtures
 # ---------------------------------------------------------------------------
 
-def _create_sample_decision(crop_id: str = "pomegranate", ph: float = 6.8, taluka: str = "Baramati"):
+def _create_sample_decision(crop_id: str = "pomegranate", ph: float = 6.8, taluka: str = "Baramati", user_id: str = "00000000-0000-0000-0000-000000000001"):
     """Create a sample evaluated decision via the deterministic engine."""
     ctx = FarmContextInput(
+        user_id=user_id,
         taluka=taluka,
         soil_ph=ph,
         soil_texture="light",
@@ -60,7 +61,7 @@ def _create_sample_decision(crop_id: str = "pomegranate", ph: float = 6.8, taluk
         target_crops=[crop_id],
         soil_data_provenance=SoilDataProvenance.LABORATORY_MEASURED
     )
-    return engine.evaluate_farm(ctx)
+    return engine.evaluate_farm(ctx, user_id=user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -247,14 +248,15 @@ def test_template_fallback_generator_mr():
 
 def test_api_explain_decision_fallback_on_llm_failure():
     """Verify clean fallback to deterministic template when LLM client raises exception."""
-    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati")
+    user_id = "00000000-0000-0000-0000-000000000001"
+    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati", user_id=user_id)
     req = {
         "decision_id": decision.decision_id,
         "language": "mr"
     }
     
     with patch.object(OllamaClient, "chat_completion", side_effect=RuntimeError("Connection refused to Ollama:11434")):
-        res = client.post("/api/v1/agriculture/explain-decision", json=req)
+        res = client.post("/api/v1/agriculture/explain-decision", json=req, headers={"X-Dev-User-Id": user_id})
         assert res.status_code == 200
         data = res.json()
         assert data["generation_source"] == "deterministic_fallback"
@@ -263,7 +265,8 @@ def test_api_explain_decision_fallback_on_llm_failure():
 
 def test_api_explain_decision_endpoint_mock_success():
     """Test POST /api/v1/agriculture/explain-decision with mocked compliant LLM response."""
-    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati")
+    user_id = "00000000-0000-0000-0000-000000000001"
+    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati", user_id=user_id)
     req = {
         "decision_id": decision.decision_id,
         "language": "en"
@@ -282,7 +285,7 @@ def test_api_explain_decision_endpoint_mock_success():
     }
     
     with patch.object(OllamaClient, "chat_completion", return_value=mock_llm_response):
-        res = client.post("/api/v1/agriculture/explain-decision", json=req)
+        res = client.post("/api/v1/agriculture/explain-decision", json=req, headers={"X-Dev-User-Id": user_id})
         assert res.status_code == 200
         data = res.json()
         assert data["decision_id"] == decision.decision_id
@@ -295,8 +298,10 @@ def test_api_explain_decision_endpoint_mock_success():
 
 def test_api_conversation_flow_and_diagnostic_re_evaluation():
     """Test POST /api/v1/agriculture/conversation with answer submission re-evaluating states."""
+    user_id = "00000000-0000-0000-0000-000000000001"
     # 1. Initial context with missing water table / drainage condition
     ctx = FarmContextInput(
+        user_id=user_id,
         taluka="Indapur",
         soil_ph=7.4,
         soil_texture="clay",
@@ -304,7 +309,7 @@ def test_api_conversation_flow_and_diagnostic_re_evaluation():
         target_crops=["chickpea"],
         soil_data_provenance=SoilDataProvenance.USER_REPORTED
     )
-    decision = engine.evaluate_farm(ctx)
+    decision = engine.evaluate_farm(ctx, user_id=user_id)
     outcome = decision.crop_outcomes[0]
     initial_state = outcome.decision_state
 
@@ -329,7 +334,7 @@ def test_api_conversation_flow_and_diagnostic_re_evaluation():
     }
     
     with patch.object(OllamaClient, "chat_completion", return_value=mock_llm_response):
-        res = client.post("/api/v1/agriculture/conversation", json=conv_req)
+        res = client.post("/api/v1/agriculture/conversation", json=conv_req, headers={"X-Dev-User-Id": user_id})
         assert res.status_code == 200
         data = res.json()
         assert data["decision_id"] is not None
@@ -346,7 +351,7 @@ def test_api_conversation_invalid_decision_id():
         "message": "Is pomegranate good here?",
         "language": "en"
     }
-    res = client.post("/api/v1/agriculture/conversation", json=conv_req)
+    res = client.post("/api/v1/agriculture/conversation", json=conv_req, headers={"X-Dev-User-Id": "00000000-0000-0000-0000-000000000001"})
     assert res.status_code == 404
     assert "not found" in res.json()["detail"].lower()
 
@@ -360,12 +365,13 @@ def test_live_ollama_qwen3_8b_integration():
     if not ollama.is_available() or not ollama.is_model_available():
         pytest.skip("Local Ollama daemon or qwen3:8b model is offline; skipping live call.")
     
-    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati")
+    user_id = "00000000-0000-0000-0000-000000000001"
+    decision = _create_sample_decision("pomegranate", ph=6.8, taluka="Baramati", user_id=user_id)
     req = {
         "decision_id": decision.decision_id,
         "language": "en"
     }
-    res = client.post("/api/v1/agriculture/explain-decision", json=req)
+    res = client.post("/api/v1/agriculture/explain-decision", json=req, headers={"X-Dev-User-Id": user_id})
     assert res.status_code == 200
     data = res.json()
     assert data["decision_id"] == decision.decision_id

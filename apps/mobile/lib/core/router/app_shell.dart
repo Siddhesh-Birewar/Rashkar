@@ -97,6 +97,11 @@ class AppShell extends StatelessWidget {
                   selectedIcon: Icon(Icons.history),
                   label: Text('History'),
                 ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.account_balance_outlined),
+                  selectedIcon: Icon(Icons.account_balance),
+                  label: Text('Schemes'),
+                ),
               ],
             ),
             const VerticalDivider(thickness: 1, width: 1),
@@ -141,6 +146,11 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'History',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_outlined),
+            selectedIcon: Icon(Icons.account_balance),
+            label: 'Schemes',
           ),
         ],
       ),

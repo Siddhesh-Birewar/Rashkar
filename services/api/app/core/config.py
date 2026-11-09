@@ -77,6 +77,30 @@ class Settings(BaseSettings):
     DEV_USER_ID: str = "00000000-0000-0000-0000-000000000001"
     DEV_USER_EMAIL: str = "dev@cropnet.local"
 
+    # Government Schemes admin authorization.
+    # Comma-separated (or JSON array) of Supabase user emails / IDs permitted to
+    # create, edit, verify, publish and deactivate schemes.
+    ADMIN_EMAILS: List[str] = []
+    ADMIN_USER_IDS: List[str] = []
+
+    @field_validator("ADMIN_EMAILS", "ADMIN_USER_IDS", mode="before")
+    @classmethod
+    def parse_admin_lists(cls, v: Any) -> List[str]:
+        """Parse admin email/user-id lists from JSON array or comma-delimited strings."""
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return [str(item).strip() for item in json.loads(v)]
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    logger.warning("Failed to parse admin list as JSON array: %s", exc)
+            return [item.strip() for item in v.split(",") if item.strip()]
+        elif isinstance(v, (list, tuple, set)):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return []
+
     # Database URLs (Strictly injected via environment variables; never hardcode credentials)
     # Credential Rotation: Set DATABASE_URL and SYNC_DATABASE_URL to new rotated credentials
     # in untracked environment files or container secret injection without source modification.
