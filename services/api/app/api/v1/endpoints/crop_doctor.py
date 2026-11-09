@@ -35,6 +35,11 @@ async def predict_crop_disease(file: UploadFile = File(...)):
         result = inference.get_prediction(content)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Crop Doctor could not process this image: {exc}",
+        )
 
     label = str(result["label"])
     is_healthy = "healthy" in label.lower()
