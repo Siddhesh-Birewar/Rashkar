@@ -10,6 +10,7 @@ import 'package:rashkar_farmer/screens/extra_income_screen.dart';
 import 'package:rashkar_farmer/screens/crop_loss_screen.dart';
 import 'package:rashkar_farmer/screens/ask_rashkar_screen.dart';
 import 'package:rashkar_farmer/screens/heat_safety_screen.dart';
+import 'package:rashkar_farmer/screens/my_crop_screen.dart';
 
 void main() {
   setUp(() {
@@ -114,5 +115,20 @@ void main() {
     expect(corrupted.supportedStages[1]['stage_name'], 'MATURITY');
     expect(corrupted.supportedStages[2]['stage_name'], 'Growth Stage');
     expect(corrupted.supportedStages.any((s) => s['stage_name'].toString().contains('null')), isFalse);
+  });
+
+  testWidgets('My Crop screen renders CropNet Soil Intelligence Card with provenance badge', (WidgetTester tester) async {
+    await AppState.instance.loadDemoFarm();
+    await tester.pumpWidget(const MaterialApp(home: MyCropScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Soil Intelligence (CropNet)'), findsOneWidget);
+    expect(find.textContaining('Location-Based Estimate'), findsOneWidget);
+    expect(find.text('Soil pH (Reaction)'), findsOneWidget);
+    expect(find.text('Organic Carbon'), findsOneWidget);
+    expect(find.text('Clay Fraction'), findsOneWidget);
+    expect(find.text('Cation Exchange Capacity'), findsOneWidget);
+    expect(find.textContaining('Available N-P-K: Physical Lab Test Required'), findsOneWidget);
+    expect(find.text('Scientific Provenance & Technical Details'), findsOneWidget);
   });
 }

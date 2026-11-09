@@ -1486,3 +1486,89 @@ class AssistantChatMessage {
     required this.timestamp,
   });
 }
+
+class SoilIndicatorItem {
+  final String key;
+  final String displayName;
+  final String valueDisplay;
+  final String unit;
+  final String status;
+  final bool isEstimated;
+  final String? scientificNote;
+
+  SoilIndicatorItem({
+    required this.key,
+    required this.displayName,
+    required this.valueDisplay,
+    required this.unit,
+    required this.status,
+    required this.isEstimated,
+    this.scientificNote,
+  });
+
+  factory SoilIndicatorItem.fromJson(Map<String, dynamic> json) {
+    return SoilIndicatorItem(
+      key: json['key'] ?? '',
+      displayName: json['display_name'] ?? '',
+      valueDisplay: json['value_display'] ?? '',
+      unit: json['unit'] ?? '',
+      status: json['status'] ?? 'normal',
+      isEstimated: json['is_estimated'] ?? true,
+      scientificNote: json['scientific_note'],
+    );
+  }
+}
+
+class CropNetSoilCardData {
+  final String farmId;
+  final String farmName;
+  final String locationDisplay;
+  final String textureSummary;
+  final String reactionSummary;
+  final String provenanceBadge;
+  final bool isLabMeasured;
+  final String lastUpdatedDisplay;
+  final String depthInterval;
+  final String disclaimer;
+  final String unmeasuredNutrientsNotice;
+  final List<SoilIndicatorItem> indicators;
+  final Map<String, dynamic> technicalDetails;
+
+  CropNetSoilCardData({
+    required this.farmId,
+    required this.farmName,
+    required this.locationDisplay,
+    required this.textureSummary,
+    required this.reactionSummary,
+    required this.provenanceBadge,
+    required this.isLabMeasured,
+    required this.lastUpdatedDisplay,
+    required this.depthInterval,
+    required this.disclaimer,
+    required this.unmeasuredNutrientsNotice,
+    required this.indicators,
+    required this.technicalDetails,
+  });
+
+  factory CropNetSoilCardData.fromJson(Map<String, dynamic> json) {
+    return CropNetSoilCardData(
+      farmId: json['farm_id'] ?? '',
+      farmName: json['farm_name'] ?? 'Demo Farm',
+      locationDisplay: json['location_display'] ?? 'Maharashtra, India',
+      textureSummary: json['texture_summary'] ?? 'Medium Black Vertisol (Clay)',
+      reactionSummary: json['reaction_summary'] ?? 'Moderately Alkaline (pH 7.8)',
+      provenanceBadge: json['provenance_badge'] ?? 'Location-Based Estimate (SoilGrids 250m)',
+      isLabMeasured: json['is_lab_measured'] ?? false,
+      lastUpdatedDisplay: json['last_updated_display'] ?? 'Recently',
+      depthInterval: json['depth_interval'] ?? '0-5cm',
+      disclaimer: json['disclaimer'] ?? 'Estimated from geospatial datasets.',
+      unmeasuredNutrientsNotice: json['unmeasured_nutrients_notice'] ?? 'Available N-P-K: Physical Lab Test Required',
+      indicators: (json['indicators'] as List<dynamic>?)
+              ?.map((item) => SoilIndicatorItem.fromJson(Map<String, dynamic>.from(item)))
+              .toList() ??
+          [],
+      technicalDetails: Map<String, dynamic>.from(json['technical_details'] ?? {}),
+    );
+  }
+}
+

@@ -10,7 +10,8 @@ from backend.app.api.v1.endpoints import (
     pmfby,
     assistant,
     geo,
-    dashboard
+    dashboard,
+    soil
 )
 
 api_router = APIRouter()
@@ -20,6 +21,7 @@ api_router.include_router(dashboard.router, tags=["Dashboard"])
 api_router.include_router(geo.router, prefix="/geo", tags=["Geography & Crops"])
 api_router.include_router(registry.router, prefix="/registry", tags=["Dataset Registry"])
 api_router.include_router(farms.router, prefix="/farms", tags=["Farms & Plots"])
+api_router.include_router(soil.router, prefix="/soil", tags=["CropNet Soil Intelligence"])
 api_router.include_router(yield_risk.router, prefix="/yield-intelligence", tags=["Yield Intelligence"])
 api_router.include_router(worker_heat.router, prefix="/heat-risk", tags=["Worker Heat Risk"])
 api_router.include_router(crop_heat.router, prefix="/heat-risk", tags=["Crop Heat Risk"])

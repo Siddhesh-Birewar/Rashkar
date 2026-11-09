@@ -14,6 +14,7 @@ class MyCropScreen extends StatefulWidget {
 
 class _MyCropScreenState extends State<MyCropScreen> {
   YieldAssessment? _assessment;
+  CropNetSoilCardData? _soilCard;
   bool _isLoading = false;
 
   @override
@@ -39,6 +40,7 @@ class _MyCropScreenState extends State<MyCropScreen> {
       if (mounted) {
         setState(() {
           _assessment = null;
+          _soilCard = null;
           _isLoading = false;
         });
       }
@@ -46,12 +48,22 @@ class _MyCropScreenState extends State<MyCropScreen> {
     }
 
     setState(() => _isLoading = true);
-    final a = await ApiService.getYieldAssessment(farmId: farmId);
-    if (mounted) {
-      setState(() {
-        _assessment = a;
-        _isLoading = false;
-      });
+    try {
+      final results = await Future.wait([
+        ApiService.getYieldAssessment(farmId: farmId),
+        ApiService.getFarmSoilCard(farmId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _assessment = results[0] as YieldAssessment?;
+          _soilCard = results[1] as CropNetSoilCardData?;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -145,6 +157,10 @@ class _MyCropScreenState extends State<MyCropScreen> {
                               _buildConditionCard(),
                               const SizedBox(height: 16),
 
+                              // CropNet Soil Intelligence Card
+                              _buildCropNetSoilCard(),
+                              const SizedBox(height: 16),
+
                               // C. Main Concerns
                               _buildMainConcernsCard(),
                               const SizedBox(height: 16),
@@ -165,6 +181,234 @@ class _MyCropScreenState extends State<MyCropScreen> {
                         ),
                       ),
                     ),
+    );
+  }
+
+  // ==================== CropNet Soil Intelligence Card ====================
+  Widget _buildCropNetSoilCard() {
+    if (_soilCard == null) return const SizedBox.shrink();
+    final soil = _soilCard!;
+
+    final badgeColor = soil.isLabMeasured ? const Color(0xFF1B5E20) : const Color(0xFF5D4037);
+    final badgeBg = soil.isLabMeasured ? const Color(0xFFE8F5E9) : const Color(0xFFEFEBE9);
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.terrain_rounded, color: Color(0xFF2E7D32), size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Soil Intelligence (CropNet)',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${soil.textureSummary} · ${soil.reactionSummary}',
+                        style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Provenance Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: badgeBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    soil.isLabMeasured ? Icons.science_outlined : Icons.satellite_alt_rounded,
+                    size: 14,
+                    color: badgeColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      soil.provenanceBadge,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: badgeColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Key Indicators 2x2 Grid
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              children: soil.indicators.map((ind) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FBF9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        ind.displayName,
+                        style: const TextStyle(fontSize: 11, color: Colors.black54),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            ind.valueDisplay,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ind.unit,
+                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            // Unmeasured Available NPK Safeguard Banner
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD54F)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFFF57F17), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          soil.unmeasuredNutrientsNotice,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Satellite models provide total nitrogen and physical texture, but cannot measure available mineral nitrogen, phosphorus, or potassium without physical soil chemistry testing.',
+                          style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Expandable Technical Details
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 8, bottom: 4),
+                title: const Text(
+                  'Scientific Provenance & Technical Details',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
+                ),
+                children: [
+                  _buildTechnicalSoilRow(
+                    'Source Dataset',
+                    '${soil.technicalDetails['source_dataset'] ?? 'ISRIC SoilGrids 2.0'} (Release ${soil.technicalDetails['dataset_version'] ?? '2.0.0'})',
+                  ),
+                  _buildTechnicalSoilRow(
+                    'Spatial Resolution',
+                    soil.technicalDetails['spatial_resolution'] ?? '250m grid cell',
+                  ),
+                  _buildTechnicalSoilRow(
+                    'Depth Interval',
+                    soil.depthInterval,
+                  ),
+                  if (soil.technicalDetails['sand_fraction_pct'] != null)
+                    _buildTechnicalSoilRow(
+                      'Fractions (Sand / Silt / Clay)',
+                      '${soil.technicalDetails['sand_fraction_pct']}% / ${soil.technicalDetails['silt_fraction_pct']}% / ${soil.technicalDetails['clay_fraction_pct']}%',
+                    ),
+                  if (soil.technicalDetails['total_nitrogen_g_kg'] != null)
+                    _buildTechnicalSoilRow(
+                      'Total Nitrogen',
+                      '${soil.technicalDetails['total_nitrogen_g_kg']} g/kg (Organic + Mineral Total)',
+                    ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      soil.disclaimer,
+                      style: const TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTechnicalSoilRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
+          ),
+        ],
+      ),
     );
   }
 
