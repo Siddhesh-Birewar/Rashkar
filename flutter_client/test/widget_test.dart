@@ -56,8 +56,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ExtraIncomeScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Extra Income & Diversification'), findsOneWidget);
-    expect(find.text('CURATED AGRO-ENTERPRISES'), findsOneWidget);
+    expect(find.text('Income Diversification'), findsOneWidget);
+    expect(find.text('MATCHED ENTERPRISE OPPORTUNITIES (NABARD FY26-27)'), findsOneWidget);
   });
 
   testWidgets('Ask Rashkar chat screen renders prompt chips and input field', (WidgetTester tester) async {

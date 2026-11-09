@@ -247,6 +247,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: _waterAvailability,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -300,6 +301,7 @@ class _ExtraIncomeScreenState extends State<ExtraIncomeScreen> {
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: _categoryPreference,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
