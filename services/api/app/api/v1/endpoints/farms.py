@@ -24,7 +24,10 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmEvaluationResponse,
     SoilDataProvenance,
 )
-from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
+from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import (
+    DeterministicDecisionEngine,
+    record_decision_owner,
+)
 from cropnet.services.api.app.core.security import get_current_user, CurrentUser
 from cropnet.services.api.app.core.database import get_db
 from cropnet.services.api.app.models.soil_and_farm import FarmModel
@@ -884,7 +887,22 @@ async def evaluate_farm_advisory(
 
     context_input = FarmContextInput(**ctx_dict)
     decision_engine = DeterministicDecisionEngine()
-    return decision_engine.evaluate_farm(ctx=context_input, db=db)
+    resp = decision_engine.evaluate_farm(ctx=context_input, db=db, user_id=str(current_user.user_id))
+    record_decision_owner(resp.decision_id, user_id=str(current_user.user_id), farm_id=str(farm_id))
+    return resp
+
+
+@router.get("/decision/{decision_id}", response_model=FarmEvaluationResponse, tags=["Farm Advisory"])
+def get_farm_decision_alias(
+    decision_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve farm evaluation decision by decision ID with caller and farm ownership verification.
+    """
+    from cropnet.services.api.app.api.v1.endpoints.agriculture import _verify_decision_access
+    return _verify_decision_access(decision_id, current_user, db)
 
 
 # Sub-router for farm-specific weather & climate intelligence

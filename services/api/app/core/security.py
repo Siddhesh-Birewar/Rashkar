@@ -60,25 +60,30 @@ async def get_current_user(
                     detail=f"Authentication service error: {str(e)}"
                 )
 
-    # 2. Development Mode Fallback with X-Dev-User-Id
-    if settings.ENVIRONMENT == "development":
-        user_id_str = x_dev_user_id or settings.DEV_USER_ID
-        try:
-            user_uuid = uuid.UUID(user_id_str)
-            return CurrentUser(
-                user_id=user_uuid,
-                email=settings.DEV_USER_EMAIL,
-                is_authenticated=True
-            )
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid UUID format in X-Dev-User-Id"
-            )
+    # 2. Local Development Opt-In Auth Bypass Gate
+    is_production = (
+        settings.ENVIRONMENT.lower() in ("production", "prod")
+        or getattr(settings, "PRODUCTION", False)
+    )
 
-    # 3. Production Protection
+    if not is_production and getattr(settings, "ALLOW_DEV_AUTH_BYPASS", False):
+        if x_dev_user_id:
+            try:
+                user_uuid = uuid.UUID(x_dev_user_id)
+                return CurrentUser(
+                    user_id=user_uuid,
+                    email=settings.DEV_USER_EMAIL,
+                    is_authenticated=True
+                )
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid UUID format in X-Dev-User-Id"
+                )
+
+    # 3. Fail-Closed Authentication Rejection (Never silently impersonate DEV_USER_ID)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Missing Authorization Bearer token",
+        detail="Missing or invalid authentication credentials: Missing Authorization Bearer token",
         headers={"WWW-Authenticate": "Bearer"}
     )

@@ -34,7 +34,7 @@ class ApiClient {
     http.Client? httpClient,
     this.defaultTimeout = const Duration(seconds: 30),
     this.bearerToken,
-    this.devUserId = ApiConstants.defaultDevUserId,
+    this.devUserId,
     this.authTokenProvider,
   })  : baseUrl = (baseUrl ?? ApiConstants.defaultBaseUrl).replaceAll(RegExp(r'/+$'), ''),
         _httpClient = httpClient ?? http.Client();
@@ -74,8 +74,11 @@ class ApiClient {
     if (provider != null) {
       try {
         token = await provider();
-      } catch (_) {
-        // Fallback to static bearerToken if provider fails
+      } catch (e) {
+        // Return clear unauthenticated state on token acquisition failure. Never silently inject X-Dev-User-Id.
+        throw UnauthorizedException(
+          message: 'Authentication token acquisition failed: $e',
+        );
       }
     }
 

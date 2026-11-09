@@ -3,10 +3,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from cropnet.services.api.app.core.config import settings
 
+_sync_db_url = settings.SYNC_DATABASE_URL or "sqlite:///./cropnet_dev.db"
+_engine_kwargs = {"pool_pre_ping": True}
+if _sync_db_url.startswith("sqlite"):
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    _engine_kwargs["pool_recycle"] = 300
+
 engine = create_engine(
-    settings.SYNC_DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=300
+    _sync_db_url,
+    **_engine_kwargs
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

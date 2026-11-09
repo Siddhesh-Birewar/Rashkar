@@ -33,6 +33,21 @@ logger = logging.getLogger(__name__)
 # In-memory store for evaluated decisions (session history)
 _DECISION_STORE: Dict[str, FarmEvaluationResponse] = {}
 _CONTEXT_STORE: Dict[str, FarmContextInput] = {}
+# Decision ownership tracking: decision_id -> {"user_id": str, "farm_id": Optional[str]}
+_DECISION_OWNERSHIP: Dict[str, Dict[str, Optional[str]]] = {}
+
+
+def record_decision_owner(decision_id: str, user_id: str, farm_id: Optional[str] = None) -> None:
+    """Record caller and farm ownership for an evaluated decision."""
+    _DECISION_OWNERSHIP[decision_id] = {
+        "user_id": str(user_id),
+        "farm_id": str(farm_id) if farm_id else None,
+    }
+
+
+def get_decision_owner(decision_id: str) -> Optional[Dict[str, Optional[str]]]:
+    """Retrieve owner metadata for a decision."""
+    return _DECISION_OWNERSHIP.get(decision_id)
 
 
 class DeterministicDecisionEngine:
@@ -120,7 +135,8 @@ class DeterministicDecisionEngine:
     def evaluate_farm(
         self,
         ctx: FarmContextInput,
-        db: Optional[Session] = None
+        db: Optional[Session] = None,
+        user_id: Optional[str] = None
     ) -> FarmEvaluationResponse:
         ctx = self._augment_context_from_query(ctx)
         decision_id = f"dec_{uuid.uuid4().hex[:12]}"
@@ -151,6 +167,8 @@ class DeterministicDecisionEngine:
             )
             _DECISION_STORE[decision_id] = resp
             _CONTEXT_STORE[decision_id] = ctx
+            if user_id:
+                record_decision_owner(decision_id, user_id=str(user_id), farm_id=str(ctx.farm_id) if ctx.farm_id else None)
             return resp
 
         # -------------------------------------------------------------
@@ -232,6 +250,8 @@ class DeterministicDecisionEngine:
             )
             _DECISION_STORE[decision_id] = resp
             _CONTEXT_STORE[decision_id] = ctx
+            if user_id:
+                record_decision_owner(decision_id, user_id=str(user_id), farm_id=str(ctx.farm_id) if ctx.farm_id else None)
             return resp
 
         # Default to requested crops if identified, else evaluate all 10 priority crops
@@ -347,6 +367,8 @@ class DeterministicDecisionEngine:
 
         _DECISION_STORE[decision_id] = resp
         _CONTEXT_STORE[decision_id] = ctx
+        if user_id:
+            record_decision_owner(decision_id, user_id=str(user_id), farm_id=str(ctx.farm_id) if ctx.farm_id else None)
         return resp
 
     def get_decision(self, decision_id: str) -> Optional[FarmEvaluationResponse]:
@@ -357,7 +379,8 @@ class DeterministicDecisionEngine:
         self,
         decision_id: str,
         answers: Dict[str, Any],
-        db: Optional[Session] = None
+        db: Optional[Session] = None,
+        user_id: Optional[str] = None
     ) -> Optional[FarmEvaluationResponse]:
         """
         Re-evaluate farm context with updated follow-up answers.
@@ -429,4 +452,6 @@ class DeterministicDecisionEngine:
                 ctx_dict[k] = v
 
         updated_ctx = FarmContextInput(**ctx_dict)
-        return self.evaluate_farm(ctx=updated_ctx, db=db)
+        owner_info = get_decision_owner(decision_id)
+        effective_user_id = user_id or (owner_info["user_id"] if owner_info else None)
+        return self.evaluate_farm(ctx=updated_ctx, db=db, user_id=effective_user_id)

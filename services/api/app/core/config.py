@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_cors_security(self) -> "Settings":
-        """Reject wildcard CORS in production environments."""
+        """Reject insecure configurations in production environments."""
         is_production = self.ENVIRONMENT.lower() in ("production", "prod")
         if is_production:
             if any(origin == "*" for origin in self.CORS_ORIGINS):
@@ -53,6 +53,10 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Security violation: CORS_ORIGINS cannot be empty in production environments."
                 )
+            if self.ALLOW_DEV_AUTH_BYPASS:
+                raise ValueError(
+                    "Security violation: ALLOW_DEV_AUTH_BYPASS is strictly prohibited in production environments."
+                )
         return self
 
     # Supabase Configuration
@@ -60,16 +64,21 @@ class Settings(BaseSettings):
     SUPABASE_URL: Optional[str] = None
     SUPABASE_ANON_KEY: Optional[str] = None
     SUPABASE_SECRET_KEY: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
     SUPABASE_JWT_SECRET: Optional[str] = None
     SUPABASE_DB_PASSWORD: Optional[str] = None
     SUPABASE_PROJECT_REF: Optional[str] = None
     
+    # Development Auth Bypass Gate (Strictly opt-in, prohibited in production)
+    ALLOW_DEV_AUTH_BYPASS: bool = False
     DEV_USER_ID: str = "00000000-0000-0000-0000-000000000001"
     DEV_USER_EMAIL: str = "dev@cropnet.local"
 
-    # Database URLs
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:rAO6B8K2yQzFXlw8@db.glnpmpagajfurpmlinvd.supabase.co:5432/postgres"
-    SYNC_DATABASE_URL: str = "postgresql://postgres:rAO6B8K2yQzFXlw8@db.glnpmpagajfurpmlinvd.supabase.co:5432/postgres"
+    # Database URLs (Strictly injected via environment variables; never hardcode credentials)
+    # Credential Rotation: Set DATABASE_URL and SYNC_DATABASE_URL to new rotated credentials
+    # in untracked environment files or container secret injection without source modification.
+    DATABASE_URL: Optional[str] = None
+    SYNC_DATABASE_URL: Optional[str] = None
 
     # Weather Provider (OpenWeather)
     OPENWEATHER_API_KEY: Optional[str] = None
