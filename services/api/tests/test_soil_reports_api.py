@@ -147,7 +147,7 @@ def test_upload_pdf_report_success():
     assert result["laboratory_name"] == "Krishi Vigyan Kendra Soil Testing Lab"
     assert result["sample_depth_interval"] == "0-15cm"
     assert result["sampling_point_name"] == "North Field - Plot A"
-    assert result["extraction_status"] in (ExtractionStatus.UPLOADED.value, ExtractionStatus.NEEDS_REVIEW.value, ExtractionStatus.FAILED.value)
+    assert result["extraction_status"] in (ExtractionStatus.UPLOADED.value, ExtractionStatus.PROCESSING.value, ExtractionStatus.NEEDS_REVIEW.value, ExtractionStatus.FAILED.value)
     assert result["review_status"] == ReviewStatus.NEEDS_REVIEW.value
     assert result["signed_document_url"] is not None
     assert result["file_size_bytes"] == len(pdf_bytes)
@@ -690,15 +690,24 @@ def test_upload_real_pdf_triggers_ocr_and_inserts_measurements():
     )
     assert resp.status_code == 201
     result = resp.json()
-    assert result["extraction_status"] == ExtractionStatus.NEEDS_REVIEW.value
+    assert result["extraction_status"] in (ExtractionStatus.PROCESSING.value, ExtractionStatus.NEEDS_REVIEW.value)
     assert result["review_status"] == ReviewStatus.NEEDS_REVIEW.value
-    assert len(result["measurements"]) > 0
+
+    # Fetch updated report from DB after background processing completes
+    detail_resp = client.get(
+        f"/api/v1/farms/{farm_id}/soil-reports/{result['id']}",
+        headers={"X-Dev-User-Id": user_id}
+    )
+    assert detail_resp.status_code == 200
+    report_detail = detail_resp.json()
+    assert report_detail["extraction_status"] == ExtractionStatus.NEEDS_REVIEW.value
+    assert len(report_detail["measurements"]) > 0
 
     # Verify measurements are in EXTRACTED_UNVERIFIED status
-    m_keys = [m["parameter_key"] for m in result["measurements"]]
+    m_keys = [m["parameter_key"] for m in report_detail["measurements"]]
     assert "soil_ph" in m_keys
     assert "available_nitrogen" in m_keys
-    for m in result["measurements"]:
+    for m in report_detail["measurements"]:
         assert m["verification_status"] == MeasurementVerificationStatus.EXTRACTED_UNVERIFIED.value
 
     # Verify reprocess re-extracts the document

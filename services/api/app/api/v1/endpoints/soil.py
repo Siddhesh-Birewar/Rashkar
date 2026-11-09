@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from shapely.geometry import Polygon
@@ -294,3 +294,51 @@ async def extract_ad_hoc_polygon(
         taluka=payload.taluka
     )
     return profile
+
+
+class SoilReportStatusResponse(BaseModel):
+    job_id: str
+    report_id: str
+    farm_id: Optional[str] = None
+    status: str
+    review_status: Optional[str] = None
+    extraction_error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+@router.get("/report-status/{job_id}", response_model=SoilReportStatusResponse)
+def get_soil_report_status(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_current_user)
+):
+    """
+    Poll the background OCR extraction status of an uploaded soil report.
+    Returns status: PROCESSING, NEEDS_REVIEW, CONFIRMED, or FAILED.
+    """
+    from cropnet.services.api.app.models.soil_reports import SoilTestReportModel
+
+    report = db.query(SoilTestReportModel).filter(SoilTestReportModel.id == job_id).first()
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Soil report job '{job_id}' not found."
+        )
+
+    if current_user and report.user_id and str(report.user_id) != str(current_user.user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to view this report status."
+        )
+
+    return SoilReportStatusResponse(
+        job_id=report.id,
+        report_id=report.id,
+        farm_id=report.farm_id,
+        status=report.extraction_status,
+        review_status=report.review_status,
+        extraction_error=report.extraction_error,
+        created_at=report.upload_timestamp.isoformat() if report.upload_timestamp else None,
+        updated_at=report.updated_at.isoformat() if getattr(report, "updated_at", None) else None,
+    )

@@ -257,15 +257,15 @@ async def upload_water_report(
     if report_date:
         try:
             parsed_report_date = datetime.fromisoformat(report_date)
-        except Exception:
-            pass
+        except (ValueError, TypeError) as exc:
+            logger.warning("Failed to parse report_date '%s': %s", report_date, exc)
 
     parsed_collection_date = None
     if sample_collection_date:
         try:
             parsed_collection_date = datetime.fromisoformat(sample_collection_date)
-        except Exception:
-            pass
+        except (ValueError, TypeError) as exc:
+            logger.warning("Failed to parse sample_collection_date '%s': %s", sample_collection_date, exc)
 
     # 4. Create WaterTestReportModel
     report_model = WaterTestReportModel(

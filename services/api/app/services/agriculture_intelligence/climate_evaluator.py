@@ -6,6 +6,7 @@ validates sowing moisture prerequisites, and qualifies thermal sensitivities.
 Phase 5.1.2: Hardened evidence boundaries; unverified compendium thresholds
 no longer enforce hard disqualification; all rules carry complete metadata.
 """
+import logging
 from typing import List, Optional, Dict, Any
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
     FarmContextInput,
@@ -16,6 +17,8 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
 )
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse
 from cropnet.services.api.app.services.agriculture_intelligence.evidence_gate import EvidenceGate
+
+logger = logging.getLogger(__name__)
 
 
 class ClimateEvaluationResult:
@@ -214,7 +217,7 @@ class ClimateSuitabilityEvaluator:
                         enforcement_level=EnforcementLevel.ADVISORY_ONLY,
                         can_trigger_disqualification=False
                     ))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed evaluating Kharif Bajra sowing window for date '%s': %s", ctx.proposed_sowing_date, exc)
 
         return res

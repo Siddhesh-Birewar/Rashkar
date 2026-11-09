@@ -9,6 +9,7 @@ Provides REST interfaces for:
 5. Grounded, farmer-friendly natural language explanations (Phase 5.2).
 6. Grounded conversational dialogue and follow-up consultation.
 """
+import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -27,6 +28,8 @@ from cropnet.services.api.app.schemas.agriculture_intelligence import (
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.services.agriculture_intelligence.decision_engine import DeterministicDecisionEngine
 from cropnet.services.api.app.services.llm.explanation_service import AgriculturalExplanationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -117,20 +120,22 @@ def evaluate_farm_intelligence(
                     updates["soil_measurement_date"] = rep.report_date.date().isoformat()
 
                 payload = payload.model_copy(update=updates)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to fuse confirmed laboratory soil measurements into farm evaluation payload: %s", exc)
 
     return decision_engine.evaluate_farm(ctx=payload, db=db)
 
 
 @router.get("/decision/{decision_id}", response_model=FarmEvaluationResponse, tags=["Agriculture Intelligence"])
 def get_evaluation_decision(
-    decision_id: str
+    decision_id: str,
+    db: Session = Depends(get_db)
 ):
     """
     Retrieve a previously computed farm evaluation decision by its decision ID.
+    Persisted across server restarts and accessible across multiple backend workers.
     """
-    decision = decision_engine.get_decision(decision_id)
+    decision = decision_engine.get_decision(decision_id, db=db)
     if not decision:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

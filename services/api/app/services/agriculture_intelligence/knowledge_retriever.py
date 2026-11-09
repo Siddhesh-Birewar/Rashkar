@@ -9,8 +9,11 @@ during multi-dimensional crop evaluation cycles. Thread-safe for concurrent asyn
 worker execution.
 """
 import threading
+import logging
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from cropnet.services.api.app.services.crop_knowledge.crop_service import CropKnowledgeService
 from cropnet.services.api.app.schemas.crop import CropFullProfileResponse, AgriculturalKnowledgeSourceResponse
@@ -58,8 +61,8 @@ class KnowledgeRetriever:
                             publication_year=src.publication_year,
                             section_or_pages=src.section_or_pages
                         )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed during knowledge retriever cache priming: %s", exc)
 
     def clear_cache(self) -> None:
         """Invalidate all cached crop profiles and citation metadata."""

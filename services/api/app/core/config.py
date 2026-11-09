@@ -1,7 +1,11 @@
 import os
+import json
+import logging
 from typing import List, Optional, Any, Union
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DEV_CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
@@ -29,11 +33,10 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
-                import json
                 try:
                     return json.loads(v)
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    logger.warning("Failed to parse CORS_ORIGINS as JSON array: %s", exc)
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         elif isinstance(v, (list, tuple, set)):
             return [str(origin).strip() for origin in v if str(origin).strip()]

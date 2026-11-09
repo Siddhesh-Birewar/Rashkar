@@ -15,7 +15,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List
 from fastapi import (
-    APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Query, Response
+    APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Query, Response, BackgroundTasks
 )
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -278,10 +278,52 @@ def _execute_report_extraction(
         report.extraction_error = str(exc)
 
 
+def _execute_background_ocr_task(
+    report_id: str,
+    content: bytes,
+    filename: str,
+    content_type: str,
+    db: Session
+) -> None:
+    """
+    Background worker task executing OCR pipeline without blocking upload response.
+    Updates report status to NEEDS_REVIEW or FAILED upon completion.
+    """
+    try:
+        report = db.query(SoilTestReportModel).filter(SoilTestReportModel.id == report_id).first()
+        if not report:
+            logger.error("Background OCR: report %s not found", report_id)
+            return
+
+        _execute_report_extraction(
+            report=report,
+            content=content,
+            filename=filename,
+            content_type=content_type,
+            db=db
+        )
+        report.updated_at = datetime.utcnow()
+        db.commit()
+        logger.info("Background OCR pipeline completed successfully for report %s", report_id)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Background OCR pipeline failed for report %s: %s", report_id, exc)
+        try:
+            report = db.query(SoilTestReportModel).filter(SoilTestReportModel.id == report_id).first()
+            if report:
+                report.extraction_status = ExtractionStatus.FAILED.value
+                report.extraction_error = str(exc)
+                report.updated_at = datetime.utcnow()
+                db.commit()
+        except Exception as save_exc:
+            logger.error("Failed to persist FAILED status for report %s: %s", report_id, save_exc)
+
+
 @router.post("", response_model=SoilReportDetail, status_code=status.HTTP_201_CREATED)
 @router.post("/upload", response_model=SoilReportDetail, status_code=status.HTTP_201_CREATED)
 async def upload_soil_report(
     farm_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Soil report document (PDF, JPEG, PNG, max 15MB)"),
     laboratory_name: Optional[str] = Form(None),
     lab_name: Optional[str] = Form(None),
@@ -392,32 +434,34 @@ async def upload_soil_report(
         sample_depth_interval=clean_depth,
         depth_provenance=prov,
         sampling_point_name=sampling_point_name,
-        extraction_status=ExtractionStatus.UPLOADED.value,
+        extraction_status=ExtractionStatus.PROCESSING.value,
         review_status=ReviewStatus.NEEDS_REVIEW.value,
     )
     db.add(report)
     db.commit()
     db.refresh(report)
 
-    # 7. Bridge to DocumentExtractionPipeline for OCR & Structured Extraction
-    _execute_report_extraction(
-        report=report,
-        content=content,
-        filename=filename,
-        content_type=content_type,
-        db=db
-    )
-    db.commit()
-    db.refresh(report)
-
-    # 8. Generate time-limited signed URL
+    # 7. Generate time-limited signed URL
     signed_url = soil_report_storage.generate_signed_url(
         storage_path=storage_path,
         farm_id=str(farm_id),
         report_id=report_id
     )
 
-    return _model_to_report_detail(report, signed_url)
+    # 8. Snapshot response detail in PROCESSING status for immediate return (<200ms)
+    response_detail = _model_to_report_detail(report, signed_url)
+
+    # 9. Enqueue bounded background OCR extraction
+    background_tasks.add_task(
+        _execute_background_ocr_task,
+        report_id=report_id,
+        content=content,
+        filename=filename,
+        content_type=content_type,
+        db=db
+    )
+
+    return response_detail
 
 
 @router.get("", response_model=List[SoilReportSummary])
