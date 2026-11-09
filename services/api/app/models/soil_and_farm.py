@@ -97,3 +97,17 @@ class SoilParameterModel(Base):
     scientific_note = Column(Text, nullable=True)
 
     profile = relationship("FarmSoilProfileModel", back_populates="parameters")
+
+
+class FarmDecisionModel(Base):
+    __tablename__ = "farm_decisions"
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=True, index=True)
+    farm_id = Column(String(64), nullable=True, index=True)
+    input_validation_status = Column(String(64), nullable=True)
+    target_season = Column(String(64), nullable=True)
+    context_json = Column(JSON, nullable=False)
+    decision_json = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

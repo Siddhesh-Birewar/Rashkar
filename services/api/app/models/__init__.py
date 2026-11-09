@@ -5,6 +5,7 @@ from .soil_and_farm import (
     SoilMapLayerModel,
     FarmSoilProfileModel,
     SoilParameterModel,
+    FarmDecisionModel,
 )
 from .soil_reports import SoilTestReportModel, SoilMeasurementModel
 from .water import WaterSourceModel, WaterTestReportModel, WaterMeasurementModel

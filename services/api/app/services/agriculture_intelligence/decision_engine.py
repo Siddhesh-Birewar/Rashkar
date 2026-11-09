@@ -7,6 +7,8 @@ decision aggregation, and clinical follow-up question selection.
 import uuid
 import re
 import logging
+import threading
+from collections import OrderedDict
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -31,9 +33,70 @@ from cropnet.services.api.app.services.agriculture_intelligence.followup_engine 
 
 logger = logging.getLogger(__name__)
 
-# In-memory store for evaluated decisions (session history)
-_DECISION_STORE: Dict[str, FarmEvaluationResponse] = {}
-_CONTEXT_STORE: Dict[str, FarmContextInput] = {}
+class BoundedLRUCache:
+    """Thread-safe bounded in-memory LRU cache with eviction."""
+
+    def __init__(self, maxsize: int = 500):
+        self._cache: OrderedDict[str, Any] = OrderedDict()
+        self._maxsize = maxsize
+        self._lock = threading.Lock()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                return self._cache[key]
+            return default
+
+    def set(self, key: str, value: Any) -> None:
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            self._cache[key] = value
+            if len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+
+    def pop(self, key: str, default: Any = None) -> Any:
+        with self._lock:
+            return self._cache.pop(key, default)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
+
+    def values(self):
+        with self._lock:
+            return list(self._cache.values())
+
+    def items(self):
+        with self._lock:
+            return list(self._cache.items())
+
+    def __getitem__(self, key: str) -> Any:
+        with self._lock:
+            self._cache.move_to_end(key)
+            return self._cache[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.set(key, value)
+
+    def __delitem__(self, key: str) -> None:
+        with self._lock:
+            del self._cache[key]
+
+    def __contains__(self, key: str) -> bool:
+        with self._lock:
+            return key in self._cache
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._cache)
+
+
+# Bounded in-memory caches mirroring authoritative persistent store
+_DECISION_STORE: BoundedLRUCache = BoundedLRUCache(maxsize=500)
+_CONTEXT_STORE: BoundedLRUCache = BoundedLRUCache(maxsize=500)
+
 # Decision ownership tracking: decision_id -> {"user_id": str, "farm_id": Optional[str]}
 _DECISION_OWNERSHIP: Dict[str, Dict[str, Optional[str]]] = {}
 
@@ -49,6 +112,7 @@ def record_decision_owner(decision_id: str, user_id: str, farm_id: Optional[str]
 def get_decision_owner(decision_id: str) -> Optional[Dict[str, Optional[str]]]:
     """Retrieve owner metadata for a decision."""
     return _DECISION_OWNERSHIP.get(decision_id)
+
 
 DEVANAGARI_DIGIT_MAP = str.maketrans("०१२३४५६७८९", "0123456789")
 
@@ -188,6 +252,9 @@ class DeterministicDecisionEngine:
         db: Optional[Session] = None,
         user_id: Optional[str] = None
     ) -> FarmEvaluationResponse:
+        effective_user_id = user_id or getattr(ctx, "user_id", None)
+        if effective_user_id and not getattr(ctx, "user_id", None):
+            ctx = ctx.model_copy(update={"user_id": effective_user_id})
         ctx = self._augment_context_from_query(ctx)
         decision_id = f"dec_{uuid.uuid4().hex[:12]}"
         now = datetime.utcnow()
@@ -310,9 +377,11 @@ class DeterministicDecisionEngine:
         # -------------------------------------------------------------
         # Step 4: Modular Dimensional Evaluation per Candidate Crop
         # -------------------------------------------------------------
+        failed_profile_crops = []
         for cid in eval_crops:
             profile = self.retriever.get_crop_profile(crop_id=cid, db=db)
             if not profile:
+                failed_profile_crops.append(cid)
                 continue
 
             # Fetch primary citation
@@ -389,6 +458,23 @@ class DeterministicDecisionEngine:
             )
             outcomes.append(outcome)
 
+        # Handle failed profile loading explicitly
+        if failed_profile_crops:
+            for cid in failed_profile_crops:
+                outcomes.append(CropEvaluationOutcome(
+                    crop_id=cid,
+                    common_name=cid.capitalize(),
+                    scientific_name=cid,
+                    decision_state=DecisionState.ABSTAIN_INSUFFICIENT_EVIDENCE,
+                    is_disqualified=False,
+                    limiting_factors=["MANDATORY_CROP_PROFILE_FAILED"],
+                    uncertainty_notes=[f"Mandatory crop requirement profile for '{cid}' could not be loaded from knowledge base."],
+                    missing_information=["crop_profile"],
+                    applied_rules=[],
+                    citations=[],
+                    explanation=f"Cannot evaluate '{cid}' because its mandatory agronomic requirements profile failed to load."
+                ))
+
         # -------------------------------------------------------------
         # Step 5: Follow-Up Question Selection
         # -------------------------------------------------------------
@@ -396,7 +482,9 @@ class DeterministicDecisionEngine:
 
         # Compile Response
         validation_status = "VALID"
-        if not val_res.is_valid or val_res.contradictions:
+        if failed_profile_crops and (len(failed_profile_crops) == len(eval_crops) or (requested_crops and any(c in requested_crops for c in failed_profile_crops))):
+            validation_status = "ABSTAIN_MANDATORY_PROFILE_FAILED"
+        elif not val_res.is_valid or val_res.contradictions:
             validation_status = "CONTRADICTORY_INPUTS_DETECTED"
         elif val_res.warnings:
             validation_status = "VALID_WITH_UNRESOLVED_CAVEATS"
@@ -417,13 +505,127 @@ class DeterministicDecisionEngine:
 
         _DECISION_STORE[decision_id] = resp
         _CONTEXT_STORE[decision_id] = ctx
-        if user_id:
-            record_decision_owner(decision_id, user_id=str(user_id), farm_id=str(ctx.farm_id) if ctx.farm_id else None)
+        owner_id = effective_user_id or user_id
+        if owner_id:
+            record_decision_owner(decision_id, user_id=str(owner_id), farm_id=str(ctx.farm_id) if ctx.farm_id else None)
+
+        self._persist_decision_to_db(decision_id, ctx, resp, db, user_id=effective_user_id)
         return resp
 
-    def get_decision(self, decision_id: str) -> Optional[FarmEvaluationResponse]:
-        """Fetch previously computed decision from session store."""
-        return _DECISION_STORE.get(decision_id)
+    def _persist_decision_to_db(
+        self,
+        decision_id: str,
+        ctx: FarmContextInput,
+        resp: FarmEvaluationResponse,
+        db: Optional[Session],
+        user_id: Optional[str] = None
+    ) -> None:
+        """Persist decision and context to database for multi-worker survival."""
+        from cropnet.services.api.app.models.soil_and_farm import FarmDecisionModel
+        from cropnet.services.api.app.core.database import SessionLocal
+
+        resolved_user_id = str(user_id) if user_id else (str(ctx.user_id) if getattr(ctx, "user_id", None) else None)
+        farm_id = str(ctx.farm_id) if getattr(ctx, "farm_id", None) else None
+
+        decision_dict = resp.model_dump(mode="json")
+        context_dict = ctx.model_dump(mode="json")
+
+        def _save(session: Session):
+            existing = session.query(FarmDecisionModel).filter(FarmDecisionModel.id == decision_id).first()
+            if existing:
+                existing.user_id = resolved_user_id
+                existing.farm_id = farm_id
+                existing.input_validation_status = resp.input_validation_status
+                existing.target_season = ctx.target_season
+                existing.context_json = context_dict
+                existing.decision_json = decision_dict
+                existing.updated_at = datetime.utcnow()
+            else:
+                record = FarmDecisionModel(
+                    id=decision_id,
+                    user_id=resolved_user_id,
+                    farm_id=farm_id,
+                    input_validation_status=resp.input_validation_status,
+                    target_season=ctx.target_season,
+                    context_json=context_dict,
+                    decision_json=decision_dict,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                session.add(record)
+            session.commit()
+
+        if db is not None:
+            try:
+                _save(db)
+            except Exception as exc:
+                logger.warning("Failed to persist decision %s to active db session: %s", decision_id, exc)
+                try:
+                    db.rollback()
+                except Exception as rollback_exc:
+                    logger.debug("Failed rollback during decision persistence: %s", rollback_exc)
+        else:
+            try:
+                with SessionLocal() as session:
+                    _save(session)
+            except Exception as exc:
+                logger.warning("Failed to persist decision %s via SessionLocal: %s", decision_id, exc)
+
+    def get_decision(
+        self,
+        decision_id: str,
+        db: Optional[Session] = None,
+        user_id: Optional[str] = None
+    ) -> Optional[FarmEvaluationResponse]:
+        """Fetch previously computed decision from LRU cache or authoritative database."""
+        # 1. Check LRU Cache
+        cached = _DECISION_STORE.get(decision_id)
+        if cached is not None:
+            if user_id:
+                cached_ctx = _CONTEXT_STORE.get(decision_id)
+                cached_user = getattr(cached_ctx, "user_id", None) if cached_ctx else None
+                owner_meta = get_decision_owner(decision_id)
+                owner_user = owner_meta.get("user_id") if owner_meta else None
+                effective_owner = cached_user or owner_user
+                if effective_owner and str(effective_owner) != str(user_id):
+                    return None
+            return cached
+
+        # 2. Database Lookup
+        from cropnet.services.api.app.models.soil_and_farm import FarmDecisionModel
+        from cropnet.services.api.app.core.database import SessionLocal
+
+        model = None
+        if db is not None:
+            try:
+                model = db.query(FarmDecisionModel).filter(FarmDecisionModel.id == decision_id).first()
+            except Exception as exc:
+                logger.warning("Database lookup failed for decision %s: %s", decision_id, exc)
+        else:
+            try:
+                with SessionLocal() as session:
+                    model = session.query(FarmDecisionModel).filter(FarmDecisionModel.id == decision_id).first()
+            except Exception as exc:
+                logger.warning("SessionLocal lookup failed for decision %s: %s", decision_id, exc)
+
+        if not model:
+            return None
+
+        # Ownership check
+        if user_id and model.user_id and str(model.user_id) != str(user_id):
+            return None
+
+        try:
+            resp = FarmEvaluationResponse(**model.decision_json)
+            ctx = FarmContextInput(**model.context_json)
+            _DECISION_STORE[decision_id] = resp
+            _CONTEXT_STORE[decision_id] = ctx
+            if model.user_id:
+                record_decision_owner(decision_id, user_id=str(model.user_id), farm_id=str(model.farm_id) if model.farm_id else None)
+            return resp
+        except Exception as exc:
+            logger.error("Failed to deserialize persisted decision %s: %s", decision_id, exc)
+            return None
 
     def process_followup_answers(
         self,
@@ -434,8 +636,33 @@ class DeterministicDecisionEngine:
     ) -> Optional[FarmEvaluationResponse]:
         """
         Re-evaluate farm context with updated follow-up answers.
+        Survives server restart and multi-worker execution.
         """
         old_ctx = _CONTEXT_STORE.get(decision_id)
+        if not old_ctx:
+            from cropnet.services.api.app.models.soil_and_farm import FarmDecisionModel
+            from cropnet.services.api.app.core.database import SessionLocal
+
+            model = None
+            if db is not None:
+                try:
+                    model = db.query(FarmDecisionModel).filter(FarmDecisionModel.id == decision_id).first()
+                except Exception as exc:
+                    logger.warning("Database lookup failed during followup for decision %s: %s", decision_id, exc)
+            else:
+                try:
+                    with SessionLocal() as session:
+                        model = session.query(FarmDecisionModel).filter(FarmDecisionModel.id == decision_id).first()
+                except Exception as exc:
+                    logger.warning("SessionLocal lookup failed during followup for decision %s: %s", decision_id, exc)
+
+            if model and model.context_json:
+                try:
+                    old_ctx = FarmContextInput(**model.context_json)
+                    _CONTEXT_STORE[decision_id] = old_ctx
+                except Exception as exc:
+                    logger.error("Failed to deserialize context for decision %s: %s", decision_id, exc)
+
         if not old_ctx:
             return None
 
@@ -453,8 +680,8 @@ class DeterministicDecisionEngine:
                     else:
                         try:
                             ctx_dict["soil_depth_cm"] = float(v)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            logger.warning("Invalid soil_depth_cm answer value '%s': %s", v, exc)
                 elif isinstance(v, (int, float)):
                     ctx_dict["soil_depth_cm"] = float(v)
             elif k == "electrical_conductivity_ds_m":
@@ -468,8 +695,8 @@ class DeterministicDecisionEngine:
                     else:
                         try:
                             ctx_dict["electrical_conductivity_ds_m"] = float(v)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            logger.warning("Invalid electrical_conductivity_ds_m answer value '%s': %s", v, exc)
                 elif isinstance(v, (int, float)):
                     ctx_dict["electrical_conductivity_ds_m"] = float(v)
             elif k == "target_bahar":

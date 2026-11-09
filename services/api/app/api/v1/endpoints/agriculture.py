@@ -10,6 +10,7 @@ Provides REST interfaces for:
 6. Grounded conversational dialogue and follow-up consultation.
 """
 import uuid
+import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -33,6 +34,8 @@ from cropnet.services.api.app.services.agriculture_intelligence.decision_engine 
     get_decision_owner,
 )
 from cropnet.services.api.app.services.llm.explanation_service import AgriculturalExplanationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -71,8 +74,8 @@ def _verify_farm_access(farm_id_str: str, current_user: CurrentUser, db: Session
             db_farm = db.query(FarmModel).filter(FarmModel.id == str(farm_uuid)).first()
             if db_farm:
                 farm = {"id": uuid.UUID(db_farm.id), "owner_id": uuid.UUID(db_farm.owner_id)}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Error fetching farm from database in _verify_farm_access: %s", exc)
 
     if not farm:
         raise HTTPException(
@@ -91,7 +94,7 @@ def _verify_decision_access(decision_id: str, current_user: CurrentUser, db: Ses
     Verify that decision exists and caller owns it or owns the associated farm.
     Raises 404 if not found, 403 if unauthorized.
     """
-    decision = decision_engine.get_decision(decision_id)
+    decision = decision_engine.get_decision(decision_id, db=db)
     if not decision:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -104,6 +107,11 @@ def _verify_decision_access(decision_id: str, current_user: CurrentUser, db: Ses
     # 1. Direct owner match
     if owner_info and owner_info.get("user_id") == caller_id:
         return decision
+
+    # Also check if model or decision context has user_id matching caller
+    if decision.farm_context and getattr(decision.farm_context, "user_id", None):
+        if str(decision.farm_context.user_id) == caller_id:
+            return decision
 
     # 2. Associated farm ownership match
     farm_id = (owner_info.get("farm_id") if owner_info else None) or (
@@ -201,8 +209,8 @@ def evaluate_farm_intelligence(
                     updates["soil_measurement_date"] = rep.report_date.date().isoformat()
 
                 payload = payload.model_copy(update=updates)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to fuse confirmed laboratory soil measurements into farm evaluation payload: %s", exc)
 
     resp = decision_engine.evaluate_farm(ctx=payload, db=db, user_id=str(current_user.user_id))
     record_decision_owner(
@@ -222,6 +230,7 @@ def get_evaluation_decision(
     """
     Retrieve a previously computed farm evaluation decision by its decision ID.
     Enforces caller and farm ownership.
+    Persisted across server restarts and accessible across multiple backend workers.
     """
     return _verify_decision_access(decision_id, current_user, db)
 

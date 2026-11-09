@@ -225,8 +225,8 @@ class SoilReportStorageService:
             try:
                 local_file_path.unlink()
                 deleted = True
-            except Exception:
-                pass
+            except OSError as exc:
+                logger.warning("Failed to remove local soil report file at %s: %s", local_file_path, exc)
 
         if self.supabase_url and self.service_key:
             try:
@@ -240,8 +240,8 @@ class SoilReportStorageService:
                     resp = client.request("DELETE", delete_url, headers=headers, json=payload)
                     if resp.status_code == 200:
                         deleted = True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Remote storage deletion error for prefix %s: %s", storage_path, exc)
 
         return deleted
 

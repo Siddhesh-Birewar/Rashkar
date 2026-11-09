@@ -239,8 +239,8 @@ class SoilOCRExtractor:
         # 1. Correct EXIF rotation
         try:
             img = ImageOps.exif_transpose(img)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed EXIF transpose on image: %s", exc)
 
         # 2. Convert to RGB
         if img.mode not in ("RGB", "L"):
