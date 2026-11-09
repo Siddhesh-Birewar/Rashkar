@@ -1,5 +1,5 @@
-"""Heat Risk — Pydantic schemas for crop and worker heat-stress assessment."""
-from typing import Optional
+"""Heat Risk — Pydantic schemas for crop, worker and farm-context assessments."""
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -56,3 +56,56 @@ class WorkerHeatResponse(BaseModel):
     utci_c: Optional[float] = None
     recommendation: str
     methodology_note: str
+
+
+class HeatRiskDailyOutlook(BaseModel):
+    date: str
+    day_name: Optional[str] = None
+    tmax_c: float
+    tmin_c: float
+    hours_above_critical: float
+    warm_night_hazard: bool
+    risk_category: str
+
+
+class HeatRiskIntervention(BaseModel):
+    title: str
+    description: str
+    rationale: str
+    evidence: str
+    category: str = "VERIFIED_AGRONOMIC"
+
+
+class FarmHeatRiskRequest(BaseModel):
+    crop_code: str = Field(..., description="Crop code (e.g. soybean, cotton, jowar, onion)")
+    sowing_date: Optional[str] = Field(None, description="Sowing date YYYY-MM-DD for automatic stage selection")
+    days_after_sowing: Optional[int] = Field(None, ge=0, le=400)
+    growth_stage: Optional[str] = None
+    include_worker_heat: bool = True
+    workload_category: str = "moderate"
+    is_acclimatised: bool = True
+    sun_exposure: str = "direct_sun"
+
+
+class FarmHeatRiskResponse(BaseModel):
+    farm_id: str
+    farm_name: str
+    crop_code: str
+    crop_common_name: str
+    growth_stage_code: str
+    growth_stage_name: str
+    forecast_tmax_c: float
+    forecast_tmin_c: float
+    critical_tmax_c: float
+    risk_category: str
+    risk_label: str
+    hours_above_critical: float
+    warm_night_hazard: bool
+    cumulative_gdd: float
+    daily_outlook: List[HeatRiskDailyOutlook]
+    interventions: List[HeatRiskIntervention]
+    worker_heat: Optional[WorkerHeatResponse] = None
+    weather_source: str
+    provenance: str
+    limitations: List[str] = Field(default_factory=list)
+    generated_at: str

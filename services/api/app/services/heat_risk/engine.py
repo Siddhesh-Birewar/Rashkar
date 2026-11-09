@@ -231,3 +231,74 @@ class WorkerHeatEngine:
                 "ISO 9920 / ACGIH clothing adjustment. " + WORKER_EVIDENCE_CITATION
             ),
         }
+
+
+# --- Farm-context helpers (added for the CropNet Heat Risk integration) ---
+
+INTERVENTIONS_BY_CATEGORY = {
+    "CRITICAL": [
+        ("Emergency irrigation / cooling", "Apply light, frequent irrigation (early morning or evening) to reduce canopy temperature and soil heat load.", "Evaporative cooling lowers leaf temperature and reduces heat-induced flower drop.", "ICAR-CRIDA / SAU crop-stage heat advisories"),
+        ("Suspend mid-day field operations", "Avoid spraying, fertilizer application and heavy field work between 12:00 and 16:00.", "Peak WBGT and crop heat load occur in the afternoon.", "ACGIH 2023 / ISO 7243:2017 screening limits"),
+        ("Mulch and shade", "Apply crop residue mulch and, where feasible, temporary shade nets for sensitive stages.", "Mulch reduces soil surface temperature and evaporation.", "SAU package of practices"),
+    ],
+    "HIGH": [
+        ("Pre-emptive evening irrigation", "Irrigate in the evening to recharge root-zone moisture before the next hot day.", "Pre-emptive moisture reduces heat-stress severity.", "ICAR-CRIDA heat advisories"),
+        ("Reduce afternoon labour", "Shift labour-intensive operations to early morning; increase rest frequency.", "Effective WBGT approaches or exceeds screening limits.", "ACGIH 2023 / ISO 7243:2017"),
+        ("Foliar protective sprays (only if locally advised)", "Use only locally recommended protective sprays; do not apply unverified chemical doses.", "Heat stress increases susceptibility; local extension advice governs treatment.", "State Department of Agriculture"),
+    ],
+    "MODERATE": [
+        ("Maintain irrigation schedule", "Keep the normal irrigation schedule and monitor soil moisture.", "Avoid letting the root zone dry out during a warm spell.", "SAU package of practices"),
+        ("Monitor crop stage", "Re-check growth stage and re-assess if the forecast warms further.", "Stage-specific sensitivity changes with phenology.", "ICAR-CRIDA crop-stage heat advisories"),
+    ],
+    "LOW": [
+        ("No emergency intervention required", "Continue normal crop management; re-assess when the forecast changes.", "Forecast temperatures are within the verified thermal tolerance for the stage.", "Rashkar Crop Heat baseline"),
+    ],
+}
+
+
+def build_interventions(risk_category: str, crop_common_name: str, warm_night: bool) -> List[dict]:
+    """Return evidence-linked interventions for the assessed risk category."""
+    items = INTERVENTIONS_BY_CATEGORY.get(risk_category, INTERVENTIONS_BY_CATEGORY["LOW"])
+    result = [
+        {
+            "title": title,
+            "description": desc,
+            "rationale": rationale,
+            "evidence": evidence,
+            "category": "VERIFIED_AGRONOMIC",
+        }
+        for (title, desc, rationale, evidence) in items
+    ]
+    if warm_night:
+        result.append({
+            "title": "Warm-night respiration mitigation",
+            "description": "Avoid late-evening irrigation that raises humidity, and ensure good field ventilation.",
+            "rationale": "Night temperatures above the crop's warm-night threshold increase respiration losses.",
+            "evidence": "ICAR-CRIDA / SAU crop-stage heat advisories",
+            "category": "PREVENTATIVE_MANAGEMENT",
+        })
+    return result
+
+
+def assess_daily_outlook(crop_code: str, daily_summaries: List[dict]) -> List[dict]:
+    """Assess each forecast day using the crop heat engine."""
+    outlook = []
+    for day in daily_summaries:
+        try:
+            res = CropHeatEngine.assess(
+                crop_code=crop_code,
+                forecast_tmax_c=float(day["temp_max_c"]),
+                forecast_tmin_c=float(day["temp_min_c"]),
+            )
+            outlook.append({
+                "date": str(day.get("date", "")),
+                "day_name": day.get("day_name"),
+                "tmax_c": float(day["temp_max_c"]),
+                "tmin_c": float(day["temp_min_c"]),
+                "hours_above_critical": res["hours_above_critical"],
+                "warm_night_hazard": res["warm_night_hazard"],
+                "risk_category": res["risk_category"],
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+    return outlook
