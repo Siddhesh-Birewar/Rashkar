@@ -69,6 +69,9 @@ data/01_raw_immutable/*
 !data/01_raw_immutable/.gitkeep
 data/02_processed/*
 !data/02_processed/.gitkeep
+!data/02_processed/APY_CANONICAL/
+data/02_processed/APY_CANONICAL/*
+!data/02_processed/APY_CANONICAL/maharashtra_apy_canonical.csv
 data/03_features/*
 !data/03_features/.gitkeep
 data/04_labels/*
