@@ -6,6 +6,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:cropnet_mobile/core/router/app_router.dart';
 import 'package:cropnet_mobile/core/router/farm_state.dart';
 import 'package:cropnet_mobile/core/router/route_paths.dart';
+import 'package:cropnet_mobile/core/network/api_client.dart';
+import 'package:cropnet_mobile/core/network/api_constants.dart';
 import 'package:cropnet_mobile/features/history/assessment_history_repository.dart';
 import 'package:cropnet_mobile/features/farm/models/farm_models.dart' as farm_models;
 import 'package:cropnet_mobile/features/soil/data/soil_repository.dart';
@@ -23,6 +25,12 @@ import 'package:cropnet_mobile/features/auth/auth_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Local prototype only: --dart-define=DEV_AUTH=true enables the development
+  // user header. Production builds omit the flag, so the client stays fail-closed.
+  const bool devAuth = bool.fromEnvironment('DEV_AUTH', defaultValue: false);
+  if (devAuth) {
+    ApiClient.defaultDevUserId = ApiConstants.defaultDevUserId;
+  }
   await AuthService.instance.initialize();
   AuthStateNotifier.instance.initialize();
   runApp(const CropNetApp());

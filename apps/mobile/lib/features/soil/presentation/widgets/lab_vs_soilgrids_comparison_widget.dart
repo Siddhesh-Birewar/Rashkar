@@ -328,10 +328,10 @@ class LabVsSoilgridsComparisonWidget extends StatelessWidget {
             _buildComparisonRow(
               parameter: 'Soil Texture',
               labValue: labReport?.getMeasurement('soil_texture')?.originalValueText ??
-                  (labReport?.isConfirmed == true ? 'Clay Loam (Lab)' : 'Pending physical test'),
-              soilgridsValue: soilgridsProfile?.soilTextureClass ?? 'Clay (250m raster)',
-              delta: 'Agreement',
-              precedence: 'Physical classification validated',
+                  'Not reported in lab test',
+              soilgridsValue: soilgridsProfile?.soilTextureClass ?? 'N/A',
+              delta: 'N/A',
+              precedence: 'Texture is only compared when the laboratory reports it explicitly',
               isLabConfirmed: labReport?.isConfirmed ?? false,
             ),
           ],
@@ -461,11 +461,27 @@ class LabVsSoilgridsComparisonWidget extends StatelessWidget {
     );
   }
 
-  /// Micronutrients & Secondary Parameters diagnostics section
+  /// Additional confirmed laboratory measurements that are NOT part of the
+  /// canonical comparison rows (e.g. elemental P/K in ppm, organic matter %,
+  /// micronutrients). Reported as-is and never converted to available NPK.
   Widget _buildMicronutrientSection() {
     final report = labReport!;
-    final microKeys = ['zinc', 'iron', 'manganese', 'copper', 'boron', 'sulphur'];
-    final items = microKeys.map((k) => report.getMeasurement(k)).whereType<SoilMeasurementItem>().toList();
+    const canonicalKeys = {
+      'soil_ph',
+      'electrical_conductivity',
+      'organic_carbon',
+      'available_nitrogen',
+      'available_phosphorus',
+      'available_potassium',
+      'soil_texture',
+    };
+    final seen = <String>{};
+    final items = <SoilMeasurementItem>[];
+    for (final m in report.measurements) {
+      final key = m.parameterKey.toLowerCase().trim();
+      if (canonicalKeys.contains(key)) continue;
+      if (seen.add(key)) items.add(m);
+    }
 
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -483,7 +499,7 @@ class LabVsSoilgridsComparisonWidget extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Comprehensive Micronutrient & Secondary Parameter Diagnostics',
+                    'Additional Laboratory Measurements (Reported as-is)',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
@@ -491,7 +507,9 @@ class LabVsSoilgridsComparisonWidget extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Extracted from physical laboratory report. Preserved for transparency and farmer guidance.',
+              'Extracted from the confirmed laboratory report. Values are preserved on the laboratory’s '
+              'original basis (e.g. elemental P/K in ppm, organic matter %) and are NOT converted to available '
+              'P2O5/K2O or organic carbon without a validated conversion.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
             const SizedBox(height: 12),

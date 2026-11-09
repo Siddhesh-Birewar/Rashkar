@@ -22,6 +22,11 @@ class ApiClient {
   /// Global default token provider injected by authentication service.
   static AuthTokenProvider? defaultAuthTokenProvider;
 
+  /// Optional global development user id, enabled only by the compile-time
+  /// `DEV_AUTH` flag (local prototype builds). Null in production builds so the
+  /// client never silently impersonates a development user.
+  static String? defaultDevUserId;
+
   final String baseUrl;
   final http.Client _httpClient;
   final Duration defaultTimeout;
@@ -84,8 +89,12 @@ class ApiClient {
 
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
-    } else if (devUserId != null && devUserId!.isNotEmpty) {
-      headers[ApiConstants.devUserIdHeader] = devUserId!;
+    } else {
+      // Dev-only fallback: explicitly enabled via the compile-time DEV_AUTH flag.
+      final effectiveDevUserId = devUserId ?? defaultDevUserId;
+      if (effectiveDevUserId != null && effectiveDevUserId.isNotEmpty) {
+        headers[ApiConstants.devUserIdHeader] = effectiveDevUserId;
+      }
     }
 
     if (customHeaders != null) {

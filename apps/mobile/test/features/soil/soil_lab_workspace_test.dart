@@ -633,7 +633,7 @@ void main() {
       expect(find.text('Bioavailable Ion'), findsAtLeastNWidgets(1));
 
       // Verify micronutrient diagnostics
-      expect(find.text('Comprehensive Micronutrient & Secondary Parameter Diagnostics'), findsOneWidget);
+      expect(find.text('Additional Laboratory Measurements (Reported as-is)'), findsOneWidget);
       expect(find.text('Available Zinc (Zn)'), findsOneWidget);
       expect(find.text('0.58 mg/kg'), findsOneWidget);
       expect(find.text('Rating: Deficient'), findsOneWidget);

@@ -79,8 +79,12 @@ class SoilLabRepository {
 
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
-    } else if (_client.devUserId != null && _client.devUserId!.isNotEmpty) {
-      request.headers[ApiConstants.devUserIdHeader] = _client.devUserId!;
+    } else {
+      // Dev-only fallback (compile-time DEV_AUTH flag) for local prototype uploads.
+      final effectiveDevUserId = _client.devUserId ?? ApiClient.defaultDevUserId;
+      if (effectiveDevUserId != null && effectiveDevUserId.isNotEmpty) {
+        request.headers[ApiConstants.devUserIdHeader] = effectiveDevUserId;
+      }
     }
 
     request.headers['Accept'] = 'application/json';
