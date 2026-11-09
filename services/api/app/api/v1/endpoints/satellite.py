@@ -95,7 +95,7 @@ async def sync_satellite_observations(
 
     _ACTIVE_SYNCS.add(str(farm_id))
     try:
-        # Calculate observation (attempts live Sentinel-2 L2A raster streaming, fallback to model)
+        # Calculate observation (attempts live Sentinel-2 L2A raster streaming)
         indices = copernicus_client.compute_polygon_indices(
             polygon_geojson=poly_geojson,
             farm_area_ha=area_ha,
@@ -103,6 +103,75 @@ async def sync_satellite_observations(
             use_live_raster=True,
             farm_id=str(farm_id),
         )
+
+        # Fail-closed handling: If live retrieval failed or no usable observation found,
+        # DO NOT insert fabricated rows into the database. Preserve existing authentic observation.
+        if indices.get("quality_status") == "NO_USABLE_OBSERVATION" or not indices.get("product_id"):
+            existing_historical = (
+                db.query(SatelliteVegetationObservationModel)
+                .filter(
+                    SatelliteVegetationObservationModel.farm_id == str(farm_id),
+                    SatelliteVegetationObservationModel.quality_status != "SYNTHETIC_QA_ISOLATED",
+                    SatelliteVegetationObservationModel.quality_status != "NO_USABLE_OBSERVATION",
+                )
+                .order_by(
+                    SatelliteVegetationObservationModel.observation_date.desc(),
+                    SatelliteVegetationObservationModel.created_at.desc(),
+                )
+                .first()
+            )
+
+            latest_item = None
+            if existing_historical:
+                latest_item = SatelliteObservationItem(
+                    id=existing_historical.id,
+                    farm_id=existing_historical.farm_id,
+                    observation_date=existing_historical.observation_date,
+                    product_id=existing_historical.product_id,
+                    tile_id=existing_historical.tile_id,
+                    sensor=existing_historical.sensor,
+                    mean_ndvi=existing_historical.mean_ndvi,
+                    median_ndvi=existing_historical.median_ndvi,
+                    min_ndvi=existing_historical.min_ndvi,
+                    max_ndvi=existing_historical.max_ndvi,
+                    std_ndvi=existing_historical.std_ndvi,
+                    mean_ndmi=existing_historical.mean_ndmi,
+                    valid_pixel_count=existing_historical.valid_pixel_count,
+                    total_pixel_count=existing_historical.total_pixel_count,
+                    farm_coverage_percent=existing_historical.farm_coverage_percent,
+                    cloud_masked_percent=existing_historical.cloud_masked_percent,
+                    spatial_resolution_meters=existing_historical.spatial_resolution_meters,
+                    quality_status=SatelliteObservationQuality(existing_historical.quality_status),
+                    quality_notes=existing_historical.quality_notes,
+                    is_small_farm_warning=existing_historical.is_small_farm_warning,
+                    vegetation_pixel_count=existing_historical.vegetation_pixel_count,
+                    bare_soil_pixel_count=existing_historical.bare_soil_pixel_count,
+                    water_pixel_count=existing_historical.water_pixel_count,
+                    vegetation_coverage_percent=existing_historical.vegetation_coverage_percent,
+                    bare_soil_coverage_percent=existing_historical.bare_soil_coverage_percent,
+                    water_coverage_percent=existing_historical.water_coverage_percent,
+                    vegetation_mean_ndvi=existing_historical.vegetation_mean_ndvi,
+                    vegetation_mean_ndmi=existing_historical.vegetation_mean_ndmi,
+                    bare_soil_mean_ndvi=existing_historical.bare_soil_mean_ndvi,
+                    polygon_area_hectares=existing_historical.polygon_area_hectares or farm.get("calculated_area_hectares"),
+                    raster_discretized_area_hectares=existing_historical.raster_discretized_area_hectares,
+                    radiometric_conversion_provenance=existing_historical.radiometric_conversion_provenance,
+                    data_attribution=existing_historical.data_attribution,
+                    created_at=existing_historical.created_at,
+                )
+
+            return SatelliteSyncResponse(
+                success=False,
+                farm_id=str(farm_id),
+                synced_observations_count=0,
+                latest_observation=latest_item,
+                copernicus_provider_status=indices.get("copernicus_provider_status", "PROVIDER_UNAVAILABLE"),
+                message=(
+                    f"Live Sentinel-2 pass unavailable. Preserving latest historical observation ({existing_historical.observation_date.strftime('%Y-%m-%d')})."
+                    if existing_historical else
+                    "Live Sentinel-2 pass unavailable from Copernicus provider. No historical observation recorded."
+                ),
+            )
 
         # Duplicate checking: If an observation with the exact same product_id was recorded recently (<30m), reuse it
         existing = db.query(SatelliteVegetationObservationModel).filter(
@@ -199,7 +268,8 @@ async def list_observations(
     _get_farm_and_verify_owner(farm_id, current_user, db)
 
     observations = db.query(SatelliteVegetationObservationModel).filter(
-        SatelliteVegetationObservationModel.farm_id == str(farm_id)
+        SatelliteVegetationObservationModel.farm_id == str(farm_id),
+        SatelliteVegetationObservationModel.quality_status != "SYNTHETIC_QA_ISOLATED",
     ).order_by(
         SatelliteVegetationObservationModel.observation_date.desc(),
         SatelliteVegetationObservationModel.created_at.desc()
@@ -218,7 +288,8 @@ async def get_latest_observation(
     _get_farm_and_verify_owner(farm_id, current_user, db)
 
     obs = db.query(SatelliteVegetationObservationModel).filter(
-        SatelliteVegetationObservationModel.farm_id == str(farm_id)
+        SatelliteVegetationObservationModel.farm_id == str(farm_id),
+        SatelliteVegetationObservationModel.quality_status != "SYNTHETIC_QA_ISOLATED",
     ).order_by(
         SatelliteVegetationObservationModel.observation_date.desc(),
         SatelliteVegetationObservationModel.created_at.desc()
@@ -246,7 +317,8 @@ async def get_vegetation_timeseries(
 
     observations = db.query(SatelliteVegetationObservationModel).filter(
         SatelliteVegetationObservationModel.farm_id == str(farm_id),
-        SatelliteVegetationObservationModel.observation_date >= cutoff_date
+        SatelliteVegetationObservationModel.observation_date >= cutoff_date,
+        SatelliteVegetationObservationModel.quality_status != "SYNTHETIC_QA_ISOLATED",
     ).order_by(SatelliteVegetationObservationModel.observation_date.asc()).all()
 
     # Return genuine persisted database observations only (never interpolate or fabricate)
@@ -331,16 +403,6 @@ async def get_latest_raster_map(
     farm = _get_farm_and_verify_owner(farm_id, current_user, db)
     path = get_raster_map_path(str(farm_id), index_type)
     if not path or not os.path.isfile(path):
-        poly_geojson = farm.get("geometry")
-        if poly_geojson:
-            copernicus_client.compute_polygon_indices(
-                polygon_geojson=poly_geojson,
-                farm_area_ha=float(farm.get("calculated_area_hectares", 1.0)),
-                farm_id=str(farm_id),
-            )
-            path = get_raster_map_path(str(farm_id), index_type)
-
-    if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Derived raster map not found for this farm.")
 
     meta = get_spatial_metadata(str(farm_id)) or {}
@@ -361,16 +423,6 @@ async def get_latest_spatial_metadata(
     """
     farm = _get_farm_and_verify_owner(farm_id, current_user, db)
     meta = get_spatial_metadata(str(farm_id))
-    if not meta:
-        poly_geojson = farm.get("geometry")
-        if poly_geojson:
-            copernicus_client.compute_polygon_indices(
-                polygon_geojson=poly_geojson,
-                farm_area_ha=float(farm.get("calculated_area_hectares", 1.0)),
-                farm_id=str(farm_id),
-            )
-            meta = get_spatial_metadata(str(farm_id))
-
     if not meta:
         raise HTTPException(status_code=404, detail="Spatial metadata not available for this farm.")
 

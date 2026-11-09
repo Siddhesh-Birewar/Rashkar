@@ -15,7 +15,8 @@ import os
 import math
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
+import uuid
 import httpx
 import numpy as np
 import pyproj
@@ -51,6 +52,37 @@ DERIVED_RASTER_CACHE_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data_cache", "satellite_rasters")
 )
 os.makedirs(DERIVED_RASTER_CACHE_DIR, exist_ok=True)
+
+
+def sanitize_farm_id(farm_id: Any) -> str:
+    """
+    Validates that farm_id is a valid UUID and returns its canonical string representation.
+    Rejects directory traversal sequences and non-UUID identifiers.
+    """
+    if farm_id is None:
+        raise ValueError("farm_id cannot be None")
+    raw_str = str(farm_id).strip()
+    try:
+        parsed = uuid.UUID(raw_str)
+        return str(parsed)
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError(f"Invalid farm_id: {raw_str!r}. Must be a valid UUID.")
+
+
+def _safe_raster_cache_path(farm_id: Any, suffix: str) -> str:
+    """
+    Constructs and verifies an absolute filesystem path inside DERIVED_RASTER_CACHE_DIR.
+    Guarantees strict containment to prevent directory traversal.
+    """
+    clean_id = sanitize_farm_id(farm_id)
+    clean_suffix = str(suffix).strip().lstrip(os.sep)
+    if ".." in clean_suffix or "/" in clean_suffix or "\\" in clean_suffix:
+        raise ValueError(f"Invalid suffix for raster cache: {suffix!r}")
+
+    target = os.path.abspath(os.path.join(DERIVED_RASTER_CACHE_DIR, f"{clean_id}_{clean_suffix}"))
+    if not (target == DERIVED_RASTER_CACHE_DIR or target.startswith(DERIVED_RASTER_CACHE_DIR + os.sep)):
+        raise ValueError(f"Path traversal attempt detected for farm_id: {farm_id!r}")
+    return target
 
 
 def save_derived_raster_maps(
@@ -166,17 +198,18 @@ def save_derived_raster_maps(
             else:
                 ndmi_rgba[r, c] = [189, 189, 189, 200]
 
-    ndvi_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_ndvi.png")
-    ndmi_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_ndmi.png")
-    scl_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_scl.png")
-    meta_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_meta.json")
+    clean_farm_id = sanitize_farm_id(farm_id)
+    ndvi_path = _safe_raster_cache_path(clean_farm_id, "ndvi.png")
+    ndmi_path = _safe_raster_cache_path(clean_farm_id, "ndmi.png")
+    scl_path = _safe_raster_cache_path(clean_farm_id, "scl.png")
+    meta_path = _safe_raster_cache_path(clean_farm_id, "meta.json")
 
     Image.fromarray(ndvi_rgba).save(ndvi_path, "PNG")
     Image.fromarray(ndmi_rgba).save(ndmi_path, "PNG")
     Image.fromarray(scl_rgba).save(scl_path, "PNG")
 
     meta_data = {
-        "farm_id": str(farm_id),
+        "farm_id": clean_farm_id,
         "product_id": product_id,
         "observation_date": obs_date.isoformat(),
         "bounds": bounds,
@@ -197,97 +230,26 @@ def save_derived_raster_maps(
     return meta_data
 
 
-def generate_synthetic_raster_maps(
-    farm_id: str,
-    polygon_geojson: Dict[str, Any],
-    product_id: str,
-    obs_date: datetime,
-) -> Dict[str, Any]:
-    """Generates synthetic spatial raster maps for test/offline environments."""
-    poly = shape(polygon_geojson)
-    bounds = list(poly.bounds)
-    W, H = 40, 40
-    ndvi_rgba = np.zeros((H, W, 4), dtype=np.uint8)
-    ndmi_rgba = np.zeros((H, W, 4), dtype=np.uint8)
-    scl_rgba = np.zeros((H, W, 4), dtype=np.uint8)
-
-    dx = (bounds[2] - bounds[0]) / W if W > 0 else 0.001
-    dy = (bounds[3] - bounds[1]) / H if H > 0 else 0.001
-    n_veg, n_soil, n_mask = 0, 0, 0
-    from shapely.geometry import Point
-    for r in range(H):
-        y = bounds[3] - (r * dy)
-        for c in range(W):
-            x = bounds[0] + (c * dx)
-            if poly.contains(Point(x, y)):
-                seed = abs(hash((round(x, 5), round(y, 5), obs_date.month))) % 100
-                if seed > 40:
-                    ndvi_rgba[r, c] = [46, 125, 50, 255]
-                    ndmi_rgba[r, c] = [3, 169, 244, 255]
-                    scl_rgba[r, c] = [46, 125, 50, 255]
-                    n_veg += 1
-                elif seed > 10:
-                    ndvi_rgba[r, c] = [215, 180, 140, 255]
-                    ndmi_rgba[r, c] = [215, 180, 140, 255]
-                    scl_rgba[r, c] = [215, 180, 140, 255]
-                    n_soil += 1
-                else:
-                    ndvi_rgba[r, c] = [170, 170, 170, 200]
-                    ndmi_rgba[r, c] = [170, 170, 170, 200]
-                    scl_rgba[r, c] = [117, 117, 117, 240]
-                    n_mask += 1
-
-    ndvi_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_ndvi.png")
-    ndmi_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_ndmi.png")
-    scl_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_scl.png")
-    meta_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_meta.json")
-
-    Image.fromarray(ndvi_rgba).save(ndvi_path, "PNG")
-    Image.fromarray(ndmi_rgba).save(ndmi_path, "PNG")
-    Image.fromarray(scl_rgba).save(scl_path, "PNG")
-
-    meta_data = {
-        "farm_id": str(farm_id),
-        "product_id": product_id,
-        "observation_date": obs_date.isoformat(),
-        "bounds": bounds,
-        "width": W,
-        "height": H,
-        "spatial_resolution_meters": 10.0,
-        "b11_native_resolution_meters": 20.0,
-        "vegetation_pixel_count": n_veg,
-        "bare_soil_pixel_count": n_soil,
-        "water_pixel_count": 0,
-        "cloud_masked_pixel_count": 0,
-        "boundary_masked_pixel_count": n_mask,
-        "total_pixel_count": n_veg + n_soil + n_mask,
-    }
-    with open(meta_path, "w") as f:
-        json.dump(meta_data, f, indent=2)
-    return meta_data
-
-
-def get_raster_map_path(farm_id: str, index_type: str = "ndvi") -> Optional[str]:
-    type_clean = index_type.lower()
+def get_raster_map_path(farm_id: Any, index_type: str = "ndvi") -> Optional[str]:
+    type_clean = str(index_type).lower().strip()
     if type_clean not in ("ndvi", "ndmi", "scl"):
         type_clean = "ndvi"
-    path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_{type_clean}.png")
+    try:
+        path = _safe_raster_cache_path(farm_id, f"{type_clean}.png")
+    except ValueError:
+        return None
     if os.path.isfile(path):
         return path
-    default_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"94a1f16e-bf0d-4d3f-9bd3-d63a57189818_{type_clean}.png")
-    if os.path.isfile(default_path):
-        return default_path
     return None
 
 
-def get_spatial_metadata(farm_id: str) -> Optional[Dict[str, Any]]:
-    meta_path = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{farm_id}_meta.json")
+def get_spatial_metadata(farm_id: Any) -> Optional[Dict[str, Any]]:
+    try:
+        meta_path = _safe_raster_cache_path(farm_id, "meta.json")
+    except ValueError:
+        return None
     if not os.path.isfile(meta_path):
-        default_path = os.path.join(DERIVED_RASTER_CACHE_DIR, "94a1f16e-bf0d-4d3f-9bd3-d63a57189818_meta.json")
-        if os.path.isfile(default_path):
-            meta_path = default_path
-        else:
-            return None
+        return None
     try:
         with open(meta_path, "r") as f:
             return json.load(f)
@@ -665,23 +627,9 @@ class CopernicusClient:
             except Exception as e:
                 logger.warning("Earth Search STAC search failed: %s", e)
 
-            # Robust fallback for Baramati agricultural polygon test fixture
             if not feature:
-                feature = {
-                    "id": "S2B_43QDA_20261104_0_L2A",
-                    "properties": {
-                        "datetime": "2026-11-04T05:43:53.880000Z",
-                        "s2:processing_baseline": "05.13",
-                        "eo:cloud_cover": 5.516,
-                        "earthsearch:boa_offset_applied": True,
-                    },
-                    "assets": {
-                        "red": {"href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/43/Q/DA/2026/11/S2B_43QDA_20261104_0_L2A/B04.tif"},
-                        "nir": {"href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/43/Q/DA/2026/11/S2B_43QDA_20261104_0_L2A/B08.tif"},
-                        "swir16": {"href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/43/Q/DA/2026/11/S2B_43QDA_20261104_0_L2A/B11.tif"},
-                        "scl": {"href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/43/Q/DA/2026/11/S2B_43QDA_20261104_0_L2A/SCL.tif"},
-                    }
-                }
+                logger.warning("No usable Sentinel-2 L2A STAC scene found covering farm geometry.")
+                return None
 
             props = feature.get("properties", {})
             assets = feature.get("assets", {})
@@ -694,31 +642,32 @@ class CopernicusClient:
                 logger.warning("Required band URLs missing in STAC feature")
                 return None
 
-            # 2. Open B04 to get CRS, transform, and embedded scales/offsets
-            with rasterio.open(b04_url) as src_b04:
-                raster_crs = src_b04.crs.to_string() if src_b04.crs else "EPSG:32643"
-                scales = src_b04.scales
-                offsets = src_b04.offsets
+            with rasterio.Env(GDAL_HTTP_TIMEOUT="15", GDAL_HTTP_MAX_RETRY="2", CPL_VSIL_CURL_TIMEOUT="15"):
+                # 2. Open B04 to get CRS, transform, and embedded scales/offsets
+                with rasterio.open(b04_url) as src_b04:
+                    raster_crs = src_b04.crs.to_string() if src_b04.crs else "EPSG:32643"
+                    scales = src_b04.scales
+                    offsets = src_b04.offsets
 
-                transformer = pyproj.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
+                    transformer = pyproj.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
 
-                def reproject_coords(coords):
-                    x, y = transformer.transform(coords[:, 0], coords[:, 1])
-                    return np.column_stack([x, y])
+                    def reproject_coords(coords):
+                        x, y = transformer.transform(coords[:, 0], coords[:, 1])
+                        return np.column_stack([x, y])
 
-                poly_proj = shapely.transform(poly, reproject_coords)
-                geom_proj = [mapping(poly_proj)]
+                    poly_proj = shapely.transform(poly, reproject_coords)
+                    geom_proj = [mapping(poly_proj)]
 
-                out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True, all_touched=False)
+                    out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True, all_touched=False)
 
-            with rasterio.open(b08_url) as src_b08:
-                out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True, all_touched=False)
+                with rasterio.open(b08_url) as src_b08:
+                    out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True, all_touched=False)
 
-            with rasterio.open(b11_url) as src_b11:
-                out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True, all_touched=False)
+                with rasterio.open(b11_url) as src_b11:
+                    out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True, all_touched=False)
 
-            with rasterio.open(scl_url) as src_scl:
-                out_scl, transform_scl = mask(src_scl, geom_proj, crop=True, all_touched=False)
+                with rasterio.open(scl_url) as src_scl:
+                    out_scl, transform_scl = mask(src_scl, geom_proj, crop=True, all_touched=False)
 
             # 3. Resample B11 (20m -> 10m grid) using Bilinear interpolation
             b11_resampled = np.empty_like(out_b08, dtype=np.float32)
@@ -1000,14 +949,15 @@ class CopernicusClient:
         polygon_geojson: Dict[str, Any],
         farm_area_ha: float,
         observation_date: Optional[datetime] = None,
-        use_live_raster: bool = False,
+        use_live_raster: bool = True,
         farm_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Calculates NDVI, NDMI, and spatial quality statistics for a farm polygon.
         If use_live_raster=True, attempts real live raster retrieval and clipping.
-        If live raster retrieval fails or is disabled, performs deterministic pixel sampling
-        over the polygon with verified geographic bounds and SCL masking.
+        If live raster retrieval fails or is unavailable, fails closed:
+        returns quality_status="NO_USABLE_OBSERVATION" and copernicus_provider_status="PROVIDER_UNAVAILABLE"
+        without generating fake records, hash-based simulation, or synthetic rasters.
         """
         if use_live_raster:
             live_res = self.fetch_live_raster_indices(
@@ -1019,126 +969,28 @@ class CopernicusClient:
             if live_res is not None:
                 return live_res
 
+        # Fail-closed retrieval: when live Sentinel-2 retrieval fails or no usable scene is found,
+        # return quality_status="NO_USABLE_OBSERVATION" and copernicus_provider_status="PROVIDER_UNAVAILABLE",
+        # without generating or persisting fake records or synthetic rasters.
         obs_date = observation_date or datetime.utcnow()
-        poly = shape(polygon_geojson)
-        bounds = poly.bounds  # minx, miny, maxx, maxy
-        centroid = poly.centroid
-
-        # 10m Sentinel-2 pixel size approx 0.0001 degrees latitude
-        # Calculate pixel grid covering the farm boundary
-        dx = max(0.0001, (bounds[2] - bounds[0]) / max(2, int(math.sqrt(farm_area_ha * 100))))
-        dy = max(0.0001, (bounds[3] - bounds[1]) / max(2, int(math.sqrt(farm_area_ha * 100))))
-
-        pixels_ndvi = []
-        pixels_ndmi = []
-        cloud_count = 0
-        total_pixels = 0
-
-        # Sample points across farm geometry
-        curr_y = bounds[1] + dy / 2.0
-        while curr_y <= bounds[3]:
-            curr_x = bounds[0] + dx / 2.0
-            while curr_x <= bounds[2]:
-                from shapely.geometry import Point
-                pt = Point(curr_x, curr_y)
-                if poly.contains(pt):
-                    total_pixels += 1
-                    # Deterministic simulated reflectance based on seasonal lat/lon
-                    # High vigor for irrigated areas in winter/spring, lower in peak summer
-                    seed = abs(hash((round(curr_x, 5), round(curr_y, 5), obs_date.month))) % 100
-                    # SCL simulation: 90% vegetation/soil, 10% occasional cloud
-                    scl_class = 4 if seed > 10 else 9
-
-                    if scl_class in SCL_MASKED_CLASSES:
-                        cloud_count += 1
-                    else:
-                        # Baseline reflectance: NIR (B08) and Red (B04)
-                        # Produces realistic NDVI between 0.40 and 0.78
-                        nir = 0.35 + (seed / 400.0)
-                        red = 0.08 + (seed / 1000.0)
-                        swir = 0.16 + (seed / 800.0)
-
-                        ndvi = (nir - red) / (nir + red)
-                        ndmi = (nir - swir) / (nir + swir)
-
-                        pixels_ndvi.append(ndvi)
-                        pixels_ndmi.append(ndmi)
-                curr_x += dx
-            curr_y += dy
-
-        if total_pixels == 0:
-            total_pixels = max(1, int(farm_area_ha * 100))  # approx 100 pixels per hectare at 10m
-            for i in range(total_pixels):
-                pixels_ndvi.append(0.62)
-                pixels_ndmi.append(0.31)
-
-        valid_count = len(pixels_ndvi)
-        cloud_pct = round((cloud_count / total_pixels) * 100.0, 1) if total_pixels > 0 else 0.0
-        coverage_pct = round((valid_count / total_pixels) * 100.0, 1) if total_pixels > 0 else 0.0
-
-        # Compute stats
-        if valid_count > 0:
-            pixels_ndvi.sort()
-            mean_ndvi = round(sum(pixels_ndvi) / valid_count, 3)
-            median_ndvi = round(pixels_ndvi[valid_count // 2], 3)
-            min_ndvi = round(min(pixels_ndvi), 3)
-            max_ndvi = round(max(pixels_ndvi), 3)
-            variance = sum((x - mean_ndvi) ** 2 for x in pixels_ndvi) / valid_count
-            std_ndvi = round(math.sqrt(variance), 3)
-            mean_ndmi = round(sum(pixels_ndmi) / valid_count, 3)
-        else:
-            mean_ndvi = None
-            median_ndvi = None
-            min_ndvi = None
-            max_ndvi = None
-            std_ndvi = None
-            mean_ndmi = None
-
-        # Small farm safeguard
-        is_small_farm = (farm_area_ha < 0.5) or (valid_count < 5)
-
-        # Quality classification
-        if cloud_pct > 50.0:
-            quality = "CLOUD_OBSTRUCTED"
-            notes = f"Observation obstructed by clouds ({cloud_pct}% masked)."
-        elif coverage_pct < 50.0:
-            quality = "INSUFFICIENT_PIXELS"
-            notes = f"Insufficient valid pixels ({coverage_pct}% farm coverage)."
-        elif is_small_farm:
-            quality = "SMALL_FARM_WARNING"
-            notes = f"Farm parcel ({farm_area_ha:.2f} ha, {valid_count} pixels) is subject to 10m Sentinel-2 boundary pixel edge effects."
-        else:
-            quality = "VALID_OBSERVATION"
-            notes = f"High quality cloud-free observation ({valid_count} valid 10m pixels)."
-
-        product_id = f"S2B_MSIL2A_{obs_date.strftime('%Y%m%d')}T053649_N0500_R119_T43QDB"
-        if farm_id:
-            try:
-                generate_synthetic_raster_maps(
-                    farm_id=str(farm_id),
-                    polygon_geojson=polygon_geojson,
-                    product_id=product_id,
-                    obs_date=obs_date,
-                )
-            except Exception as ex:
-                logger.warning("Failed to generate synthetic raster maps: %s", ex)
-
         return {
             "observation_date": obs_date,
-            "product_id": product_id,
-            "tile_id": "T43QDB",
+            "product_id": None,
+            "tile_id": None,
             "sensor": "Sentinel-2 L2A",
-            "processing_baseline": "N0500",
-            "mean_ndvi": mean_ndvi,
-            "median_ndvi": median_ndvi,
-            "min_ndvi": min_ndvi,
-            "max_ndvi": max_ndvi,
-            "std_ndvi": std_ndvi,
-            "mean_ndmi": mean_ndmi,
-            "valid_pixel_count": valid_count,
-            "total_pixel_count": total_pixels,
-            "farm_coverage_percent": coverage_pct,
-            "cloud_masked_percent": cloud_pct,
+            "processing_baseline": None,
+            "mean_ndvi": None,
+            "median_ndvi": None,
+            "min_ndvi": None,
+            "max_ndvi": None,
+            "std_ndvi": None,
+            "mean_ndmi": None,
+            "surface_mean_ndvi": None,
+            "surface_mean_ndmi": None,
+            "valid_pixel_count": 0,
+            "total_pixel_count": 0,
+            "farm_coverage_percent": 0.0,
+            "cloud_masked_percent": 0.0,
             "spatial_resolution_meters": 10.0,
             "b11_native_resolution_meters": 20.0,
             "b08_native_resolution_meters": 10.0,
@@ -1146,10 +998,12 @@ class CopernicusClient:
             "resampling_method": "bilinear",
             "resampling_notes": "Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.",
             "scl_resampling_method": "nearest_neighbour",
-            "quality_status": quality,
-            "quality_notes": notes,
-            "is_small_farm_warning": is_small_farm,
-            "copernicus_provider_status": "AUTHENTICATED" if self.has_credentials else "STANDALONE_DETERMINISTIC_MODEL",
+            "quality_status": "NO_USABLE_OBSERVATION",
+            "quality_notes": "Live Sentinel-2 observation unavailable or failed retrieval. No synthetic data generated.",
+            "is_small_farm_warning": False,
+            "copernicus_provider_status": "PROVIDER_UNAVAILABLE",
+            "radiometric_conversion_provenance": "NONE",
+            "data_attribution": "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.",
         }
 
 

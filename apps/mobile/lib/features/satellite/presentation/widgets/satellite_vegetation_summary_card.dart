@@ -148,6 +148,10 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
     final ndmiTitle = obs.vegetationMeanNdmi != null ? 'Canopy NDMI' : 'Mixed-Surface NDMI';
     final ndmiSubtitle = obs.vegetationMeanNdmi != null ? 'Canopy Moisture Reflectance' : 'Mixed Surface Reflectance';
     final vegPct = obs.vegetationCoveragePercent?.toStringAsFixed(1);
+    final now = DateTime.now();
+    final isToday = obs.observationDate.year == now.year &&
+        obs.observationDate.month == now.month &&
+        obs.observationDate.day == now.day;
 
     return Card(
       elevation: 2,
@@ -184,12 +188,44 @@ class _SatelliteVegetationSummaryCardState extends State<SatelliteVegetationSumm
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
                         ),
                         Text(
-                          'Observation: ${_formatDate(obs.observationDate)} (${obs.sensor})',
-                          style: const TextStyle(fontSize: 11, color: Colors.black54),
+                          isToday
+                              ? 'Observation: ${_formatDate(obs.observationDate)} (${obs.sensor})'
+                              : 'Historical Observation: ${_formatDate(obs.observationDate)} (${obs.sensor})',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isToday ? FontWeight.normal : FontWeight.w600,
+                            color: isToday ? Colors.black54 : const Color(0xFFB45309),
+                          ),
                         ),
                       ],
                     ),
                   ),
+                  if (!isToday) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFF59E0B)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.history, size: 11, color: Color(0xFFB45309)),
+                          SizedBox(width: 3),
+                          Text(
+                            'Historical',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(

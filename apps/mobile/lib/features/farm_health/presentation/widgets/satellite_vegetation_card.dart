@@ -98,6 +98,12 @@ class SatelliteVegetationCard extends StatelessWidget {
                     label: _formatDate(satellite.observationDate),
                     color: const Color(0xFF2E7D32),
                   ),
+                if (satellite.observationDate != null && (satellite.observationAgeDays ?? 0) > 0)
+                  _buildMetaChip(
+                    icon: Icons.history_rounded,
+                    label: 'Historical (${_formatDate(satellite.observationDate)})',
+                    color: const Color(0xFFB45309),
+                  ),
                 if (satellite.observationAgeDays != null)
                   _buildMetaChip(
                     icon: Icons.access_time_rounded,

@@ -218,7 +218,7 @@ def test_spatial_resolution_truth_in_polygon_computation():
         "type": "Polygon",
         "coordinates": [[[74.5, 18.1], [74.52, 18.1], [74.52, 18.12], [74.5, 18.12], [74.5, 18.1]]]
     }
-    result = copernicus_client.compute_polygon_indices(poly, farm_area_ha=2.5)
+    result = copernicus_client.compute_polygon_indices(poly, farm_area_ha=2.5, use_live_raster=False)
 
     assert result["spatial_resolution_meters"] == 10.0
     assert result["b11_native_resolution_meters"] == 20.0
@@ -245,35 +245,114 @@ def test_satellite_endpoint_ownership_enforcement(client):
 
 
 def test_polygon_indices_computation_normal_farm():
+    import unittest.mock
     poly = {
         "type": "Polygon",
         "coordinates": [[[74.9, 18.0], [74.92, 18.0], [74.92, 18.02], [74.9, 18.02], [74.9, 18.0]]]
     }
-    indices = copernicus_client.compute_polygon_indices(
-        polygon_geojson=poly,
-        farm_area_ha=2.5,
-    )
-    assert indices["valid_pixel_count"] > 10
-    assert indices["mean_ndvi"] is not None
-    assert 0.0 <= indices["mean_ndvi"] <= 1.0
-    assert indices["mean_ndmi"] is not None
-    assert indices["spatial_resolution_meters"] == 10.0
-    assert indices["is_small_farm_warning"] is False
-    assert indices["quality_status"] == "VALID_OBSERVATION"
+    mock_live = {
+        "observation_date": datetime.utcnow(),
+        "product_id": "S2B_MSIL2A_20261104T053009_N0513_R105_T43QDB_20261104T073410.SAFE",
+        "tile_id": "T43QDB",
+        "sensor": "Sentinel-2 L2A",
+        "processing_baseline": "N0513",
+        "valid_pixel_count": 25,
+        "total_pixel_count": 25,
+        "mean_ndvi": 0.55,
+        "median_ndvi": 0.55,
+        "min_ndvi": 0.40,
+        "max_ndvi": 0.70,
+        "std_ndvi": 0.08,
+        "mean_ndmi": 0.28,
+        "surface_mean_ndvi": 0.55,
+        "surface_mean_ndmi": 0.28,
+        "spatial_resolution_meters": 10.0,
+        "b11_native_resolution_meters": 20.0,
+        "b08_native_resolution_meters": 10.0,
+        "target_grid_meters": 10.0,
+        "resampling_method": "bilinear",
+        "resampling_notes": "Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.",
+        "scl_resampling_method": "nearest_neighbour",
+        "is_small_farm_warning": False,
+        "quality_status": "VALID_OBSERVATION",
+        "quality_notes": "Clean retrieval",
+        "copernicus_provider_status": "LIVE_SENTINEL_2_L2A_RASTER",
+        "radiometric_conversion_provenance": "BOA_ADD_OFFSET_-1000",
+        "data_attribution": "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.",
+        "raster_crs": "EPSG:32643",
+        "asset_urls": {},
+    }
+    with unittest.mock.patch.object(copernicus_client, "fetch_live_raster_indices", return_value=mock_live):
+        indices = copernicus_client.compute_polygon_indices(
+            polygon_geojson=poly,
+            farm_area_ha=2.5,
+        )
+        assert indices["valid_pixel_count"] > 10
+        assert indices["mean_ndvi"] is not None
+        assert 0.0 <= indices["mean_ndvi"] <= 1.0
+        assert indices["mean_ndmi"] is not None
+        assert indices["spatial_resolution_meters"] == 10.0
+        assert indices["is_small_farm_warning"] is False
+        assert indices["quality_status"] == "VALID_OBSERVATION"
+
+    # Fails closed when live retrieval is unavailable
+    with unittest.mock.patch.object(copernicus_client, "fetch_live_raster_indices", return_value=None):
+        indices_fail = copernicus_client.compute_polygon_indices(
+            polygon_geojson=poly,
+            farm_area_ha=2.5,
+        )
+        assert indices_fail["quality_status"] == "NO_USABLE_OBSERVATION"
+        assert indices_fail["copernicus_provider_status"] == "PROVIDER_UNAVAILABLE"
+        assert indices_fail["mean_ndvi"] is None
+        assert indices_fail["valid_pixel_count"] == 0
 
 
 def test_polygon_indices_computation_small_farm_warning():
+    import unittest.mock
     poly = {
         "type": "Polygon",
         "coordinates": [[[74.91, 18.01], [74.911, 18.01], [74.911, 18.011], [74.91, 18.011], [74.91, 18.01]]]
     }
-    indices = copernicus_client.compute_polygon_indices(
-        polygon_geojson=poly,
-        farm_area_ha=0.2,  # <0.5 ha
-    )
-    assert indices["is_small_farm_warning"] is True
-    assert indices["quality_status"] == "SMALL_FARM_WARNING"
-    assert "boundary pixel edge effects" in indices["quality_notes"]
+    mock_small = {
+        "observation_date": datetime.utcnow(),
+        "product_id": "S2B_MSIL2A_20261104T053009_N0513_R105_T43QDB_20261104T073410.SAFE",
+        "tile_id": "T43QDB",
+        "sensor": "Sentinel-2 L2A",
+        "processing_baseline": "N0513",
+        "valid_pixel_count": 4,
+        "total_pixel_count": 4,
+        "mean_ndvi": 0.42,
+        "median_ndvi": 0.42,
+        "min_ndvi": 0.35,
+        "max_ndvi": 0.50,
+        "std_ndvi": 0.05,
+        "mean_ndmi": 0.18,
+        "surface_mean_ndvi": 0.42,
+        "surface_mean_ndmi": 0.18,
+        "spatial_resolution_meters": 10.0,
+        "b11_native_resolution_meters": 20.0,
+        "b08_native_resolution_meters": 10.0,
+        "target_grid_meters": 10.0,
+        "resampling_method": "bilinear",
+        "resampling_notes": "Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.",
+        "scl_resampling_method": "nearest_neighbour",
+        "is_small_farm_warning": True,
+        "quality_status": "SMALL_FARM_WARNING",
+        "quality_notes": "boundary pixel edge effects (<0.5 ha)",
+        "copernicus_provider_status": "LIVE_SENTINEL_2_L2A_RASTER",
+        "radiometric_conversion_provenance": "BOA_ADD_OFFSET_-1000",
+        "data_attribution": "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.",
+        "raster_crs": "EPSG:32643",
+        "asset_urls": {},
+    }
+    with unittest.mock.patch.object(copernicus_client, "fetch_live_raster_indices", return_value=mock_small):
+        indices = copernicus_client.compute_polygon_indices(
+            polygon_geojson=poly,
+            farm_area_ha=0.2,  # <0.5 ha
+        )
+        assert indices["is_small_farm_warning"] is True
+        assert indices["quality_status"] == "SMALL_FARM_WARNING"
+        assert "boundary pixel edge effects" in indices["quality_notes"]
 
 
 # ===========================================================================
@@ -281,48 +360,111 @@ def test_polygon_indices_computation_small_farm_warning():
 # ===========================================================================
 
 def test_satellite_sync_and_timeseries_endpoints(client):
-    # 1. Sync satellite observation
-    res = client.post(f"/api/v1/farms/{TEST_FARM_ID}/satellite/sync")
-    assert res.status_code == 200
-    sync_data = res.json()
-    assert sync_data["success"] is True
-    assert sync_data["latest_observation"] is not None
-    assert sync_data["latest_observation"]["mean_ndvi"] is not None
-    assert sync_data["latest_observation"]["spatial_resolution_meters"] == 10.0
+    import os
+    import json
+    import unittest.mock
+    from PIL import Image
+    from cropnet.services.api.app.services.satellite.copernicus_client import DERIVED_RASTER_CACHE_DIR
 
-    # 2. Get latest observation
-    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest")
-    assert res.status_code == 200
-    latest = res.json()
-    assert latest["farm_id"] == str(TEST_FARM_ID)
-    assert latest["mean_ndvi"] is not None
-    assert latest["mean_ndmi"] is not None
+    mock_live = {
+        "observation_date": datetime.utcnow(),
+        "product_id": "S2B_MSIL2A_20261104T053009_N0513_R105_T43QDB_20261104T073410.SAFE",
+        "tile_id": "T43QDB",
+        "sensor": "Sentinel-2 L2A",
+        "processing_baseline": "N0513",
+        "valid_pixel_count": 25,
+        "total_pixel_count": 25,
+        "farm_coverage_percent": 100.0,
+        "cloud_masked_percent": 0.0,
+        "mean_ndvi": 0.55,
+        "median_ndvi": 0.55,
+        "min_ndvi": 0.40,
+        "max_ndvi": 0.70,
+        "std_ndvi": 0.08,
+        "mean_ndmi": 0.28,
+        "surface_mean_ndvi": 0.55,
+        "surface_mean_ndmi": 0.28,
+        "spatial_resolution_meters": 10.0,
+        "b11_native_resolution_meters": 20.0,
+        "b08_native_resolution_meters": 10.0,
+        "target_grid_meters": 10.0,
+        "resampling_method": "bilinear",
+        "resampling_notes": "Resampled 20m SWIR (B11) to 10m grid (Bilinear). Note: Resampling does not create native 10m information.",
+        "scl_resampling_method": "nearest_neighbour",
+        "is_small_farm_warning": False,
+        "quality_status": "VALID_OBSERVATION",
+        "quality_notes": "Clean retrieval",
+        "copernicus_provider_status": "LIVE_SENTINEL_2_L2A_RASTER",
+        "radiometric_conversion_provenance": "BOA_ADD_OFFSET_-1000",
+        "data_attribution": "Copernicus Sentinel data [2026], processed by ESA, hosted on AWS by Element 84.",
+        "raster_crs": "EPSG:32643",
+        "asset_urls": {},
+    }
 
-    # 3. List historical observations
-    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/observations")
-    assert res.status_code == 200
-    obs_list = res.json()
-    assert len(obs_list) >= 1
+    os.makedirs(DERIVED_RASTER_CACHE_DIR, exist_ok=True)
+    ndvi_png = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{TEST_FARM_ID}_ndvi.png")
+    meta_json = os.path.join(DERIVED_RASTER_CACHE_DIR, f"{TEST_FARM_ID}_meta.json")
+    img = Image.new("RGBA", (10, 10), (100, 200, 100, 255))
+    img.save(ndvi_png)
+    with open(meta_json, "w") as f:
+        json.dump({
+            "farm_id": str(TEST_FARM_ID),
+            "spatial_resolution_meters": 10.0,
+            "bounds": [74.9, 18.0, 74.92, 18.02],
+            "crs": "EPSG:32643"
+        }, f)
 
-    # 4. Get vegetation timeseries (genuine observations without synthetic fabrication)
-    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/timeseries?months=6")
-    assert res.status_code == 200
-    ts = res.json()
-    assert len(ts["series"]) >= 1
-    assert ts["vegetation_interpretation"] != ""
-    assert "MUST NEVER be interpreted as direct diagnoses" in ts["scientific_disclaimer"]
+    try:
+        with unittest.mock.patch.object(copernicus_client, "compute_polygon_indices", return_value=mock_live):
+            # 1. Sync satellite observation
+            res = client.post(f"/api/v1/farms/{TEST_FARM_ID}/satellite/sync")
+            if res.status_code != 200:
+                print("SYNC ERROR:", res.status_code, res.text)
+            assert res.status_code == 200
+            sync_data = res.json()
+            assert sync_data["success"] is True
+            assert sync_data["latest_observation"] is not None
+            assert sync_data["latest_observation"]["mean_ndvi"] is not None
+            assert sync_data["latest_observation"]["spatial_resolution_meters"] == 10.0
 
-    # 5. Get spatial raster metadata
-    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/spatial-metadata")
-    assert res.status_code == 200
-    meta = res.json()
-    assert meta["farm_id"] == str(TEST_FARM_ID)
-    assert meta["spatial_resolution_meters"] == 10.0
-    assert len(meta["bounds"]) == 4
+            # 2. Get latest observation
+            res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest")
+            assert res.status_code == 200
+            latest = res.json()
+            assert latest["farm_id"] == str(TEST_FARM_ID)
+            assert latest["mean_ndvi"] is not None
+            assert latest["mean_ndmi"] is not None
 
-    # 6. Get derived raster map image (PNG)
-    res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/raster-map?index_type=ndvi")
-    assert res.status_code == 200
-    assert res.headers["content-type"] == "image/png"
-    assert len(res.content) > 0
-    assert "X-Raster-Bounds" in res.headers
+            # 3. List historical observations
+            res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/observations")
+            assert res.status_code == 200
+            obs_list = res.json()
+            assert len(obs_list) >= 1
+
+            # 4. Get vegetation timeseries (genuine observations without synthetic fabrication)
+            res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/timeseries?months=6")
+            assert res.status_code == 200
+            ts = res.json()
+            assert len(ts["series"]) >= 1
+            assert ts["vegetation_interpretation"] != ""
+            assert "MUST NEVER be interpreted as direct diagnoses" in ts["scientific_disclaimer"]
+
+            # 5. Get spatial raster metadata
+            res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/spatial-metadata")
+            assert res.status_code == 200
+            meta = res.json()
+            assert meta["farm_id"] == str(TEST_FARM_ID)
+            assert meta["spatial_resolution_meters"] == 10.0
+            assert len(meta["bounds"]) == 4
+
+            # 6. Get derived raster map image (PNG)
+            res = client.get(f"/api/v1/farms/{TEST_FARM_ID}/satellite/latest/raster-map?index_type=ndvi")
+            assert res.status_code == 200
+            assert res.headers["content-type"] == "image/png"
+            assert len(res.content) > 0
+            assert "X-Raster-Bounds" in res.headers
+    finally:
+        if os.path.exists(ndvi_png):
+            os.remove(ndvi_png)
+        if os.path.exists(meta_json):
+            os.remove(meta_json)
