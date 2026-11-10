@@ -29,37 +29,12 @@ import {
 import { farmsApi } from "@/lib/api/client";
 import { useFarm } from "@/lib/farm-context";
 import type { GeoJSONPolygon } from "@/lib/api/types";
-
-const PILOT_COORDINATE_PRESETS: Record<string, [number, number][]> = {
-  Baramati: [
-    [74.5305, 18.1824],
-    [74.5335, 18.1824],
-    [74.5319, 18.1800],
-    [74.5302, 18.1800],
-    [74.5305, 18.1824],
-  ],
-  Indapur: [
-    [75.0200, 18.1150],
-    [75.0235, 18.1150],
-    [75.0235, 18.1120],
-    [75.0200, 18.1120],
-    [75.0200, 18.1150],
-  ],
-  Maval: [
-    [73.5350, 18.7520],
-    [73.5380, 18.7520],
-    [73.5380, 18.7490],
-    [73.5350, 18.7490],
-    [73.5350, 18.7520],
-  ],
-  Mulshi: [
-    [73.5120, 18.5050],
-    [73.5160, 18.5050],
-    [73.5160, 18.5020],
-    [73.5120, 18.5020],
-    [73.5120, 18.5050],
-  ],
-};
+import { FarmMap } from "@/components/dynamic-farm-map";
+import {
+  latLngsToGeoJSONPolygon,
+  validateFarmPolygon,
+  calculateGeodesicAreaHectares,
+} from "@/lib/geo-utils";
 
 export function FarmSetupForm() {
   const router = useRouter();
@@ -72,17 +47,44 @@ export function FarmSetupForm() {
   const [irrigationType, setIrrigationType] = useState("irrigated");
   const [waterSource, setWaterSource] = useState("canal");
 
-  const [coordinates, setCoordinates] = useState<[number, number][]>(
-    PILOT_COORDINATE_PRESETS["Baramati"]
-  );
+  // Real interactive polygon boundary vertices: [latitude, longitude][]
+  const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
+  const [areaPreview, setAreaPreview] = useState<{ hectares: number; acres: number }>({
+    hectares: 0,
+    acres: 0,
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleTalukaChange = (newTaluka: string) => {
-    setTaluka(newTaluka);
-    if (PILOT_COORDINATE_PRESETS[newTaluka]) {
-      setCoordinates(PILOT_COORDINATE_PRESETS[newTaluka]);
+  const handleBoundaryChange = (
+    pts: [number, number][],
+    preview: { hectares: number; acres: number }
+  ) => {
+    setBoundaryPoints(pts);
+    setAreaPreview(preview);
+    if (error && pts.length >= 3) {
+      setError(null);
     }
+  };
+
+  const handleProceedToStep2 = () => {
+    if (!name.trim()) {
+      setError("Please provide a name for this farm parcel.");
+      return;
+    }
+    setError(null);
+    setStep(2);
+  };
+
+  const handleProceedToStep3 = () => {
+    const validation = validateFarmPolygon(boundaryPoints);
+    if (!validation.isValid) {
+      setError(validation.error || "Please mark at least 3 corners on the map to form a closed boundary.");
+      return;
+    }
+    setError(null);
+    setStep(3);
   };
 
   const handleSaveFarm = async () => {
@@ -92,14 +94,19 @@ export function FarmSetupForm() {
       return;
     }
 
+    const validation = validateFarmPolygon(boundaryPoints);
+    if (!validation.isValid) {
+      setError(validation.error || "Please draw a valid farm boundary polygon.");
+      setStep(2);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
 
-      const geometry: GeoJSONPolygon = {
-        type: "Polygon",
-        coordinates: [coordinates],
-      };
+      // Convert [lat, lng] points to EPSG:4326 GeoJSON Polygon [lng, lat] closed ring
+      const geometry = latLngsToGeoJSONPolygon(boundaryPoints);
 
       const newFarm = await farmsApi.create({
         name: name.trim(),
@@ -127,7 +134,14 @@ export function FarmSetupForm() {
       <CardContent className="p-0">
         <div className="border-b border-line p-5 sm:p-6">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-extrabold text-ink">Farm registration wizard</p>
+            <div>
+              <p className="text-sm font-extrabold text-ink">Farm registration wizard</p>
+              <p className="text-xs text-muted mt-0.5">
+                {step === 1 && "Step 1: Parcel details & agro-climatic region"}
+                {step === 2 && "Step 2: Draw boundary on satellite map"}
+                {step === 3 && "Step 3: Review & confirm registration"}
+              </p>
+            </div>
             <Badge>Step {step} of 3</Badge>
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e7eee8]">
@@ -142,7 +156,7 @@ export function FarmSetupForm() {
           <div className="m-5 sm:m-6 flex items-start gap-3 rounded-xl bg-red-50 p-4 text-xs text-red-800 border border-red-200">
             <AlertCircle size={17} className="shrink-0 text-red-600" />
             <div>
-              <p className="font-bold">Error saving farm</p>
+              <p className="font-bold">Error</p>
               <p className="mt-0.5">{error}</p>
             </div>
           </div>
@@ -169,7 +183,7 @@ export function FarmSetupForm() {
                   <span className="mb-2 block text-sm font-extrabold text-ink">
                     Taluka (Pune District) <span className="text-red-500">*</span>
                   </span>
-                  <Select value={taluka} onValueChange={handleTalukaChange}>
+                  <Select value={taluka} onValueChange={setTaluka}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -233,44 +247,48 @@ export function FarmSetupForm() {
             </div>
           )}
 
-          {/* ── STEP 2: Field Boundary ── */}
+          {/* ── STEP 2: Real Interactive Map Boundary Drawing ── */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-line bg-canvas p-4 text-xs">
-                <div className="flex items-center gap-2 font-bold text-ink">
-                  <MapPin size={16} className="text-leaf" />
-                  Boundary coordinates for {taluka}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-extrabold text-ink">Draw Farm Boundary on Map</p>
+                  <p className="text-xs text-muted">
+                    Tap or click along field bunds, fences, or borders. Drag numbered markers to adjust corners.
+                  </p>
                 </div>
-                <p className="mt-1 text-muted">
-                  GeoJSON EPSG:4326 polygon (min 4 coordinates, closed ring).
-                </p>
-                <div className="mt-3 font-mono text-[11px] bg-white p-3 rounded-xl border border-line overflow-x-auto">
-                  {JSON.stringify(coordinates)}
+                <div>
+                  {boundaryPoints.length < 3 ? (
+                    <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs">
+                      {3 - boundaryPoints.length} more corner{3 - boundaryPoints.length > 1 ? "s" : ""} required
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-leaf text-white border-0 text-xs">
+                      {boundaryPoints.length} corners • {areaPreview.hectares.toFixed(2)} ha ({areaPreview.acres.toFixed(2)} ac)
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-[#a8c2aa] bg-[linear-gradient(45deg,#f1f7f1_25%,transparent_25%),linear-gradient(-45deg,#f1f7f1_25%,transparent_25%)] bg-[size:22px_22px] p-6 text-center">
-                <div className="max-w-md">
-                  <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-white text-leaf shadow-sm">
-                    <Map size={22} />
-                  </span>
-                  <p className="mt-3 text-sm font-extrabold text-ink">Verified Polygon Coordinates</p>
-                  <p className="mt-1 text-xs leading-5 text-muted">
-                    Boundary is preset for the {taluka} pilot agro-climatic region. The backend computes exact acreage, centroid latitude, and intersects ISRIC soil rasters upon registration.
+              {/* Dynamic Leaflet Map with MapTiler Satellite / Street Tiles */}
+              <FarmMap
+                initialPoints={boundaryPoints}
+                defaultTaluka={taluka}
+                onChange={handleBoundaryChange}
+                height="h-[400px] sm:h-[460px]"
+              />
+
+              <div className="rounded-xl border border-line bg-canvas p-3.5 text-xs text-muted flex items-start gap-2.5">
+                <MapPin size={16} className="text-leaf shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-ink">How to draw your farm parcel:</p>
+                  <p className="text-[11px] leading-relaxed">
+                    1. Switch between <strong>Satellite</strong> and <strong>Street</strong> views or tap <strong>GPS</strong> to locate your field.
+                    <br />
+                    2. Click each corner of the farm. A minimum of 3 corners forms a closed parcel.
+                    <br />
+                    3. Drag any numbered pin to fine-tune the boundary along bunds or trees.
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => {
-                      if (PILOT_COORDINATE_PRESETS[taluka]) {
-                        setCoordinates(PILOT_COORDINATE_PRESETS[taluka]);
-                      }
-                    }}
-                  >
-                    <LocateFixed size={15} /> Reset to {taluka} Pilot Center
-                  </Button>
                 </div>
               </div>
             </div>
@@ -278,7 +296,7 @@ export function FarmSetupForm() {
 
           {/* ── STEP 3: Review & Confirmation ── */}
           {step === 3 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="rounded-2xl border border-line bg-canvas p-5">
                 <div className="flex items-center gap-3">
                   <span className="grid size-10 place-items-center rounded-xl bg-[#e8f5e9] text-leaf">
@@ -287,12 +305,12 @@ export function FarmSetupForm() {
                   <div>
                     <p className="text-sm font-extrabold text-ink">Ready to save {name || "your farm"}</p>
                     <p className="text-xs text-muted">
-                      Your parcel will be verified against Maharashtra pilot boundaries and assigned to your account.
+                      Your parcel geometry will be validated and registered in the agricultural database.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3 text-xs pt-4 border-t border-line">
+                <div className="mt-5 grid grid-cols-2 gap-3 text-xs pt-4 border-t border-line sm:grid-cols-4">
                   <div>
                     <span className="text-muted block text-[10px]">Taluka / District</span>
                     <span className="font-bold text-ink">{taluka}, Pune</span>
@@ -310,6 +328,34 @@ export function FarmSetupForm() {
                     <span className="font-bold text-ink capitalize">{waterSource}</span>
                   </div>
                 </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs pt-3 border-t border-line bg-white/80 p-3 rounded-xl border border-line">
+                  <div>
+                    <span className="text-muted block text-[10px]">Boundary Corners</span>
+                    <span className="font-bold text-ink">{boundaryPoints.length} corners mapped</span>
+                  </div>
+                  <div>
+                    <span className="text-muted block text-[10px]">Live Estimated Area</span>
+                    <span className="font-bold text-leaf">
+                      {areaPreview.hectares.toFixed(2)} ha ({areaPreview.acres.toFixed(2)} acres)
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-2 text-[10px] text-muted italic">
+                  * Authoritative acreage, representative centroid, and ISRIC soil raster overlays are calculated upon registration.
+                </p>
+              </div>
+
+              {/* Boundary Map Confirmation Preview */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-ink">Mapped Boundary Preview</p>
+                <FarmMap
+                  initialPoints={boundaryPoints}
+                  defaultTaluka={taluka}
+                  readOnly={true}
+                  height="h-[260px]"
+                />
               </div>
             </div>
           )}
@@ -319,26 +365,30 @@ export function FarmSetupForm() {
             {step > 1 && (
               <Button
                 variant="secondary"
-                onClick={() => setStep((value) => value - 1)}
+                onClick={() => {
+                  setError(null);
+                  setStep((value) => value - 1);
+                }}
                 disabled={isSubmitting}
               >
                 Back
               </Button>
             )}
-            {step < 3 ? (
-              <Button
-                onClick={() => {
-                  if (step === 1 && !name.trim()) {
-                    setError("Farm name is required.");
-                    return;
-                  }
-                  setError(null);
-                  setStep((v) => v + 1);
-                }}
-              >
-                Continue to Boundary
+            {step === 1 && (
+              <Button onClick={handleProceedToStep2}>
+                Continue to Boundary Map
               </Button>
-            ) : (
+            )}
+            {step === 2 && (
+              <Button
+                onClick={handleProceedToStep3}
+                disabled={boundaryPoints.length < 3}
+                className="bg-forest hover:bg-forest/90"
+              >
+                Review & Confirm Boundary
+              </Button>
+            )}
+            {step === 3 && (
               <Button
                 onClick={handleSaveFarm}
                 disabled={isSubmitting}

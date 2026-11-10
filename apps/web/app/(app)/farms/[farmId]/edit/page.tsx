@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertCircle, Check, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, Trash2, MapPin } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,14 @@ import {
 import { farmsApi } from "@/lib/api/client";
 import { useFarm } from "@/lib/farm-context";
 import type { Farm } from "@/lib/api/types";
+import { FarmMap } from "@/components/dynamic-farm-map";
+import {
+  geoJSONPolygonToLatLngs,
+  latLngsToGeoJSONPolygon,
+  validateFarmPolygon,
+  calculateGeodesicAreaHectares,
+  formatAreaPreview,
+} from "@/lib/geo-utils";
 
 export default function EditFarmPage() {
   const params = useParams();
@@ -36,6 +45,10 @@ export default function EditFarmPage() {
   const [taluka, setTaluka] = useState("Baramati");
   const [irrigationType, setIrrigationType] = useState("irrigated");
   const [waterSource, setWaterSource] = useState("canal");
+
+  // Farm boundary polygon points: [latitude, longitude][]
+  const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
+  const [areaPreview, setAreaPreview] = useState(formatAreaPreview(0));
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,6 +72,14 @@ export default function EditFarmPage() {
         setTaluka(data.taluka || "Baramati");
         setIrrigationType(data.irrigation_type || "irrigated");
         setWaterSource(data.water_source || "canal");
+
+        // Populate boundary polygon from backend GeoJSON
+        if (data.geometry) {
+          const latLngs = geoJSONPolygonToLatLngs(data.geometry);
+          setBoundaryPoints(latLngs);
+          const ha = calculateGeodesicAreaHectares(latLngs);
+          setAreaPreview(formatAreaPreview(ha));
+        }
       } catch (err: any) {
         setError(err?.message || "Failed to load farm details");
       } finally {
@@ -73,19 +94,38 @@ export default function EditFarmPage() {
     e.preventDefault();
     if (!actualFarmId) return;
 
+    if (!name.trim()) {
+      setError("Farm name is required.");
+      return;
+    }
+
+    // Validate boundary points if provided or modified
+    if (boundaryPoints.length > 0) {
+      const validation = validateFarmPolygon(boundaryPoints);
+      if (!validation.isValid) {
+        setError(validation.error || "Please draw a valid boundary polygon with at least 3 points.");
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError(null);
       setSuccess(false);
 
-      await farmsApi.update(actualFarmId, {
+      const updatePayload: any = {
         name: name.trim(),
         village: village.trim() || null,
         taluka,
         irrigation_type: irrigationType,
         water_source: waterSource,
-      });
+      };
 
+      if (boundaryPoints.length >= 3) {
+        updatePayload.geometry = latLngsToGeoJSONPolygon(boundaryPoints);
+      }
+
+      await farmsApi.update(actualFarmId, updatePayload);
       await refreshFarms();
       setSuccess(true);
       setTimeout(() => {
@@ -140,7 +180,7 @@ export default function EditFarmPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={`Edit ${farm.name}`}
-        description="Update parcel identification, irrigation, and water source parameters."
+        description="Update parcel identification, boundary coordinates, irrigation, and water source."
         backHref={`/farms/${farm.id}`}
       />
 
@@ -228,6 +268,46 @@ export default function EditFarmPage() {
                   </SelectContent>
                 </Select>
               </label>
+            </div>
+
+            {/* ── Farm Boundary Editor Section ── */}
+            <div className="space-y-3 pt-3 border-t border-line">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm font-extrabold text-ink">Field Boundary Polygon</span>
+                  <p className="text-xs text-muted">
+                    Tap to add new corners or drag numbered pins to adjust existing parcel corners.
+                  </p>
+                </div>
+                {boundaryPoints.length >= 3 ? (
+                  <Badge className="bg-leaf text-white border-0 text-xs">
+                    {boundaryPoints.length} corners • {areaPreview.haText} ({areaPreview.acresText})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs">
+                    Boundary incomplete
+                  </Badge>
+                )}
+              </div>
+
+              <FarmMap
+                initialPoints={boundaryPoints}
+                defaultTaluka={taluka}
+                onChange={(pts, preview) => {
+                  setBoundaryPoints(pts);
+                  setAreaPreview(formatAreaPreview(preview.hectares));
+                }}
+                height="h-[380px] sm:h-[440px]"
+              />
+
+              {farm.calculated_area_acres ? (
+                <div className="rounded-xl border border-line bg-canvas p-3 text-xs text-muted flex items-center justify-between">
+                  <span>Currently registered PostGIS area:</span>
+                  <span className="font-bold text-ink">
+                    {farm.calculated_area_hectares?.toFixed(2)} ha ({farm.calculated_area_acres?.toFixed(2)} acres)
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <div className="pt-4 border-t border-line flex items-center justify-between">

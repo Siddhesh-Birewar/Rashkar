@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { farmsApi } from "@/lib/api/client";
 import { useFarm } from "@/lib/farm-context";
 import type { Farm } from "@/lib/api/types";
+import { FarmMap } from "@/components/dynamic-farm-map";
+import { geoJSONPolygonToLatLngs } from "@/lib/geo-utils";
 
 export default function FarmDetailPage() {
   const params = useParams();
@@ -191,13 +193,21 @@ export default function FarmDetailPage() {
           </div>
 
           {farm.geometry && farm.geometry.coordinates?.[0] && (
-            <div className="mt-6 rounded-2xl bg-[#f4f8f4] p-4 border border-[#d2e4d3] text-xs">
-              <div className="flex items-center gap-2 font-bold text-forest">
-                <MapPin size={16} /> Mapped Polygon Boundary
+            <div className="mt-6 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-bold text-forest text-xs">
+                  <MapPin size={16} /> Mapped Parcel Boundary on Satellite Imagery
+                </div>
+                <span className="text-[11px] text-muted">
+                  {farm.geometry.coordinates[0].length} boundary vertices recorded (GeoJSON EPSG:4326)
+                </span>
               </div>
-              <p className="mt-1 text-muted text-[11px]">
-                {farm.geometry.coordinates[0].length} boundary vertices recorded (GeoJSON EPSG:4326).
-              </p>
+              <FarmMap
+                initialPoints={geoJSONPolygonToLatLngs(farm.geometry)}
+                defaultTaluka={farm.taluka}
+                readOnly={true}
+                height="h-[300px] sm:h-[360px]"
+              />
             </div>
           )}
         </CardContent>
