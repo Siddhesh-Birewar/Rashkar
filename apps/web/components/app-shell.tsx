@@ -31,6 +31,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { FarmSelector } from "@/components/farm-selector";
+import { useAuth } from "@/lib/auth-context";
+import { useFarm } from "@/lib/farm-context";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -52,27 +54,6 @@ type NavItem = {
   href: string;
   icon: LucideIcon;
 };
-
-const primaryNav: NavItem[] = [
-  { label: "Home", href: "/", icon: Home },
-  { label: "Farms", href: "/farms", icon: Sprout },
-  { label: "Advisory", href: "/advisory", icon: BookOpenText },
-];
-
-const intelligenceNav: NavItem[] = [
-  { label: "Soil", href: "/farms/current/soil", icon: Leaf },
-  { label: "Weather", href: "/farms/current/weather", icon: CloudSun },
-  { label: "Farm health", href: "/farms/current/health", icon: HeartPulse },
-  { label: "Water", href: "/farms/current/water", icon: Droplets },
-  { label: "Satellite", href: "/farms/current/vegetation", icon: Satellite },
-  { label: "Crop catalogue", href: "/crops", icon: Wheat },
-  { label: "Crop Doctor", href: "/crop-doctor", icon: Stethoscope },
-  { label: "Heat Risk", href: "/heat-risk", icon: Flame },
-  { label: "Schemes", href: "/schemes", icon: Landmark },
-  { label: "Income", href: "/income", icon: CircleDollarSign },
-  { label: "History", href: "/history", icon: FileClock },
-  { label: "Profile & settings", href: "/profile", icon: Settings },
-];
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -104,6 +85,8 @@ function NavLink({ item, compact = false }: { item: NavItem; compact?: boolean }
 }
 
 function AccountDialog() {
+  const { user, signOut, isDevMode } = useAuth();
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -115,15 +98,17 @@ function AccountDialog() {
             <UserRound size={18} />
           </span>
           <span className="hidden xl:block">
-            <span className="block text-xs font-extrabold">Your account</span>
-            <span className="block text-[10px] text-muted">Profile & settings</span>
+            <span className="block text-xs font-extrabold">{user?.email || "Account"}</span>
+            <span className="block text-[10px] text-muted">
+              {isDevMode ? "Local Dev Mode" : "Farmer Profile"}
+            </span>
           </span>
         </button>
       </DialogTrigger>
       <DialogContent>
-        <DialogTitle>Account</DialogTitle>
+        <DialogTitle>Account Profile</DialogTitle>
         <DialogDescription>
-          Profile data will become available after authentication is connected.
+          {user ? `Signed in as ${user.email} (${user.id.slice(0, 8)}...)` : "Not currently signed in"}
         </DialogDescription>
         <div className="mt-6 grid gap-2">
           <Link
@@ -131,22 +116,22 @@ function AccountDialog() {
             className="flex min-h-12 items-center gap-3 rounded-xl bg-[#f3f7f3] px-4 text-sm font-bold"
           >
             <Settings size={18} className="text-leaf" />
-            Account settings
+            Account settings & dev bypass
           </Link>
           <Link
             href="/help"
             className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold hover:bg-[#f3f7f3]"
           >
             <HelpCircle size={18} className="text-leaf" />
-            Help & support
+            Help & agronomic support
           </Link>
-          <Link
-            href="/login"
-            className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-accent hover:bg-[#fff3ec]"
+          <button
+            onClick={() => signOut()}
+            className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-accent hover:bg-[#fff3ec] text-left w-full"
           >
             <LogOut size={18} />
             Sign out
-          </Link>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -165,14 +150,14 @@ function NotificationsDialog() {
         </button>
       </DialogTrigger>
       <DialogContent>
-        <DialogTitle>Notifications</DialogTitle>
+        <DialogTitle>Farm Alerts & Advisories</DialogTitle>
         <DialogDescription>
-          Advisory and farm alerts will appear here after your data sources are connected.
+          Important crop alerts, heat warnings, and scheme deadlines.
         </DialogDescription>
         <div className="mt-6 rounded-2xl border border-dashed border-line bg-canvas px-5 py-8 text-center">
           <Bell size={22} className="mx-auto text-[#93a395]" />
           <p className="mt-3 text-sm font-bold">You&apos;re all caught up</p>
-          <p className="mt-1 text-xs leading-5 text-muted">There are no notifications to show.</p>
+          <p className="mt-1 text-xs leading-5 text-muted">No pending critical warnings for your selected farm.</p>
         </div>
         <Link
           href="/notifications"
@@ -185,28 +170,26 @@ function NotificationsDialog() {
   );
 }
 
-function MoreSheet() {
+function MoreSheet({ intelligenceNav }: { intelligenceNav: NavItem[] }) {
   const pathname = usePathname();
 
   return (
     <BottomSheet>
       <BottomSheetTrigger asChild>
         <button
-          className="flex min-h-12 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-bold text-muted"
-          aria-label="Open more navigation"
+          className="flex min-h-12 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-bold text-muted"
+          aria-label="Open more menu"
         >
           <Ellipsis size={21} />
           More
         </button>
       </BottomSheetTrigger>
       <BottomSheetContent>
-        <BottomSheetTitle className="text-xl font-extrabold tracking-[-0.03em]">
-          More tools
-        </BottomSheetTitle>
-        <BottomSheetDescription className="mt-1 text-sm text-muted">
-          Farm intelligence and account tools
+        <BottomSheetTitle>Farm Intelligence</BottomSheetTitle>
+        <BottomSheetDescription>
+          All diagnostic modules and decision tools.
         </BottomSheetDescription>
-        <div className="mt-5 grid grid-cols-3 gap-2 overflow-y-auto pb-5">
+        <div className="mt-6 grid grid-cols-2 gap-2.5">
           {intelligenceNav.map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
@@ -215,19 +198,14 @@ function MoreSheet() {
                 key={item.label}
                 href={item.href}
                 className={cn(
-                  "flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border bg-white p-3 text-center text-[11px] font-extrabold shadow-sm",
-                  active ? "border-leaf text-forest" : "border-line text-ink",
+                  "flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-white p-3 text-xs font-bold shadow-sm",
+                  active && "border-leaf bg-[#eef7ee] text-forest",
                 )}
               >
-                <span
-                  className={cn(
-                    "grid size-9 place-items-center rounded-xl",
-                    active ? "bg-[#e7f3e7] text-leaf" : "bg-[#f2f5f2] text-muted",
-                  )}
-                >
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#edf5ed] text-leaf">
                   <Icon size={18} />
                 </span>
-                {item.label}
+                <span className="min-w-0 truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -239,6 +217,29 @@ function MoreSheet() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { selectedFarmId } = useFarm();
+  const farmIdParam = selectedFarmId || "current";
+
+  const primaryNav: NavItem[] = [
+    { label: "Home", href: "/", icon: Home },
+    { label: "Farms", href: "/farms", icon: Sprout },
+    { label: "Advisory", href: "/advisory", icon: BookOpenText },
+  ];
+
+  const intelligenceNav: NavItem[] = [
+    { label: "Soil", href: `/farms/${farmIdParam}/soil`, icon: Leaf },
+    { label: "Weather", href: `/farms/${farmIdParam}/weather`, icon: CloudSun },
+    { label: "Farm health", href: `/farms/${farmIdParam}/health`, icon: HeartPulse },
+    { label: "Water", href: `/farms/${farmIdParam}/water`, icon: Droplets },
+    { label: "Satellite", href: `/farms/${farmIdParam}/vegetation`, icon: Satellite },
+    { label: "Crop catalogue", href: "/crops", icon: Wheat },
+    { label: "Crop Doctor", href: "/crop-doctor", icon: Stethoscope },
+    { label: "Heat Risk", href: "/heat-risk", icon: Flame },
+    { label: "Schemes", href: "/schemes", icon: Landmark },
+    { label: "Income", href: "/income", icon: CircleDollarSign },
+    { label: "History", href: "/history", icon: FileClock },
+    { label: "Profile & settings", href: "/profile", icon: Settings },
+  ];
 
   return (
     <div className="min-h-screen">
@@ -263,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mt-auto rounded-2xl bg-forest p-4 text-white">
           <Bot size={21} className="text-[#a5d6a7]" />
           <p className="mt-3 text-sm font-extrabold">Need crop help?</p>
-          <p className="mt-1 text-[11px] leading-5 text-white/70">Start a guided crop diagnosis.</p>
+          <p className="mt-1 text-[11px] leading-5 text-white/70">Photograph a symptom for rapid diagnosis.</p>
           <Link
             href="/crop-doctor"
             className="mt-3 flex min-h-9 items-center justify-between rounded-lg bg-white/12 px-3 text-xs font-bold hover:bg-white/18"
@@ -338,7 +339,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
-        <MoreSheet />
+        <MoreSheet intelligenceNav={intelligenceNav} />
       </nav>
     </div>
   );

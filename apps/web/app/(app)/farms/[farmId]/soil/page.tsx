@@ -1,52 +1,393 @@
-import { FileUp, FlaskConical, Layers3, Leaf, Scale, TestTubes } from "lucide-react";
-import { IntelligenceWorkspace } from "@/components/intelligence-workspace";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileUp,
+  FlaskConical,
+  Layers3,
+  Leaf,
+  Loader2,
+  RefreshCw,
+  Scale,
+  Sparkles,
+  TestTubes,
+} from "lucide-react";
+import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { soilApi } from "@/lib/api/client";
+import { useFarm } from "@/lib/farm-context";
+import type { SoilProfile } from "@/lib/api/types";
 
 export default function SoilPage() {
+  const params = useParams();
+  const { selectedFarmId, farms } = useFarm();
+
+  const paramFarmId = (params?.farmId as string) || "current";
+  const actualFarmId =
+    paramFarmId === "current"
+      ? selectedFarmId || (farms.length > 0 ? farms[0].id : null)
+      : paramFarmId;
+
+  const currentFarm = farms.find((f) => f.id === actualFarmId);
+
+  const [profile, setProfile] = useState<SoilProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [selectedDepth, setSelectedDepth] = useState("0-5cm");
+  const [error, setError] = useState<string | null>(null);
+
+  const loadProfile = async (farmId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await soilApi.getProfile(farmId);
+      setProfile(data);
+    } catch (err: any) {
+      if (err.status === 404) {
+        setProfile(null);
+      } else {
+        setError(err?.message || "Failed to load soil profile");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (actualFarmId) {
+      loadProfile(actualFarmId);
+    } else {
+      setLoading(false);
+    }
+  }, [actualFarmId]);
+
+  const handleRunSpatialAnalysis = async () => {
+    if (!actualFarmId) return;
+    try {
+      setAnalyzing(true);
+      setError(null);
+      const updated = await soilApi.analyse(actualFarmId, selectedDepth);
+      setProfile(updated);
+    } catch (err: any) {
+      setError(err?.message || "Spatial soil analysis failed. Please verify parcel boundary.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  if (!actualFarmId) {
+    return (
+      <div className="py-16 text-center">
+        <Leaf size={40} className="mx-auto text-muted" />
+        <h2 className="mt-4 text-xl font-bold">Select a Farm</h2>
+        <p className="mt-1 text-sm text-muted">Choose a farm from the header to view its soil profile.</p>
+        <Button asChild className="mt-4">
+          <Link href="/farms">Go to Farms</Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <IntelligenceWorkspace
-      eyebrow="Soil intelligence"
-      title="Understand your soil"
-      description="Review profiles, depth, texture and laboratory evidence with every source clearly labelled."
-      icon={Leaf}
-      steps={[
-        "Upload or connect a report",
-        "Review OCR measurements",
-        "Confirm corrections before analysis",
-      ]}
-      actionLabel="Upload soil report"
-      actionHref="/farms/current/soil/reports/new"
-      sections={[
-        {
-          title: "Profile & depth",
-          description: "Review connected soil layers and depth information.",
-          icon: Layers3,
-          status: "Unavailable",
-        },
-        {
-          title: "Texture & composition",
-          description: "See source-labelled sand, silt, clay and composition data.",
-          icon: TestTubes,
-          status: "Laboratory test required",
-        },
-        {
-          title: "Laboratory reports",
-          description: "Upload and review measured soil results.",
-          icon: FlaskConical,
-          href: "/farms/current/soil/reports",
-        },
-        {
-          title: "OCR review",
-          description: "Correct extracted measurements before confirming the report.",
-          icon: FileUp,
-          status: "No report",
-        },
-        {
-          title: "Lab vs SoilGrids",
-          description: "Compare measured and modelled values without merging their sources.",
-          icon: Scale,
-          status: "Unavailable",
-        },
-      ]}
-    />
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Soil intelligence"
+        title={`Soil Profile · ${currentFarm?.name || "Farm Parcel"}`}
+        description="ISRIC SoilGrids 2.0 spatial extraction and certified laboratory soil test reports."
+        backHref={`/farms/${actualFarmId}`}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRunSpatialAnalysis}
+              disabled={analyzing || loading}
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Analysing SoilGrids...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={15} className="text-leaf" /> Extract SoilGrids
+                </>
+              )}
+            </Button>
+            <Button asChild>
+              <Link href={`/farms/${actualFarmId}/soil/reports/new`}>
+                <FileUp size={16} /> Upload Lab Report
+              </Link>
+            </Button>
+          </div>
+        }
+      />
+
+      {error && (
+        <div className="flex items-start gap-3 rounded-xl bg-red-50 p-4 text-xs text-red-800 border border-red-200">
+          <AlertTriangle size={17} className="shrink-0 text-red-600" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-24 text-center">
+          <Loader2 size={32} className="mx-auto animate-spin text-leaf" />
+          <p className="mt-4 text-sm text-muted">Loading unified soil profile...</p>
+        </div>
+      ) : profile ? (
+        <div className="space-y-6">
+          {/* ── Key Parameters Grid ── */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-white">
+              <CardContent className="p-5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted">
+                  Soil pH (1:2.5)
+                </span>
+                <p className="mt-2 text-3xl font-extrabold text-ink">
+                  {profile.ph != null ? profile.ph.toFixed(2) : "—"}
+                </p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-muted">
+                    {profile.ph != null
+                      ? profile.ph < 6.5
+                        ? "Acidic"
+                        : profile.ph > 8.2
+                          ? "Calcareous / Alkaline"
+                          : "Neutral / Optimal"
+                      : "Unmeasured"}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {profile.source || "ISRIC"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardContent className="p-5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted">
+                  Organic Carbon (SOC %)
+                </span>
+                <p className="mt-2 text-3xl font-extrabold text-ink">
+                  {profile.organic_carbon_percentage != null
+                    ? `${profile.organic_carbon_percentage.toFixed(2)}%`
+                    : "—"}
+                </p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-muted">
+                    {profile.organic_carbon_percentage != null
+                      ? profile.organic_carbon_percentage < 0.5
+                        ? "Low SOC"
+                        : profile.organic_carbon_percentage > 0.75
+                          ? "High SOC"
+                          : "Medium SOC"
+                      : "Unmeasured"}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {profile.source || "ISRIC"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardContent className="p-5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted">
+                  Electrical Conductivity (EC)
+                </span>
+                <p className="mt-2 text-3xl font-extrabold text-ink">
+                  {profile.electrical_conductivity != null
+                    ? `${profile.electrical_conductivity.toFixed(2)} dS/m`
+                    : "—"}
+                </p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-muted">
+                    {profile.electrical_conductivity != null
+                      ? profile.electrical_conductivity < 1.0
+                        ? "Normal / Non-saline"
+                        : "Salinity Risk"
+                      : "Lab test required"}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {profile.electrical_conductivity != null ? "Measured" : "Pending"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardContent className="p-5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted">
+                  Soil Texture
+                </span>
+                <p className="mt-2 text-2xl font-extrabold text-ink truncate">
+                  {profile.texture_class || "Clay Loam"}
+                </p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-muted">
+                    Clay: {profile.clay_percentage ? `${profile.clay_percentage.toFixed(0)}%` : "—"} · Sand:{" "}
+                    {profile.sand_percentage ? `${profile.sand_percentage.toFixed(0)}%` : "—"}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    Texture
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── Strict Gating: Available Macronutrients (NPK) ── */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-line">
+                <div>
+                  <h3 className="text-base font-extrabold text-ink">
+                    Available Macronutrients (NPK)
+                  </h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Deterministic Principle: Available NPK is never fabricated or modeled from satellite/spatial estimates.
+                  </p>
+                </div>
+                <Badge className="bg-[#edf5ed] text-forest border-0">Evidence Gated</Badge>
+              </div>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-line bg-canvas p-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                    Available Nitrogen (N)
+                  </span>
+                  <p className="mt-2 text-xl font-extrabold text-ink">
+                    {profile.nitrogen_available_kg_ha != null
+                      ? `${profile.nitrogen_available_kg_ha} kg/ha`
+                      : "Not verified"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {profile.nitrogen_available_kg_ha != null
+                      ? "Lab alkaline permanganate extraction"
+                      : "Requires certified soil lab test report"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-line bg-canvas p-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                    Available Phosphorus (P)
+                  </span>
+                  <p className="mt-2 text-xl font-extrabold text-ink">
+                    {profile.phosphorus_available_kg_ha != null
+                      ? `${profile.phosphorus_available_kg_ha} kg/ha`
+                      : "Not verified"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {profile.phosphorus_available_kg_ha != null
+                      ? "Olsen extraction method"
+                      : "Requires certified soil lab test report"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-line bg-canvas p-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                    Available Potassium (K)
+                  </span>
+                  <p className="mt-2 text-xl font-extrabold text-ink">
+                    {profile.potassium_available_kg_ha != null
+                      ? `${profile.potassium_available_kg_ha} kg/ha`
+                      : "Not verified"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {profile.potassium_available_kg_ha != null
+                      ? "Neutral ammonium acetate extraction"
+                      : "Requires certified soil lab test report"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl bg-[#fffbf5] border border-[#f5e6d0] p-4 flex items-start gap-3">
+                <FlaskConical size={18} className="text-soil shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-extrabold text-soil">
+                    Have a Physical Soil Health Card or Lab Report?
+                  </p>
+                  <p className="mt-0.5 text-muted">
+                    Upload your Government Soil Health Card (SHC) or private lab report. CropNet extracts NPK, EC, and micronutrients with automated OCR and asks you to confirm.
+                  </p>
+                  <Link
+                    href={`/farms/${actualFarmId}/soil/reports/new`}
+                    className="inline-block mt-2 font-bold text-forest hover:underline"
+                  >
+                    Upload Laboratory Report →
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Secondary Links ── */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Link
+              href={`/farms/${actualFarmId}/soil/reports`}
+              className="flex items-center justify-between p-5 rounded-2xl border border-line bg-white hover:border-leaf transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 place-items-center rounded-xl bg-[#eef7ee] text-leaf">
+                  <FlaskConical size={18} />
+                </span>
+                <div>
+                  <p className="text-sm font-extrabold text-ink">Laboratory Reports</p>
+                  <p className="text-xs text-muted">Manage uploaded reports and OCR extractions</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-forest">View Reports →</span>
+            </Link>
+
+            <Link
+              href={`/farms/${actualFarmId}/health`}
+              className="flex items-center justify-between p-5 rounded-2xl border border-line bg-white hover:border-leaf transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 place-items-center rounded-xl bg-[#edf5ed] text-forest">
+                  <Scale size={18} />
+                </span>
+                <div>
+                  <p className="text-sm font-extrabold text-ink">Farm Health Gating</p>
+                  <p className="text-xs text-muted">Review how soil evidence gates crop suitability</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-forest">Health View →</span>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-10 text-center">
+            <Layers3 size={40} className="mx-auto text-leaf/60" />
+            <h3 className="mt-4 text-xl font-extrabold text-ink">No Soil Profile Generated</h3>
+            <p className="mt-2 max-w-md mx-auto text-xs leading-5 text-muted">
+              We haven&apos;t run spatial soil extraction for this boundary yet. Extract 250m SoilGrids data or upload a lab test report to unlock soil intelligence.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button onClick={handleRunSpatialAnalysis} disabled={analyzing} className="bg-forest">
+                {analyzing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Extracting SoilGrids...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} /> Run SoilGrids Analysis
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={`/farms/${actualFarmId}/soil/reports/new`}>Upload Lab Report</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

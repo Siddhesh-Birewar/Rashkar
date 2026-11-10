@@ -342,7 +342,7 @@ async def get_vegetation_timeseries(
             )
         )
 
-    is_small_farm = area_ha < 0.5 or (series_points and series_points[-1].valid_pixels < 5)
+    is_small_farm = bool(area_ha < 0.5 or (series_points and series_points[-1].valid_pixels < 5))
 
     if not series_points:
         interpretation = "No satellite observations recorded yet for this parcel. Perform a sync to establish baseline."

@@ -1,15 +1,22 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BookOpenText,
   CloudSun,
   Droplets,
   Flame,
+  HeartPulse,
   Leaf,
   MapPinned,
   Plus,
+  RefreshCw,
+  Satellite,
   ScanSearch,
   Sprout,
   Stethoscope,
+  Wheat,
 } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/states";
@@ -17,6 +24,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/section-header";
+import { useFarm } from "@/lib/farm-context";
+import { weatherApi, farmHealthApi } from "@/lib/api/client";
+import type { CurrentWeather, FarmHealthSnapshot } from "@/lib/api/types";
 
 const quickActions = [
   {
@@ -35,60 +45,136 @@ const quickActions = [
   },
   {
     label: "Heat Risk",
-    helper: "Plan for hot days",
+    helper: "Crop & worker heat risk",
     href: "/heat-risk",
     icon: Flame,
     tone: "brown",
   },
 ] as const;
 
-const intelligenceLinks = [
-  {
-    label: "Soil insights",
-    href: "/farms/current/soil",
-    icon: Leaf,
-    description: "Reports and soil health",
-  },
-  {
-    label: "Water planning",
-    href: "/farms/current/water",
-    icon: Droplets,
-    description: "Irrigation guidance",
-  },
-  {
-    label: "Farm health",
-    href: "/farms/current/health",
-    icon: ScanSearch,
-    description: "Field condition overview",
-  },
-  {
-    label: "Advisory",
-    href: "/advisory",
-    icon: BookOpenText,
-    description: "Timely recommendations",
-  },
-];
-
 export default function HomePage() {
+  const { selectedFarm, selectedFarmId, farms, loading: farmsLoading } = useFarm();
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);
+  const [health, setHealth] = useState<FarmHealthSnapshot | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
+
+  const farmIdParam = selectedFarmId || (farms.length > 0 ? farms[0].id : "current");
+
+  useEffect(() => {
+    if (!selectedFarmId) {
+      setWeather(null);
+      setHealth(null);
+      return;
+    }
+
+    let isMounted = true;
+    async function loadFarmData() {
+      try {
+        setLoadingWeather(true);
+        const [wData, hData] = await Promise.allSettled([
+          weatherApi.getCurrent(selectedFarmId!),
+          farmHealthApi.getSnapshot(selectedFarmId!),
+        ]);
+
+        if (!isMounted) return;
+
+        if (wData.status === "fulfilled") {
+          setWeather(wData.value);
+        } else {
+          setWeather(null);
+        }
+
+        if (hData.status === "fulfilled") {
+          setHealth(hData.value);
+        } else {
+          setHealth(null);
+        }
+      } finally {
+        if (isMounted) setLoadingWeather(false);
+      }
+    }
+
+    loadFarmData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedFarmId]);
+
+  const intelligenceLinks = [
+    {
+      label: "Soil insights",
+      href: `/farms/${farmIdParam}/soil`,
+      icon: Leaf,
+      description: "ISRIC profile & lab tests",
+    },
+    {
+      label: "Weather planning",
+      href: `/farms/${farmIdParam}/weather`,
+      icon: CloudSun,
+      description: "Forecasts & climate normals",
+    },
+    {
+      label: "Farm health",
+      href: `/farms/${farmIdParam}/health`,
+      icon: HeartPulse,
+      description: "Multi-domain evidence",
+    },
+    {
+      label: "Water intelligence",
+      href: `/farms/${farmIdParam}/water`,
+      icon: Droplets,
+      description: "Sources & BIS evaluation",
+    },
+    {
+      label: "Satellite & canopy",
+      href: `/farms/${farmIdParam}/vegetation`,
+      icon: Satellite,
+      description: "Sentinel-2 NDVI/NDMI",
+    },
+    {
+      label: "Crop catalogue",
+      href: "/crops",
+      icon: Wheat,
+      description: "Regional suitability specs",
+    },
+    {
+      label: "Government schemes",
+      href: "/schemes",
+      icon: Sprout,
+      description: "Subsidies & assistance",
+    },
+    {
+      label: "Advisory",
+      href: "/advisory",
+      icon: BookOpenText,
+      description: "Agronomic recommendations",
+    },
+  ];
+
   return (
     <div className="space-y-7 sm:space-y-9">
+      {/* ── Top Header ── */}
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Badge>Farm workspace</Badge>
           <h1 className="mt-3 text-[30px] leading-[1.08] font-extrabold tracking-[-0.05em] sm:text-[38px]">
-            Welcome to CropNet
+            Welcome to CropNet AI
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted sm:text-[15px]">
-            Your farm intelligence will come together here.
+            {selectedFarm
+              ? `Active farm: ${selectedFarm.name} · ${selectedFarm.taluka}, Pune`
+              : "Location-aware agricultural intelligence for Indian smallholders."}
           </p>
         </div>
         <Button asChild className="w-full sm:w-auto">
           <Link href="/farms/new">
-            <Plus size={18} /> Add your first farm
+            <Plus size={18} /> Add new farm
           </Link>
         </Button>
       </section>
 
+      {/* ── Hero / Farm Card & Weather ── */}
       <section className="grid gap-4 lg:grid-cols-[1.4fr_.6fr]">
         <Card
           className="relative overflow-hidden border-0 bg-forest bg-cover bg-center text-white shadow-[0_20px_45px_rgba(27,94,32,.18)]"
@@ -104,58 +190,136 @@ export default function HomePage() {
               <span className="grid size-11 place-items-center rounded-2xl bg-white/12">
                 <MapPinned size={21} className="text-[#b7dfb9]" />
               </span>
-              <Badge className="bg-white/12 text-white">No farm selected</Badge>
+              <Badge className="bg-white/12 text-white">
+                {selectedFarm ? `${selectedFarm.taluka} Taluka` : "No farm selected"}
+              </Badge>
             </div>
-            <div className="mt-10 max-w-md">
+            <div className="mt-8 max-w-md">
               <h2 className="text-2xl font-extrabold tracking-[-0.04em] sm:text-3xl">
-                Start with your farm
+                {selectedFarm ? selectedFarm.name : "Start with your farm"}
               </h2>
-              <p className="mt-3 text-sm leading-6 text-white/70">
-                Add a farm to unlock location-aware weather, soil information, crop health and
-                practical recommendations.
+              <p className="mt-3 text-sm leading-6 text-white/80">
+                {selectedFarm ? (
+                  <>
+                    Area:{" "}
+                    <span className="font-bold text-white">
+                      {selectedFarm.calculated_area_acres
+                        ? `${selectedFarm.calculated_area_acres.toFixed(2)} acres`
+                        : `${selectedFarm.calculated_area_hectares?.toFixed(2) || "—"} ha`}
+                    </span>
+                    {" · "}
+                    Irrigation:{" "}
+                    <span className="capitalize font-semibold text-white">
+                      {selectedFarm.irrigation_type || "Rainfed"}
+                    </span>
+                    {" · "}
+                    Water:{" "}
+                    <span className="capitalize font-semibold text-white">
+                      {selectedFarm.water_source || "Canal"}
+                    </span>
+                  </>
+                ) : (
+                  "Add a farm to unlock location-aware weather, soil information, crop health and practical recommendations."
+                )}
               </p>
-              <Link
-                href="/farms/new"
-                className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-forest transition-transform active:scale-[.98]"
-              >
-                Set up a farm <ArrowRight size={17} />
-              </Link>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {selectedFarm ? (
+                  <>
+                    <Link
+                      href={`/farms/${selectedFarm.id}`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-forest transition-transform active:scale-[.98]"
+                    >
+                      View Farm Details <ArrowRight size={17} />
+                    </Link>
+                    <Link
+                      href={`/farms/${selectedFarm.id}/health`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white/15 px-4 text-sm font-bold text-white hover:bg-white/20"
+                    >
+                      Health Snapshot
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    href="/farms/new"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-forest transition-transform active:scale-[.98]"
+                  >
+                    Set up a farm <ArrowRight size={17} />
+                  </Link>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* ── Weather Widget ── */}
         <Card>
-          <CardContent className="flex h-full min-h-64 flex-col">
+          <CardContent className="flex h-full min-h-64 flex-col justify-between p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted">
                   Weather
                 </p>
-                <h2 className="mt-1 font-extrabold">Today&apos;s outlook</h2>
+                <h2 className="mt-1 font-extrabold">Current Conditions</h2>
               </div>
               <span className="grid size-11 place-items-center rounded-2xl bg-[#edf5ed] text-leaf">
                 <CloudSun size={22} />
               </span>
             </div>
-            <div className="my-auto py-6 text-center">
-              <p className="text-4xl font-extrabold text-[#c3cec4]">—</p>
-              <p className="mt-3 text-sm font-bold">Location needed</p>
-              <p className="mt-1 text-xs leading-5 text-muted">
-                Select a farm to see local conditions.
-              </p>
-            </div>
+
+            {loadingWeather ? (
+              <div className="my-auto py-6 text-center">
+                <RefreshCw size={24} className="mx-auto animate-spin text-leaf" />
+                <p className="mt-3 text-xs text-muted">Retrieving live observation...</p>
+              </div>
+            ) : weather ? (
+              <div className="my-auto py-4">
+                <div className="flex items-baseline gap-2">
+                  <p className="text-4xl font-extrabold tracking-tight text-ink">
+                    {weather.temperature_c.toFixed(1)}°C
+                  </p>
+                  <span className="text-xs font-bold text-muted capitalize">
+                    {weather.weather_description}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg bg-canvas p-2">
+                    <span className="text-muted block">Humidity</span>
+                    <span className="font-bold text-ink">{weather.humidity_percent}%</span>
+                  </div>
+                  <div className="rounded-lg bg-canvas p-2">
+                    <span className="text-muted block">Wind</span>
+                    <span className="font-bold text-ink">{weather.wind_speed_ms ?? "—"} m/s</span>
+                  </div>
+                </div>
+                <p className="mt-3 text-[10px] text-muted">Source: {weather.source} (observed)</p>
+              </div>
+            ) : (
+              <div className="my-auto py-6 text-center">
+                <p className="text-4xl font-extrabold text-[#c3cec4]">—</p>
+                <p className="mt-3 text-sm font-bold">
+                  {selectedFarm ? "Weather unavailable" : "Location needed"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  {selectedFarm
+                    ? "Unable to fetch live observation."
+                    : "Select a farm to see local conditions."}
+                </p>
+              </div>
+            )}
+
             <Link
-              href="/farms"
-              className="flex min-h-11 items-center justify-center rounded-xl bg-[#f0f5f0] text-xs font-extrabold text-forest"
+              href={selectedFarm ? `/farms/${selectedFarm.id}/weather` : "/farms"}
+              className="flex min-h-11 items-center justify-center rounded-xl bg-[#f0f5f0] text-xs font-extrabold text-forest hover:bg-[#e4eee4] transition-colors"
             >
-              Choose a farm
+              {selectedFarm ? "View 5-day forecast" : "Choose a farm"}
             </Link>
           </CardContent>
         </Card>
       </section>
 
+      {/* ── Quick Actions ── */}
       <section>
-        <SectionHeader title="Quick actions" description="Common tasks, always within reach" />
+        <SectionHeader title="Quick actions" description="Immediate decision tools" />
         <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-3">
           {quickActions.map((action) => {
             const Icon = action.icon;
@@ -184,8 +348,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Farm Intelligence Grid ── */}
       <section>
-        <SectionHeader title="Crop intelligence" />
+        <SectionHeader title="Crop & Field Intelligence" description="Evidence-backed modules" />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {intelligenceLinks.map((item) => {
             const Icon = item.icon;
@@ -193,7 +358,7 @@ export default function HomePage() {
               <Link
                 href={item.href}
                 key={item.label}
-                className="flex min-h-20 items-center gap-4 rounded-2xl border border-line bg-white p-4 shadow-[0_8px_24px_rgba(27,65,32,.04)] hover:border-[#b9d2ba]"
+                className="flex min-h-20 items-center gap-4 rounded-2xl border border-line bg-white p-4 shadow-[0_8px_24px_rgba(27,65,32,.04)] hover:border-[#b9d2ba] transition-colors"
               >
                 <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#edf5ed] text-forest">
                   <Icon size={20} />
@@ -209,25 +374,107 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Bottom Section: Evidence Overview & Farm Status ── */}
       <section className="grid gap-5 xl:grid-cols-2">
         <div>
-          <SectionHeader title="Important advisories" />
+          <SectionHeader title="Farm Evidence Overview" />
           <Card>
-            <EmptyState
-              icon={Sprout}
-              title="No advisories yet"
-              description="Important recommendations will appear once a farm and crop profile are connected."
-            />
+            <CardContent className="p-6">
+              {health ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-extrabold text-ink">
+                        {health.overall_evidence_overview.domains_available} of 5 Domains Verified
+                      </p>
+                      <p className="text-xs text-muted mt-1">
+                        {health.overall_evidence_overview.actionable_summary}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="border-leaf text-forest">
+                      {health.overall_evidence_overview.domains_available > 0 ? "Evidence Active" : "Pending Data"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                    <div className="p-2 rounded-lg bg-canvas border border-line">
+                      <span className="block text-muted text-[10px]">Soil</span>
+                      <span className="font-bold text-ink">{health.soil.availability_state}</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-canvas border border-line">
+                      <span className="block text-muted text-[10px]">Weather</span>
+                      <span className="font-bold text-ink">{health.weather.availability_state}</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-canvas border border-line">
+                      <span className="block text-muted text-[10px]">Water</span>
+                      <span className="font-bold text-ink">{health.water.availability_state}</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-canvas border border-line">
+                      <span className="block text-muted text-[10px]">Satellite</span>
+                      <span className="font-bold text-ink">{health.satellite.availability_state}</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-canvas border border-line">
+                      <span className="block text-muted text-[10px]">Crops</span>
+                      <span className="font-bold text-ink">{health.crop_context.availability_state}</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted italic">
+                    {health.governance_notice}
+                  </p>
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Sprout}
+                  title={selectedFarm ? "No health snapshot yet" : "No farm selected"}
+                  description={
+                    selectedFarm
+                      ? "Visit the Farm Health tab to evaluate multi-domain indicators."
+                      : "Important recommendations will appear once a farm and crop profile are connected."
+                  }
+                />
+              )}
+            </CardContent>
           </Card>
         </div>
         <div>
-          <SectionHeader title="Recent activity" />
+          <SectionHeader title="Your Registered Farms" />
           <Card>
-            <EmptyState
-              icon={BookOpenText}
-              title="No recent activity"
-              description="Reports, diagnoses and farm updates will be collected here as you use CropNet."
-            />
+            <CardContent className="p-6">
+              {farms.length > 0 ? (
+                <div className="space-y-3">
+                  {farms.slice(0, 3).map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-canvas border border-line"
+                    >
+                      <div>
+                        <p className="text-sm font-extrabold text-ink">{f.name}</p>
+                        <p className="text-xs text-muted">
+                          {f.taluka}, Pune · {f.calculated_area_acres ? `${f.calculated_area_acres.toFixed(1)} acres` : "—"}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/farms/${f.id}`}
+                        className="text-xs font-bold text-leaf hover:underline"
+                      >
+                        Inspect
+                      </Link>
+                    </div>
+                  ))}
+                  <div className="pt-2 flex justify-between items-center text-xs">
+                    <span className="text-muted">Total: {farms.length} parcels</span>
+                    <Link href="/farms" className="font-extrabold text-forest hover:underline">
+                      View all farms →
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  icon={BookOpenText}
+                  title="No farms registered"
+                  description="Add your first farm parcel to start recording field boundaries and soil assessments."
+                />
+              )}
+            </CardContent>
           </Card>
         </div>
       </section>
