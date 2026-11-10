@@ -201,25 +201,72 @@ export interface SoilProfile {
 
 export interface SoilReportMeasurement {
   id: string;
-  parameter_name: string;
+  report_id?: string;
+  farm_id?: string;
+  parameter_key?: string;
+  parameter_category?: string;
+  original_parameter_name?: string;
+  display_name?: string;
+  parameter_name?: string;
   parameter_code?: string;
-  numeric_value: number | null;
+  original_value?: number | null;
+  original_value_text?: string | null;
+  original_unit?: string;
+  normalized_value?: number | null;
+  normalized_unit?: string | null;
+  numeric_value?: number | null;
   unit?: string;
-  verified: boolean;
+  analytical_method?: string | null;
+  lab_reference_range?: Record<string, any> | null;
+  lab_rating?: string | null;
+  page_number?: number;
+  sample_id?: string | null;
+  sample_designation?: string | null;
+  area_type?: string | null;
+  extraction_confidence?: number;
   confidence_score?: number;
+  is_ambiguous?: boolean;
+  verification_status?: string;
+  verified?: boolean;
+  farmer_corrected_value?: number | null;
+  farmer_notes?: string | null;
   interpretation?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SoilTestReport {
   id: string;
   farm_id: string;
-  laboratory_name?: string | null;
-  sample_date?: string | null;
-  upload_timestamp: string;
-  status: "PROCESSING" | "NEEDS_REVIEW" | "CONFIRMED" | "REJECTED";
+  user_id?: string;
+  original_filename?: string;
   file_name?: string;
+  upload_timestamp: string;
+  laboratory_name?: string | null;
+  lab_number?: string | null;
+  report_date?: string | null;
+  sample_collection_date?: string | null;
+  sample_date?: string | null;
+  date_received?: string | null;
+  date_processed?: string | null;
+  sample_depth_interval?: string | null;
+  depth_provenance?: string;
+  sampling_point_name?: string | null;
+  extraction_status?: "UPLOADED" | "PROCESSING" | "NEEDS_REVIEW" | "CONFIRMED" | "FAILED" | string;
+  review_status?: "NEEDS_REVIEW" | "PARTIALLY_REVIEWED" | "CONFIRMED" | "REJECTED" | string;
+  status?: "PROCESSING" | "NEEDS_REVIEW" | "CONFIRMED" | "REJECTED" | "FAILED" | string;
+  total_measurements?: number;
+  confirmed_measurements?: number;
+  storage_path?: string;
+  file_size_bytes?: number;
+  mime_type?: string;
+  extraction_error?: string | null;
+  reviewed_at?: string | null;
+  confirmed_at?: string | null;
+  signed_document_url?: string | null;
   measurements?: SoilReportMeasurement[];
   created_at?: string;
+  updated_at?: string;
 }
 
 // ── Farm Health Snapshot ─────────────────────────────────────────────────────

@@ -175,6 +175,13 @@ class SoilMeasurementItem(BaseModel):
     farmer_corrected_value: Optional[float] = None
     farmer_notes: Optional[str] = None
 
+    # Convenience aliases for cross-client compatibility (Flutter, Next.js, scripts)
+    parameter_name: Optional[str] = None
+    numeric_value: Optional[float] = None
+    unit: Optional[str] = None
+    confidence_score: Optional[float] = None
+    verified: bool = False
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -213,6 +220,10 @@ class SoilReportSummary(BaseModel):
     review_status: ReviewStatus = ReviewStatus.NEEDS_REVIEW
     total_measurements: int = 0
     confirmed_measurements: int = 0
+    # Cross-client compatibility aliases
+    status: Optional[str] = None
+    sample_date: Optional[str] = None
+    file_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

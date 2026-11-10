@@ -7,6 +7,7 @@ import type {
   ClimateSummary,
   SoilProfile,
   SoilTestReport,
+  SoilReportMeasurement,
   FarmHealthSnapshot,
   WaterSource,
   WaterEvaluation,
@@ -178,6 +179,23 @@ export const soilApi = {
     formData.append("file", file);
     return apiUpload<SoilTestReport>(`/api/v1/farms/${farmId}/soil-reports/upload`, formData);
   },
+  correctMeasurement: (
+    farmId: string,
+    reportId: string,
+    measurementId: string,
+    data: { corrected_value: number; corrected_unit?: string; farmer_notes?: string }
+  ) =>
+    apiFetch<SoilReportMeasurement>(
+      `/api/v1/farms/${farmId}/soil-reports/${reportId}/measurements/${measurementId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    ),
+  reprocessReport: (farmId: string, reportId: string) =>
+    apiFetch<SoilTestReport>(`/api/v1/farms/${farmId}/soil-reports/${reportId}/reprocess`, {
+      method: "POST",
+    }),
   confirmReport: (farmId: string, reportId: string, confirmedData?: any) =>
     apiFetch<SoilTestReport>(`/api/v1/farms/${farmId}/soil-reports/${reportId}/confirm`, {
       method: "POST",
@@ -187,6 +205,8 @@ export const soilApi = {
     apiFetch<void>(`/api/v1/farms/${farmId}/soil-reports/${reportId}`, {
       method: "DELETE",
     }),
+  getDocumentUrl: (farmId: string, reportId: string) =>
+    `${API_BASE_URL.replace(/\/$/, "")}/api/v1/farms/${farmId}/soil-reports/${reportId}/document`,
 };
 
 export const farmHealthApi = {

@@ -95,6 +95,12 @@ def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
     param_meta = CANONICAL_SOIL_PARAMETERS.get(m.parameter_key, {})
     disp_name = param_meta.get("display_name", m.original_parameter_name)
 
+    val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+        m.normalized_value if m.normalized_value is not None else m.original_value
+    )
+    unit_str = m.normalized_unit or m.original_unit or ""
+    is_verified = (m.verification_status == MeasurementVerificationStatus.FARMER_CONFIRMED.value)
+
     return SoilMeasurementItem(
         id=uuid.UUID(m.id),
         report_id=uuid.UUID(m.report_id),
@@ -122,6 +128,12 @@ def _model_to_measurement_item(m: SoilMeasurementModel) -> SoilMeasurementItem:
         verification_status=MeasurementVerificationStatus(m.verification_status),
         farmer_corrected_value=m.farmer_corrected_value,
         farmer_notes=m.farmer_notes,
+        # Cross-client compatibility aliases
+        parameter_name=disp_name or m.original_parameter_name,
+        numeric_value=val,
+        unit=unit_str,
+        confidence_score=m.extraction_confidence,
+        verified=is_verified,
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -131,6 +143,9 @@ def _model_to_report_summary(r: SoilTestReportModel) -> SoilReportSummary:
     measurements = r.measurements or []
     total = len(measurements)
     confirmed = sum(1 for m in measurements if m.verification_status == MeasurementVerificationStatus.FARMER_CONFIRMED.value)
+
+    sample_dt = r.sample_collection_date or r.report_date
+    sample_date_str = sample_dt.strftime("%Y-%m-%d") if sample_dt else None
 
     return SoilReportSummary(
         id=uuid.UUID(r.id),
@@ -151,6 +166,9 @@ def _model_to_report_summary(r: SoilTestReportModel) -> SoilReportSummary:
         review_status=ReviewStatus(r.review_status),
         total_measurements=total,
         confirmed_measurements=confirmed,
+        status=r.extraction_status,
+        sample_date=sample_date_str,
+        file_name=r.original_filename,
         created_at=r.created_at,
         updated_at=r.updated_at,
     )
@@ -283,12 +301,22 @@ def _execute_background_ocr_task(
     content: bytes,
     filename: str,
     content_type: str,
-    db: Session
+    db: Optional[Session] = None
 ) -> None:
     """
     Background worker task executing OCR pipeline without blocking upload response.
     Updates report status to NEEDS_REVIEW or FAILED upon completion.
+    Creates and closes an isolated SessionLocal instance if no db session passed.
     """
+    should_close_db = False
+    if db is None:
+        try:
+            from cropnet.services.api.app.core.database import SessionLocal
+        except ImportError:
+            from ...core.database import SessionLocal
+        db = SessionLocal()
+        should_close_db = True
+
     try:
         report = db.query(SoilTestReportModel).filter(SoilTestReportModel.id == report_id).first()
         if not report:
@@ -317,6 +345,9 @@ def _execute_background_ocr_task(
                 db.commit()
         except Exception as save_exc:
             logger.error("Failed to persist FAILED status for report %s: %s", report_id, save_exc)
+    finally:
+        if should_close_db and db is not None:
+            db.close()
 
 
 @router.post("", response_model=SoilReportDetail, status_code=status.HTTP_201_CREATED)
