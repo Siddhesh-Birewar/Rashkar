@@ -15,33 +15,53 @@ class LlmStructuredAdvisoryPayload(BaseModel):
     """
     Structured advisory payload for JSON-Schema-constrained generation by Qwen3:8B.
     Passed directly to Ollama `format` parameter via `LlmStructuredAdvisoryPayload.model_json_schema()`.
+    Enforces concise, context-aware structure: direct_answer, key_reasons, recommended_action, limitations.
     """
-    title: str = Field(
-        ...,
-        max_length=120,
-        description="Short descriptive advisory title (4-8 words) in requested language"
+    title: Optional[str] = Field(
+        default="Advisory",
+        max_length=80,
+        description="Short descriptive advisory title (2-6 words) in requested language"
     )
     direct_answer: str = Field(
         ...,
         max_length=250,
-        description="Direct 1-2 sentence answer addressing the farmer's specific inquiry"
+        description="Direct 1-2 sentence answer (approx 20-50 words) addressing the farmer's specific inquiry first"
     )
-    what_this_means: str = Field(
-        ...,
+    key_reasons: Optional[List[str]] = Field(
+        default_factory=list,
+        max_length=3,
+        description="At most 2-3 short bullet reasons; empty in QUICK mode unless strictly necessary"
+    )
+    recommended_action: Optional[str] = Field(
+        default=None,
+        max_length=150,
+        description="One practical next action when relevant"
+    )
+    limitations: Optional[List[str]] = Field(
+        default_factory=list,
+        max_length=2,
+        description="Verified limiting factors, risks, or critical constraints if applicable"
+    )
+    response_mode: Optional[str] = Field(
+        default="QUICK",
+        description="'QUICK' (default, ~30-60 words), 'STANDARD' (~80-120 words), or 'DETAILED'"
+    )
+    what_this_means: Optional[str] = Field(
+        default="",
         max_length=350,
-        description="Clear 2-3 sentence agronomic explanation grounded in verified measurements"
+        description="Agronomic explanation only when in STANDARD or DETAILED mode"
     )
-    what_needs_attention: List[str] = Field(
+    what_needs_attention: Optional[List[str]] = Field(
         default_factory=list,
         max_length=3,
-        description="At most 2-3 key limiting factors, missing parameters, or agronomic constraints"
+        description="Key limiting factors or constraints"
     )
-    next_steps: List[str] = Field(
+    next_steps: Optional[List[str]] = Field(
         default_factory=list,
         max_length=3,
-        description="At most 2-3 practical, actionable next steps for the farmer"
+        description="Practical next steps for the farmer"
     )
-    missing_information: List[str] = Field(
+    missing_information: Optional[List[str]] = Field(
         default_factory=list,
         max_length=3,
         description="Disclosed missing measurements or unverified items"

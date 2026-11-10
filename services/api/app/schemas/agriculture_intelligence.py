@@ -246,6 +246,7 @@ class ExplainDecisionRequest(BaseModel):
     language: Optional[str] = Field(default="en", description="Target explanation language: 'en' or 'mr'")
     focus_crop: Optional[str] = Field(None, description="Optional specific crop_id to focus the explanation on")
     query: Optional[str] = Field(None, description="Optional specific farmer question or query to evaluate")
+    response_mode: Optional[str] = Field(default=None, description="Response length mode: 'QUICK' (default), 'STANDARD', or 'DETAILED'")
 
 
 class ConversationMessage(BaseModel):
@@ -266,6 +267,7 @@ class ConversationRequest(BaseModel):
     language: Optional[str] = Field(default="en", description="Language preference: 'en' or 'mr'")
     history: Optional[List[ConversationMessage]] = Field(default_factory=list, description="Bounded prior conversation turns")
     submitted_answers: Optional[Dict[str, Any]] = Field(None, description="Optional diagnostic parameter updates to trigger deterministic re-evaluation")
+    response_mode: Optional[str] = Field(default=None, description="Response length mode: 'QUICK' (default), 'STANDARD', or 'DETAILED'")
 
 
 class AdvisoryObservationItem(BaseModel):
@@ -280,7 +282,7 @@ class AdvisoryObservationItem(BaseModel):
 
 class StructuredAdvisoryCard(BaseModel):
     """
-    Structured farmer-facing advisory card matching the 6 standard UI sections.
+    Structured farmer-facing advisory card matching the standard UI sections.
     """
     title: str = Field(..., description="Advisory card title")
     direct_answer: str = Field(..., description="Short, direct answer to the farmer's question")
@@ -291,6 +293,10 @@ class StructuredAdvisoryCard(BaseModel):
     what_needs_attention: List[str] = Field(default_factory=list, description="Key limiting factors, missing info, or constraints")
     next_steps: List[str] = Field(default_factory=list, description="Numbered recommended actions")
     evidence_references: List[str] = Field(default_factory=list, description="Authoritative institutional source references")
+    key_reasons: Optional[List[str]] = Field(default_factory=list, description="Concise bullet points explaining reasons if needed")
+    recommended_action: Optional[str] = Field(default=None, description="Single practical next action for the farmer")
+    limitations: Optional[List[str]] = Field(default_factory=list, description="Verified agronomic constraints and risks")
+    response_mode: Optional[str] = Field(default="QUICK", description="Mode used for this advisory card ('QUICK', 'STANDARD', 'DETAILED')")
 
 
 class AgriculturalExplanationResponse(BaseModel):
@@ -300,6 +306,11 @@ class AgriculturalExplanationResponse(BaseModel):
     decision_id: str
     language: str
     explanation_text: str
+    response_mode: str = Field(default="QUICK", description="Response brevity mode applied: 'QUICK', 'STANDARD', or 'DETAILED'")
+    direct_answer: Optional[str] = Field(default=None, description="Direct answer isolated from explanation")
+    recommended_action: Optional[str] = Field(default=None, description="Single practical action recommended")
+    key_reasons: List[str] = Field(default_factory=list, description="Concise bullet points explaining reasons")
+    limitations: List[str] = Field(default_factory=list, description="Verified agronomic constraints")
     generation_source: str = Field(..., description="'llm_qwen3_8b' or 'deterministic_fallback'")
     validation_passed: bool = Field(..., description="Whether output passed numerical and constraint guardrails")
     validation_warnings: List[str] = Field(default_factory=list, description="Guardrail warnings or failure notes")

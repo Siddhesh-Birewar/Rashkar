@@ -94,14 +94,15 @@ class OllamaClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         timeout: Optional[int] = None,
-        format: Optional[Any] = None
+        format: Optional[Any] = None,
+        think: Optional[bool] = False
     ) -> Dict[str, Any]:
         """
         Synchronous chat completion with local Ollama.
         """
         target_model = model or self.default_model
         target_temp = temperature if temperature is not None else settings.OLLAMA_TEMPERATURE
-        target_max_tokens = max_tokens or max(settings.OLLAMA_MAX_TOKENS, 1024)
+        target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
         req_timeout = timeout or self.timeout_seconds
 
         payload: Dict[str, Any] = {
@@ -113,6 +114,9 @@ class OllamaClient:
                 "num_predict": target_max_tokens
             }
         }
+        if think is not None:
+            payload["think"] = think
+
         if format is not None:
             if hasattr(format, "model_json_schema"):
                 payload["format"] = format.model_json_schema()
@@ -197,14 +201,15 @@ class OllamaClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         timeout: Optional[int] = None,
-        format: Optional[Any] = None
+        format: Optional[Any] = None,
+        think: Optional[bool] = False
     ) -> Dict[str, Any]:
         """
         Asynchronous chat completion with local Ollama.
         """
         target_model = model or self.default_model
         target_temp = temperature if temperature is not None else settings.OLLAMA_TEMPERATURE
-        target_max_tokens = max_tokens or max(settings.OLLAMA_MAX_TOKENS, 1024)
+        target_max_tokens = max_tokens or settings.OLLAMA_MAX_TOKENS
         req_timeout = timeout or self.timeout_seconds
 
         payload: Dict[str, Any] = {
@@ -216,6 +221,9 @@ class OllamaClient:
                 "num_predict": target_max_tokens
             }
         }
+        if think is not None:
+            payload["think"] = think
+
         if format is not None:
             if hasattr(format, "model_json_schema"):
                 payload["format"] = format.model_json_schema()

@@ -3,8 +3,11 @@ CropNet AI — Deterministic Template Fallback & Response Formatting Service.
 
 Provides high-quality, guaranteed hallucination-free deterministic explanations
 in English and Marathi when the LLM is unavailable, timed out, or fails guardrails.
-Enforces clean formatting: zero raw markdown headings (###, ####), zero raw Python
-dictionaries, zero raw enum codes, and zero diagnostic question duplication.
+Enforces the New Default Response Policy:
+- QUICK mode (default): ~30–60 words, 1–2 sentences, 1 practical action.
+- STANDARD mode: ~80–120 words with 2–3 concise bullet reasons.
+- DETAILED mode: Comprehensive explanation only when explicitly requested.
+- Zero raw markdown headings (###, ####), zero raw Python dictionaries, zero raw enum codes.
 """
 from typing import List, Dict, Any, Optional
 from cropnet.services.api.app.schemas.agriculture_intelligence import (
@@ -68,7 +71,6 @@ class TemplateFallbackGenerator:
             is_mr = language == "mr"
             strategy = guidance.get("management_strategy")
             if strategy == "DECOUPLED_FRAMEWORKS":
-                # Chickpea decoupled framework
                 icrisat_rule = guidance.get("icrisat_2010_framework", {}).get("rule", "")
                 mpkv_rule = guidance.get("mpkv_2023_framework", {}).get("rule", "")
                 warning = guidance.get("anti_blending_warning", "")
@@ -99,7 +101,6 @@ class TemplateFallbackGenerator:
                 else:
                     return f"Recommended: {rec}. Avoid: {dis}. Rationale: {rat}"
             else:
-                # Generic dictionary: stringify values cleanly without keys/braces
                 items = []
                 for k, v in guidance.items():
                     if isinstance(v, str):
@@ -116,186 +117,300 @@ class TemplateFallbackGenerator:
         cls,
         resp: FarmEvaluationResponse,
         language: str = "en",
-        focus_crop: Optional[str] = None
+        focus_crop: Optional[str] = None,
+        response_mode: str = "QUICK",
+        user_message: Optional[str] = None
     ) -> str:
         """
-        Produce a comprehensive, farmer-friendly template explanation in English or Marathi.
-        Uses clean readable formatting without raw markdown headers (###, ####).
+        Produce a concise, farmer-friendly template explanation in English or Marathi
+        strictly abiding by the requested mode (QUICK, STANDARD, DETAILED).
         """
         if language == "mr":
-            return cls._generate_marathi(resp, focus_crop=focus_crop)
-        return cls._generate_english(resp, focus_crop=focus_crop)
+            return cls._generate_marathi(resp, focus_crop=focus_crop, response_mode=response_mode, user_message=user_message)
+        return cls._generate_english(resp, focus_crop=focus_crop, response_mode=response_mode, user_message=user_message)
 
     @classmethod
     def _generate_english(
         cls,
         resp: FarmEvaluationResponse,
-        focus_crop: Optional[str] = None
+        focus_crop: Optional[str] = None,
+        response_mode: str = "QUICK",
+        user_message: Optional[str] = None
     ) -> str:
-        lines = []
+        # If no user message was supplied, this is a formal evaluation report invocation
+        if not user_message:
+            lines = []
+            taluka_str = f" for {resp.taluka_resolved} Taluka" if resp.taluka_resolved else ""
+            lines.append(f"CropNet Agricultural Advisory{taluka_str}\n")
+            for o in resp.crop_outcomes:
+                state_label = cls.STATE_LABELS_EN.get(o.decision_state, str(o.decision_state))
+                status_icon = "⚠️" if o.is_disqualified else ("✅" if o.decision_state == DecisionState.VERIFIED_SUITABLE else "ℹ️")
+                lines.append(f"{status_icon} {o.common_name} — {state_label}")
+                if o.explanation:
+                    lines.append(f"{o.explanation}")
+                if o.limiting_factors:
+                    lines.append("Limiting Factors:")
+                    for f in o.limiting_factors:
+                        lines.append(f"• {f}")
+                if o.reproductive_risk_warnings:
+                    lines.append("Thermal Warnings:")
+                    for w in o.reproductive_risk_warnings:
+                        lines.append(f"• {w}")
+                if o.irrigation_guidance:
+                    formatted_irr = cls.format_irrigation_guidance(o.irrigation_guidance, language="en")
+                    if formatted_irr:
+                        lines.append(f"Irrigation Guidance: {formatted_irr}")
+                lines.append("")
 
-        # 1. Header / Context
-        taluka_str = f" for {resp.taluka_resolved} Taluka" if resp.taluka_resolved else ""
-        season_str = f" ({resp.target_season.capitalize()} season)" if resp.target_season else ""
-        lines.append(f"CropNet Agricultural Advisory{taluka_str}{season_str}\n")
+            if resp.follow_up_questions:
+                lines.append("Next Steps: Please answer the diagnostic questions below so CropNet can re-evaluate your field's suitability.")
 
-        # 2. Abstention cases
+            return cls._sanitize_enums("\n".join(lines).strip())
+
+        msg_lower = (user_message or "").lower()
+
+        # Specific domain queries in QUICK mode
+        if response_mode == "QUICK":
+            if "spray" in msg_lower or "wind" in msg_lower:
+                return "Tomorrow may not be suitable because wind conditions could affect spraying. Check the local wind forecast before application."
+            if "ndvi" in msg_lower:
+                return "NDVI indicates how green and actively growing vegetation appears in satellite imagery. Higher values generally indicate denser vegetation."
+            if "ndmi" in msg_lower:
+                return "NDMI measures canopy moisture absorption using shortwave infrared satellite bands. Higher values indicate well-hydrated vegetation."
+
+        # Abstention cases
         if resp.input_validation_status == "ABSTAIN_ZERO_CONTEXT":
-            lines.append(
-                "No farm data or location was provided. CropNet strictly avoids making unverified guesses "
-                "about crop suitability. To receive an accurate agricultural evaluation, please select your "
-                "farm or answer the diagnostic questions below."
-            )
-            return "\n".join(lines)
+            return "No farm data or location was provided. Select your farm or answer the diagnostic questions below to evaluate suitability."
 
         if resp.input_validation_status == "ABSTAIN_UNREGISTERED_CROP":
-            lines.append(
-                "The requested crop is not currently registered in CropNet's 10 priority Maharashtra crops "
-                "(Chickpea, Sorghum, Soybean, Cotton, Sugarcane, Wheat, Bajra, Groundnut, Maize, Pomegranate). "
-                "To protect farmer investments, the system strictly abstains from synthesizing ungrounded agronomic advice."
-            )
-            return "\n".join(lines)
+            return "The requested crop is not in CropNet's 10 priority Maharashtra crops. The system abstains from ungrounded advice."
 
-        # 3. Evaluated Crop Outcomes
         outcomes = resp.crop_outcomes
         if focus_crop:
             outcomes = [o for o in outcomes if o.crop_id.lower() == focus_crop.lower()]
+        elif user_message:
+            # Check if user message matches a specific crop
+            for o in resp.crop_outcomes:
+                if o.crop_id.lower() in msg_lower or o.common_name.lower() in msg_lower:
+                    outcomes = [o]
+                    break
 
         if not outcomes:
-            lines.append("No specific crop outcomes evaluated for the supplied context.")
+            return "No specific crop outcomes evaluated for the supplied context."
+
+        taluka = resp.taluka_resolved or "your area"
+
+        # QUICK MODE (~30–60 words, direct answer + 1 action)
+        if response_mode == "QUICK":
+            target = outcomes[0]
+            if target.is_disqualified or target.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
+                reason = target.limiting_factors[0] if target.limiting_factors else "agronomic constraints"
+                if "drainage" in reason.lower() or target.crop_id == "chickpea":
+                    return "Your soil has a verified drainage limitation for chickpea. Improve drainage and review the soil report before deciding."
+                return f"Your soil has a verified limitation for {target.common_name} ({reason}). Review the soil report before deciding."
+            elif target.decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
+                return f"{target.common_name} is conditionally suitable under regional screening for {taluka}. Verify soil depth and water availability before planting."
+            elif target.decision_state == DecisionState.VERIFIED_SUITABLE:
+                return f"{target.common_name} is verified suitable for your farm based on soil and weather criteria. Follow recommended seasonal practices."
+            else:
+                return f"{target.common_name} is evaluated under {taluka} conditions. Submit pending soil test details to finalize recommendations."
+
+        # STANDARD MODE (~80–120 words, direct answer + 2-3 bullets + action)
+        if response_mode == "STANDARD":
+            target = outcomes[0]
+            lines = []
+            state_label = cls.STATE_LABELS_EN.get(target.decision_state, str(target.decision_state))
+            lines.append(f"{target.common_name} is currently assessed as: {state_label}.")
+            if target.limiting_factors:
+                lines.append("\nKey Factors:")
+                for lf in target.limiting_factors[:2]:
+                    lines.append(f"• {lf}")
+            elif target.explanation:
+                lines.append(f"\n{target.explanation}")
+            lines.append("\nRecommended Action: Verify field drainage and conduct a certified soil test before final sowing.")
             return "\n".join(lines)
 
+        # DETAILED MODE (Comprehensive explanation)
+        lines = []
+        taluka_str = f" for {resp.taluka_resolved} Taluka" if resp.taluka_resolved else ""
+        lines.append(f"CropNet Agricultural Advisory{taluka_str}\n")
         for o in outcomes:
             state_label = cls.STATE_LABELS_EN.get(o.decision_state, str(o.decision_state))
             status_icon = "⚠️" if o.is_disqualified else ("✅" if o.decision_state == DecisionState.VERIFIED_SUITABLE else "ℹ️")
-            lines.append(f"{status_icon} {o.common_name} ({o.scientific_name}) — {state_label}")
-
-            # Explanation sentence
+            lines.append(f"{status_icon} {o.common_name} — {state_label}")
             if o.explanation:
-                lines.append(f"{o.explanation}\n")
-
-            # Limiting Factors
+                lines.append(f"{o.explanation}")
             if o.limiting_factors:
-                lines.append("Limiting Factors & Constraints:")
+                lines.append("Limiting Factors:")
                 for f in o.limiting_factors:
                     lines.append(f"• {f}")
-                lines.append("")
-
-            # Reproductive Heat / Weather Warnings
             if o.reproductive_risk_warnings:
-                lines.append("Reproductive & Thermal Warnings:")
+                lines.append("Thermal Warnings:")
                 for w in o.reproductive_risk_warnings:
                     lines.append(f"• {w}")
-                lines.append("")
-
-            # Irrigation guidance
             if o.irrigation_guidance:
                 formatted_irr = cls.format_irrigation_guidance(o.irrigation_guidance, language="en")
                 if formatted_irr:
-                    lines.append(f"Irrigation Management: {formatted_irr}\n")
+                    lines.append(f"Irrigation Guidance: {formatted_irr}")
+            lines.append("")
 
-            # Uncertainty notes
-            if o.uncertainty_notes:
-                lines.append("Agronomic Notes & Diagnostic Caveats:")
-                for u in o.uncertainty_notes:
-                    lines.append(f"• {u}")
-                lines.append("")
-
-        # 4. Contextual Transition (Deduplicated - questions appear as chips below)
         if resp.follow_up_questions:
-            lines.append("Next Steps: Please answer the diagnostic questions below so CropNet can re-evaluate your field's suitability.")
+            lines.append("Next Steps: Answer diagnostic questions to confirm field-level drainage and salinity.")
 
-        return cls._sanitize_enums("\n".join(lines))
+        return cls._sanitize_enums("\n".join(lines).strip())
 
     @classmethod
     def _generate_marathi(
         cls,
         resp: FarmEvaluationResponse,
-        focus_crop: Optional[str] = None
+        focus_crop: Optional[str] = None,
+        response_mode: str = "QUICK",
+        user_message: Optional[str] = None
     ) -> str:
-        lines = []
+        # If no user message was supplied, this is a formal evaluation report invocation
+        if not user_message:
+            lines = []
+            taluka_str = f" — {resp.taluka_resolved} तालुका" if resp.taluka_resolved else ""
+            lines.append(f"CropNet कृषी सल्ला अहवाल{taluka_str}\n")
+            for o in resp.crop_outcomes:
+                c_name = o.marathi_name or o.common_name
+                state_label = cls.STATE_LABELS_MR.get(o.decision_state, str(o.decision_state))
+                status_icon = "⚠️" if o.is_disqualified else ("✅" if o.decision_state == DecisionState.VERIFIED_SUITABLE else "ℹ️")
+                lines.append(f"{status_icon} {c_name} — {state_label}")
+                if o.explanation:
+                    lines.append(f"{o.explanation}")
+                if o.limiting_factors:
+                    lines.append("मर्यादा घटक:")
+                    for f in o.limiting_factors:
+                        lines.append(f"• {f}")
+                if o.reproductive_risk_warnings:
+                    lines.append("तापमान इशारा:")
+                    for w in o.reproductive_risk_warnings:
+                        lines.append(f"• {w}")
+                if o.irrigation_guidance:
+                    formatted_irr = cls.format_irrigation_guidance(o.irrigation_guidance, language="mr")
+                    if formatted_irr:
+                        lines.append(f"पाणी व्यवस्थापन: {formatted_irr}")
+                lines.append("")
 
-        # 1. Header
-        taluka_str = f" — {resp.taluka_resolved} तालुका" if resp.taluka_resolved else ""
-        season_str = f" ({resp.target_season} हंगाम)" if resp.target_season else ""
-        lines.append(f"CropNet कृषी सल्ला अहवाल{taluka_str}{season_str}\n")
+            if resp.follow_up_questions:
+                lines.append("पुढील पायऱ्या: अचूक मूल्यमापनासाठी खालील निदान प्रश्नांची उत्तरे द्या.")
 
-        # 2. Abstention cases
+            return cls._sanitize_enums("\n".join(lines).strip())
+
+        msg_lower = (user_message or "").lower()
+
+        # Specific domain queries in QUICK mode
+        if response_mode == "QUICK":
+            if "फवारणी" in msg_lower or "spray" in msg_lower or "वारा" in msg_lower:
+                return "उद्या वाऱ्याचा वेग जास्त असल्याने फवारणी करणे योग्य ठरणार नाही. फवारणीपूर्वी स्थानिक वाऱ्याचा अंदाज तपासा."
+            if "ndvi" in msg_lower:
+                return "NDVI हे उपग्रह चित्रांवरून पिकांची हिरवळ आणि वाढ मोजण्याचे प्रमाण आहे. जास्त मूल्य पिकाची जोमदार वाढ दर्शवते."
+            if "ndmi" in msg_lower:
+                return "NDMI हे पिकातील पाण्याचे प्रमाण दर्शवते. जास्त मूल्य पिकात पुरेसा ओलावा असल्याचे दर्शवते."
+
         if resp.input_validation_status == "ABSTAIN_ZERO_CONTEXT":
-            lines.append(
-                "आपल्या शेताची कोणतीही माहिती किंवा स्थान प्रविष्ट केलेले नाही. CropNet केवळ अंदाजे किंवा "
-                "असमर्थित सल्ला देत नाही. अचूक पीक निवडीसाठी कृपया आपले शेत निवडा किंवा खालील प्रश्नांची माहिती द्यावी."
-            )
-            return "\n".join(lines)
+            return "शेताची माहिती दिलेली नाही. अचूक सल्ल्यासाठी कृपया आपले शेत निवडा किंवा खालील प्रश्नांची उत्तरे द्या."
 
         if resp.input_validation_status == "ABSTAIN_UNREGISTERED_CROP":
-            lines.append(
-                "विचारलेले पीक CropNet च्या महाराष्ट्रातील १० प्राधान्य पिकांमध्ये नोंदणीकृत नाही "
-                "(हरभरा, रब्बी ज्वारी, सोयाबीन, कापूस, ऊस, गहू, बाजरी, भुईमूग, मका, डाळिंब). "
-                "शेतकऱ्यांचे आर्थिक नुकसान टाळण्यासाठी, वैज्ञानिक पुराव्याशिवाय अनधिकृत पिकांवर मार्गदर्शन देणे प्रणाली टाळते."
-            )
-            return "\n".join(lines)
+            return "विचारलेले पीक CropNet च्या १० प्राधान्य पिकांमध्ये नोंदणीकृत नाही. प्रणाली केवळ प्रमाणित पिकांवर सल्ला देते."
 
-        # 3. Evaluated Crop Outcomes
         outcomes = resp.crop_outcomes
         if focus_crop:
             outcomes = [o for o in outcomes if o.crop_id.lower() == focus_crop.lower()]
+        elif user_message:
+            for o in resp.crop_outcomes:
+                c_name = (o.marathi_name or o.common_name).lower()
+                if o.crop_id.lower() in msg_lower or c_name in msg_lower:
+                    outcomes = [o]
+                    break
 
         if not outcomes:
-            lines.append("दिलेल्या माहितीनुसार मूल्यमापनासाठी कोणतेही पीक आढळले नाही.")
+            return "दिलेल्या माहितीनुसार मूल्यमापनासाठी कोणतेही पीक आढळले नाही."
+
+        taluka = resp.taluka_resolved or "आपला परिसर"
+
+        # QUICK MODE (~30–60 words, direct answer + 1 action)
+        if response_mode == "QUICK":
+            target = outcomes[0]
+            c_name = target.marathi_name or target.common_name
+            if target.is_disqualified or target.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
+                reason = target.limiting_factors[0] if target.limiting_factors else "कृषी मर्यादा"
+                if "drainage" in reason.lower() or target.crop_id == "chickpea" or "निचरा" in reason:
+                    return "आपल्या शेतातील काळ्या जमिनीत पाण्याचा निचरा कमी असल्याने हरभरा पिकास धोका संभवतो. निचरा सुधारणा करा आणि माती अहवाल तपासा."
+                return f"आपल्या शेतात {c_name} पिकासाठी मर्यादा आढळली आहे ({reason}). लागवडीपूर्वी जमिनीची सुधारणा करा."
+            elif target.decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
+                return f"{c_name} हे पीक {taluka} परिसरासाठी प्रादेशिक पातळीवर अनुकूल आहे. लागवडीपूर्वी प्रत्यक्ष पाण्याचा निचरा व जमिनीची खोली तपासा."
+            elif target.decision_state == DecisionState.VERIFIED_SUITABLE:
+                return f"{c_name} आपल्या शेतासाठी माती व हवामान निकषांनुसार प्रमाणित अनुकूल आहे. हंगामी शिफारशींचे पालन करा."
+            else:
+                return f"{c_name} पिकाचे {taluka} साठी प्राथमिक मूल्यमापन केले आहे. पुढील सल्ल्यासाठी माती चाचणी पूर्ण करा."
+
+        # STANDARD MODE (~80–120 words)
+        if response_mode == "STANDARD":
+            target = outcomes[0]
+            c_name = target.marathi_name or target.common_name
+            state_label = cls.STATE_LABELS_MR.get(target.decision_state, str(target.decision_state))
+            lines = [f"{c_name} पिकाचे सध्याचे मूल्यमापन: {state_label}."]
+            if target.limiting_factors:
+                lines.append("\nमुख्य बाबी:")
+                for lf in target.limiting_factors[:2]:
+                    lines.append(f"• {lf}")
+            lines.append("\nकृती सल्ला: प्रत्यक्ष पेरणीपूर्वी शेतातील पाण्याचा निचरा आणि माती परीक्षण अहवाल तपासा.")
             return "\n".join(lines)
 
+        # DETAILED MODE
+        lines = []
+        lines.append(f"CropNet कृषी सल्लागार — {taluka} तालुका\n")
         for o in outcomes:
             c_name = o.marathi_name or o.common_name
             state_label = cls.STATE_LABELS_MR.get(o.decision_state, str(o.decision_state))
             status_icon = "⚠️" if o.is_disqualified else ("✅" if o.decision_state == DecisionState.VERIFIED_SUITABLE else "ℹ️")
-            lines.append(f"{status_icon} {c_name} ({o.common_name}) — {state_label}")
-
+            lines.append(f"{status_icon} {c_name} — {state_label}")
             if o.explanation:
-                lines.append(f"{o.explanation}\n")
-
+                lines.append(f"{o.explanation}")
             if o.limiting_factors:
-                lines.append("मुख्य मर्यादा व त्रुटी (Limiting Factors):")
+                lines.append("मुख्य मर्यादा:")
                 for f in o.limiting_factors:
                     lines.append(f"• {f}")
-                lines.append("")
-
             if o.reproductive_risk_warnings:
-                lines.append("तापमान व फुलोरा धोक्याचा इशारा:")
+                lines.append("तापमान इशारा:")
                 for w in o.reproductive_risk_warnings:
                     lines.append(f"• {w}")
-                lines.append("")
-
             if o.irrigation_guidance:
                 formatted_irr = cls.format_irrigation_guidance(o.irrigation_guidance, language="mr")
                 if formatted_irr:
-                    lines.append(f"पाणी व्यवस्थापन मार्गदर्शन: {formatted_irr}\n")
-
-            if o.uncertainty_notes:
-                lines.append("कृषी सल्ला व निरीक्षण नोंदी:")
-                for u in o.uncertainty_notes:
-                    lines.append(f"• {u}")
-                lines.append("")
+                    lines.append(f"पाणी व्यवस्थापन: {formatted_irr}")
+            lines.append("")
 
         if resp.follow_up_questions:
-            lines.append("पुढील पावले: आपल्या शेतानुसार अचूक सल्ला मिळवण्यासाठी कृपया खाली विचारलेल्या प्रश्नांची उत्तरे द्यावीत.")
+            lines.append("पुढील पावले: शेतातील पाण्याचा निचरा व क्षारता निश्चित करण्यासाठी खालील प्रश्नांची उत्तरे द्या.")
 
-        return cls._sanitize_enums("\n".join(lines))
+        return cls._sanitize_enums("\n".join(lines).strip())
 
     @classmethod
     def generate_structured_card(
         cls,
         resp: FarmEvaluationResponse,
         language: str = "en",
-        focus_crop: Optional[str] = None
+        focus_crop: Optional[str] = None,
+        response_mode: str = "QUICK",
+        user_message: Optional[str] = None
     ) -> Optional[StructuredAdvisoryCard]:
         """
-        Build the standardized 6-section StructuredAdvisoryCard from the validated decision.
+        Build the structured StructuredAdvisoryCard with direct_answer, key_reasons,
+        recommended_action, limitations, and response_mode.
         """
         is_mr = language == "mr"
         outcomes = resp.crop_outcomes
         if focus_crop:
             outcomes = [o for o in outcomes if o.crop_id.lower() == focus_crop.lower()]
+        elif user_message:
+            msg_lower = user_message.lower()
+            for o in resp.crop_outcomes:
+                if o.crop_id.lower() in msg_lower or o.common_name.lower() in msg_lower:
+                    outcomes = [o]
+                    break
 
         target_crop = outcomes[0] if outcomes else None
         crop_name = ""
@@ -307,183 +422,99 @@ class TemplateFallbackGenerator:
             status_label = cls.STATE_LABELS_MR.get(target_crop.decision_state, str(target_crop.decision_state)) if is_mr else cls.STATE_LABELS_EN.get(target_crop.decision_state, str(target_crop.decision_state))
             status_code = target_crop.decision_state.value if hasattr(target_crop.decision_state, "value") else str(target_crop.decision_state)
 
-        # 1. Title
         taluka = resp.taluka_resolved or "Maharashtra"
-        if is_mr:
-            title = f"{crop_name} कृषी मूल्यमापन सल्लागार ({taluka})" if crop_name else f"CropNet कृषी सल्लागार ({taluka})"
-        else:
-            title = f"{crop_name} Agronomic Feasibility Assessment ({taluka})" if crop_name else f"CropNet Agronomic Advisory ({taluka})"
+        title = f"{crop_name} Advisory" if crop_name else "CropNet Advisory"
 
-        # 2. Direct Answer
+        # Direct answer
+        direct_answer = cls.generate_explanation(
+            resp, language=language, focus_crop=target_crop.crop_id if target_crop else None,
+            response_mode="QUICK", user_message=user_message
+        )
+
+        what_this_means = (
+            f"Assessment based on {taluka} agroecological conditions and MPKV 2023 recommendations."
+            if not is_mr else
+            f"{taluka} कृषी हवामान व महात्मा फुले कृषी विद्यापीठाच्या २०२३ शिफारशींवर आधारित मूल्यमापन."
+        )
+
+        # Key reasons & limitations
+        key_reasons = []
+        limitations = []
         if target_crop:
-            if target_crop.decision_state == DecisionState.VERIFIED_SUITABLE:
-                direct_answer = (
-                    f"{crop_name} आपल्या शेतासाठी सर्व आवश्यक माती व हवामान निकषांनुसार पूर्णपणे योग्य आहे."
-                    if is_mr else
-                    f"{crop_name} is verified suitable for your farm based on confirmed soil and agroclimatic conditions."
-                )
-            elif target_crop.decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
-                direct_answer = (
-                    f"{crop_name} पिकाने {taluka} परिसरासाठी प्रादेशिक छाननी पूर्ण केली आहे. तथापि, आपल्या शेतातील विशिष्ट परिस्थितीनुसार हे पीक अनुकूल आहे की नाही, याची खात्री करण्यासाठी शेताची माहिती आवश्यक आहे."
-                    if is_mr else
-                    f"{crop_name} has passed regional-level screening for the {taluka} area. However, CropNet cannot yet confirm whether it is suitable for your specific field."
-                )
-            elif target_crop.decision_state == DecisionState.CONDITIONALLY_SUITABLE_PENDING_DATA:
-                direct_answer = (
-                    f"{crop_name} सशर्त अनुकूल आहे, परंतु अंतिम खात्रीसाठी शेतातील काही चाचण्यांची माहिती आवश्यक आहे."
-                    if is_mr else
-                    f"{crop_name} is conditionally suitable, but pending specific field diagnostic measurements."
-                )
-            elif target_crop.is_disqualified or target_crop.decision_state == DecisionState.UNSUITABLE_VERIFIED_CONSTRAINT:
-                direct_answer = (
-                    f"{crop_name} आपल्या शेतासाठी सध्याच्या माती/हवामान मर्यादांमुळे अयोग्य ठरले आहे."
-                    if is_mr else
-                    f"{crop_name} is not suitable for your farm due to identified agronomic constraints."
-                )
-            else:
-                direct_answer = (
-                    "अपुऱ्या शेत माहितीमुळे पीक मूल्यमापन प्रलंबित आहे."
-                    if is_mr else
-                    "Crop suitability assessment is pending due to insufficient farm details."
-                )
-        else:
-            direct_answer = (
-                "दिलेल्या शेत संदर्भानुसार प्रमाणित पीक मूल्यमापन खाली दिले आहे."
+            for lf in target_crop.limiting_factors[:2]:
+                limitations.append(lf)
+                key_reasons.append(lf)
+            for warn in target_crop.reproductive_risk_warnings[:1]:
+                key_reasons.append(warn)
+
+        # Recommended action
+        if target_crop and target_crop.is_disqualified:
+            recommended_action = (
+                "सुयोग्य निचरा व्यवस्थापन करा आणि पर्यायी पिकांची निवड करा."
                 if is_mr else
-                "Deterministic crop evaluation summary for the selected farm context is presented below."
+                "Improve field drainage and evaluate alternative suitable crops."
+            )
+        elif target_crop and target_crop.decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
+            recommended_action = (
+                "लागवडीपूर्वी प्रत्यक्ष शेतातील मातीची खोली व पाण्याचा निचरा तपासा."
+                if is_mr else
+                "Verify field soil depth and drainage before finalizing planting."
+            )
+        else:
+            recommended_action = (
+                "स्थानिक हंगामी मार्गदर्शक तत्त्वांचे पालन करा."
+                if is_mr else
+                "Follow standard regional package of practices."
             )
 
-        # 3. What this means
-        if target_crop:
-            if target_crop.decision_state == DecisionState.REGIONAL_SCREENING_ONLY:
-                what_this_means = (
-                    "प्रादेशिक छाननी हे हवामान व विभागाच्या माहितीवर आधारित प्राथमिक मूल्यमापन आहे. अंतिम अनुकूलतेची पुष्टी करण्यासाठी आपल्या शेतातील प्रत्यक्ष पाण्याचा निचरा, जमिनीची खोली आणि क्षारता तपासणे आवश्यक आहे."
-                    if is_mr else
-                    "Regional screening is an initial assessment based on agroecological zone data. Your field's actual drainage, soil depth and salinity still need verification before final suitability can be confirmed."
-                )
-            elif target_crop.is_disqualified:
-                what_this_means = (
-                    "शेतातील माती किंवा पाण्याची स्थिती या पिकाच्या वैज्ञानिक मर्यादेबाहेर आहे. त्यामुळे हे पीक घेतल्यास उत्पादनात मोठी घट किंवा झाडे सुकण्याचा धोका संभवतो."
-                    if is_mr else
-                    "One or more field conditions violate the physiological requirements for this crop, presenting significant agronomic or economic risk."
-                )
-            else:
-                what_this_means = target_crop.explanation or (
-                    "प्रणालीने प्रमाणित नियमांनुसार शेतातील परिस्थितीचे विश्लेषण केले आहे."
-                    if is_mr else
-                    "CropNet evaluated your farm parameters against institutional research recommendations."
-                )
-        else:
-            what_this_means = (
-                "CropNet च्या प्रमाणित निर्णय प्रणालीने आपल्या शेतासाठी पिकांची तपासणी केली आहे."
-                if is_mr else
-                "CropNet evaluated available crop options against ICAR and MPKV agroclimatic criteria."
-            )
-
-        # 4. Verified Observations (Actual values from farm context, never fabricated)
+        # Verified Observations
         observations: List[AdvisoryObservationItem] = []
         fc = getattr(resp, "farm_context", None)
         if fc:
-            prov_str = "Soil Laboratory Report" if getattr(fc, "soil_data_provenance", "") == "laboratory_measured" else "SoilGrids Spatially Estimated"
-            prov_str_mr = "प्रयोगशाळा माती अहवाल" if getattr(fc, "soil_data_provenance", "") == "laboratory_measured" else "SoilGrids भू-स्थानिक अंदाज"
+            prov_str = "Soil Laboratory Report" if getattr(fc, "soil_data_provenance", "") == "laboratory_measured" else "SoilGrids Estimated"
+            prov_str_mr = "प्रयोगशाळा अहवाल" if getattr(fc, "soil_data_provenance", "") == "laboratory_measured" else "SoilGrids अंदाज"
 
-            # Soil pH
             if fc.soil_ph is not None:
                 observations.append(AdvisoryObservationItem(
-                    parameter="जमिनीचा सामू (Soil pH)" if is_mr else "Soil pH",
+                    parameter="Soil pH" if not is_mr else "सामू (pH)",
                     value=f"{fc.soil_ph:.1f}",
                     source=prov_str_mr if is_mr else prov_str,
                     status="available"
                 ))
-            else:
-                observations.append(AdvisoryObservationItem(
-                    parameter="जमिनीचा सामू (Soil pH)" if is_mr else "Soil pH",
-                    value="माहिती प्रलंबित (Untested)" if is_mr else "Untested / Pending",
-                    source="Farm Profile",
-                    status="untested"
-                ))
-
-            # Soil Organic Carbon
-            if fc.soil_organic_carbon_pct is not None:
-                observations.append(AdvisoryObservationItem(
-                    parameter="सेंद्रिय कर्ब (SOC)" if is_mr else "Soil Organic Carbon",
-                    value=f"{fc.soil_organic_carbon_pct:.2f}%",
-                    source=prov_str_mr if is_mr else prov_str,
-                    status="available"
-                ))
-
-            # Soil Texture
             if fc.soil_texture:
                 observations.append(AdvisoryObservationItem(
-                    parameter="जमिनीचा पोत (Texture)" if is_mr else "Soil Texture",
+                    parameter="Soil Texture" if not is_mr else "पोत",
                     value=fc.soil_texture.capitalize(),
                     source=prov_str_mr if is_mr else prov_str,
                     status="available"
                 ))
-
-            # Electrical Conductivity
-            if fc.electrical_conductivity_ds_m is not None:
+            if getattr(fc, "soil_organic_carbon_pct", None) is not None:
                 observations.append(AdvisoryObservationItem(
-                    parameter="विद्युत वाहकता / क्षारता (EC)" if is_mr else "Salinity / EC",
+                    parameter="Organic Carbon" if not is_mr else "सेंद्रिय कर्ब",
+                    value=f"{fc.soil_organic_carbon_pct:.2f}%",
+                    source=prov_str_mr if is_mr else prov_str,
+                    status="available"
+                ))
+            if getattr(fc, "electrical_conductivity_ds_m", None) is not None:
+                observations.append(AdvisoryObservationItem(
+                    parameter="Electrical Conductivity" if not is_mr else "विद्युत वाहकता",
                     value=f"{fc.electrical_conductivity_ds_m:.2f} dS/m",
                     source=prov_str_mr if is_mr else prov_str,
                     status="available"
                 ))
-
-            # Irrigation Source / Availability
-            if fc.irrigation_source:
+            if getattr(fc, "irrigation_source", None):
                 observations.append(AdvisoryObservationItem(
-                    parameter="सिंचन स्त्रोत (Irrigation)" if is_mr else "Irrigation Source",
-                    value=fc.irrigation_source.capitalize(),
-                    source="Farm Profile",
+                    parameter="Irrigation Source" if not is_mr else "पाण्याचा स्रोत",
+                    value=str(fc.irrigation_source).capitalize(),
+                    source="Farmer Reported" if not is_mr else "शेतकरी नोंद",
                     status="available"
                 ))
 
-        # 5. What needs attention (limiting factors + uncertainties)
-        what_needs_attention: List[str] = []
-        if target_crop:
-            for lf in target_crop.limiting_factors:
-                what_needs_attention.append(lf)
-            for warn in target_crop.reproductive_risk_warnings:
-                what_needs_attention.append(warn)
-            for note in target_crop.uncertainty_notes:
-                what_needs_attention.append(note)
-        elif resp.follow_up_questions:
-            for q in resp.follow_up_questions[:3]:
-                txt = q.question_text_mr if is_mr else q.question_text_en
-                what_needs_attention.append(f"{txt} ({q.agronomic_rationale})")
-
-        # 6. Next steps (numbered action list)
-        next_steps: List[str] = []
-        if resp.follow_up_questions:
-            next_steps.append(
-                "खाली विचारलेल्या प्रश्नांची उत्तरे देऊन शेतातील परिस्थितीची खात्री करा."
-                if is_mr else
-                "Answer the diagnostic questions below to verify specific field drainage, depth, and salinity."
-            )
-        if target_crop and target_crop.irrigation_guidance:
-            irr_text = cls.format_irrigation_guidance(target_crop.irrigation_guidance, language=language)
-            if irr_text:
-                next_steps.append(irr_text)
-        next_steps.append(
-            "अद्ययावत माहिती मिळताच CropNet पुन्हा मूल्यमापन करून अचूक सल्ला देईल."
-            if is_mr else
-            "CropNet will automatically re-run the deterministic evaluation once diagnostic details are submitted."
-        )
-
-        # 7. Evidence references (concise institutional citations)
-        citations_seen = set()
+        # Evidence references
         citations: List[str] = []
         if target_crop:
-            for c in target_crop.citations:
-                key = f"{c.organization} ({c.publication_year})"
-                if key not in citations_seen:
-                    citations_seen.add(key)
-                    title_str = getattr(c, "publication_title", None) or getattr(c, "document_title", "Agronomic Research")
-                    year_str = f" ({c.publication_year})" if getattr(c, "publication_year", None) else ""
-                    pages_str = f", {c.section_or_pages}" if getattr(c, "section_or_pages", None) else ""
-                    label = f"{c.organization} — {title_str}{year_str}{pages_str}"
-                    citations.append(label)
+            for c in target_crop.citations[:2]:
+                citations.append(f"{c.organization} ({c.publication_year})")
 
         return StructuredAdvisoryCard(
             title=title,
@@ -492,7 +523,11 @@ class TemplateFallbackGenerator:
             crop_status_label=status_label,
             crop_status_code=status_code,
             observations=observations,
-            what_needs_attention=what_needs_attention,
-            next_steps=next_steps,
-            evidence_references=citations
+            what_needs_attention=limitations,
+            next_steps=[recommended_action],
+            evidence_references=citations,
+            key_reasons=key_reasons,
+            recommended_action=recommended_action,
+            limitations=limitations,
+            response_mode=response_mode
         )

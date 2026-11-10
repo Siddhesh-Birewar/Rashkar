@@ -32,7 +32,11 @@ from cropnet.services.api.app.services.agriculture_intelligence.decision_engine 
     _DECISION_STORE
 )
 from cropnet.services.api.app.services.llm.ollama_client import OllamaClient
-from cropnet.services.api.app.services.llm.prompt_builder import ExplanationPromptBuilder
+from cropnet.services.api.app.services.llm.prompt_builder import (
+    ExplanationPromptBuilder,
+    detect_focus_crop,
+    determine_response_mode
+)
 from cropnet.services.api.app.services.llm.guardrail_validator import GuardrailValidator
 from cropnet.services.api.app.services.llm.template_fallback import TemplateFallbackGenerator
 from cropnet.services.api.app.services.llm.farm_context_builder import FarmContextBuilder
@@ -340,8 +344,16 @@ class AgriculturalExplanationService:
         citations = self._extract_citations(decision)
         states_summary = self._extract_decision_summary(decision)
         follow_ups = decision.follow_up_questions
-        fallback_card = TemplateFallbackGenerator.generate_structured_card(decision, language=lang, focus_crop=req.focus_crop)
-        fallback_text = TemplateFallbackGenerator.generate_explanation(decision, language=lang, focus_crop=req.focus_crop)
+
+        mode = determine_response_mode(getattr(req, "response_mode", None), req.query)
+        detected_crop = req.focus_crop or detect_focus_crop(req.query)
+
+        fallback_card = TemplateFallbackGenerator.generate_structured_card(
+            decision, language=lang, focus_crop=detected_crop, response_mode=mode, user_message=req.query
+        )
+        fallback_text = TemplateFallbackGenerator.generate_explanation(
+            decision, language=lang, focus_crop=detected_crop, response_mode=mode, user_message=req.query
+        )
 
         # 2. Build centralized grounded farm evidence (injecting farmer query and snapshot if present)
         snap = snapshot or getattr(req, "snapshot", None)
@@ -349,7 +361,7 @@ class AgriculturalExplanationService:
             farm_id=getattr(decision, "farm_id", None),
             db=db,
             query=req.query,
-            focus_crop=req.focus_crop,
+            focus_crop=detected_crop,
             decision=decision,
             language=lang,
             snapshot=snap
@@ -364,6 +376,11 @@ class AgriculturalExplanationService:
                 decision_id=decision.decision_id,
                 language=lang,
                 explanation_text=fallback_text,
+                response_mode=mode,
+                direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                recommended_action=fallback_card.recommended_action if fallback_card else None,
+                key_reasons=fallback_card.key_reasons or [],
+                limitations=fallback_card.limitations or [],
                 generation_source="deterministic_fallback",
                 validation_passed=True,
                 validation_warnings=["Ollama service or Qwen3:8B model is offline; executed deterministic fallback"],
@@ -374,9 +391,9 @@ class AgriculturalExplanationService:
             )
 
         # 4. Construct domain-aware structured prompt
-        sys_prompt = ExplanationPromptBuilder.build_system_prompt(language=lang)
+        sys_prompt = ExplanationPromptBuilder.build_system_prompt(language=lang, response_mode=mode)
         user_prompt = ExplanationPromptBuilder.build_user_prompt(
-            decision, user_message=req.query, language=lang, focus_crop=req.focus_crop, farm_context=farm_ctx
+            decision, user_message=req.query, language=lang, focus_crop=detected_crop, farm_context=farm_ctx, response_mode=mode
         )
         messages = [
             {"role": "system", "content": sys_prompt},
@@ -384,13 +401,16 @@ class AgriculturalExplanationService:
         ]
 
         # 5. Invoke local Ollama with JSON-Schema-constrained generation
-        req_timeout = 115 if lang == "mr" else 75
+        req_timeout = 35 if lang == "mr" else 25
+        max_tokens = 300 if mode == "QUICK" else (450 if mode == "STANDARD" else 800)
         schema = LlmStructuredAdvisoryPayload.model_json_schema()
         try:
             llm_res = self.ollama.chat_completion(
                 messages=messages,
                 format=schema,
-                timeout=req_timeout
+                max_tokens=max_tokens,
+                timeout=req_timeout,
+                think=False
             )
         except Exception as e:
             llm_res = {"success": False, "error_type": "unspecified_error", "error": str(e), "content": None}
@@ -415,6 +435,11 @@ class AgriculturalExplanationService:
                 decision_id=decision.decision_id,
                 language=lang,
                 explanation_text=fallback_text,
+                response_mode=mode,
+                direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                recommended_action=fallback_card.recommended_action if fallback_card else None,
+                key_reasons=fallback_card.key_reasons or [],
+                limitations=fallback_card.limitations or [],
                 generation_source="deterministic_fallback",
                 validation_passed=True,
                 validation_warnings=[f"Ollama inference failed ({err}); executed deterministic fallback"],
@@ -442,6 +467,11 @@ class AgriculturalExplanationService:
                     decision_id=decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=[f"Pydantic schema validation failed: {pe}"],
@@ -453,9 +483,12 @@ class AgriculturalExplanationService:
 
         if parsed_payload is not None:
             direct_ans = parsed_payload.direct_answer.strip()
-            what_means = parsed_payload.what_this_means.strip()
-            what_att = parsed_payload.what_needs_attention or fallback_card.what_needs_attention
-            next_s = parsed_payload.next_steps or fallback_card.next_steps
+            key_reasons = parsed_payload.key_reasons or []
+            rec_action = parsed_payload.recommended_action
+            limitations = parsed_payload.limitations or []
+            what_means = (parsed_payload.what_this_means or "").strip()
+            what_att = parsed_payload.what_needs_attention or limitations or fallback_card.what_needs_attention
+            next_s = parsed_payload.next_steps or ([rec_action] if rec_action else fallback_card.next_steps)
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
             val_result = self.validate_explanation_guardrails(
@@ -469,6 +502,11 @@ class AgriculturalExplanationService:
                     decision_id=decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=val_result.violations,
@@ -477,6 +515,37 @@ class AgriculturalExplanationService:
                     follow_up_questions=follow_ups,
                     structured_card=fallback_card
                 )
+
+            # Format final explanation according to mode
+            if mode == "QUICK":
+                if rec_action and rec_action.lower() not in direct_ans.lower():
+                    final_explanation = f"{direct_ans} {rec_action}".strip()
+                else:
+                    final_explanation = direct_ans
+            elif mode == "STANDARD":
+                lines = [direct_ans]
+                if key_reasons:
+                    lines.append("")
+                    for kr in key_reasons[:3]:
+                        lines.append(f"• {kr}")
+                if rec_action and rec_action.lower() not in direct_ans.lower():
+                    lines.append(f"\n{rec_action}")
+                final_explanation = "\n".join(lines).strip()
+            else: # DETAILED
+                lines = [direct_ans]
+                if what_means:
+                    lines.append(f"\n{what_means}")
+                if key_reasons:
+                    lines.append("\nKey Factors:")
+                    for kr in key_reasons:
+                        lines.append(f"• {kr}")
+                if limitations:
+                    lines.append("\nLimitations & Risks:")
+                    for lim in limitations:
+                        lines.append(f"• {lim}")
+                if rec_action:
+                    lines.append(f"\nRecommended Action: {rec_action}")
+                final_explanation = "\n".join(lines).strip()
 
             final_card = StructuredAdvisoryCard(
                 title=str(parsed_payload.title or fallback_card.title),
@@ -487,17 +556,24 @@ class AgriculturalExplanationService:
                 observations=fallback_card.observations,
                 what_needs_attention=what_att or fallback_card.what_needs_attention,
                 next_steps=next_s or fallback_card.next_steps,
-                evidence_references=fallback_card.evidence_references
+                evidence_references=fallback_card.evidence_references,
+                key_reasons=key_reasons,
+                recommended_action=rec_action,
+                limitations=limitations,
+                response_mode=mode
             )
             final_card = self._enrich_card_observations(final_card, farm_ctx, language=lang)
-
-            final_explanation = f"{direct_ans}\n\n{what_means}"
             self._record_live_success(latency=elapsed)
 
             return AgriculturalExplanationResponse(
                 decision_id=decision.decision_id,
                 language=lang,
                 explanation_text=final_explanation,
+                response_mode=mode,
+                direct_answer=direct_ans,
+                recommended_action=rec_action,
+                key_reasons=key_reasons,
+                limitations=limitations,
                 generation_source="llm_qwen3_8b",
                 validation_passed=True,
                 validation_warnings=[],
@@ -518,6 +594,11 @@ class AgriculturalExplanationService:
                     decision_id=decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=val_result.violations,
@@ -532,6 +613,11 @@ class AgriculturalExplanationService:
                 decision_id=decision.decision_id,
                 language=lang,
                 explanation_text=val_result.cleaned_text,
+                response_mode=mode,
+                direct_answer=val_result.cleaned_text,
+                recommended_action=None,
+                key_reasons=[],
+                limitations=[],
                 generation_source="llm_qwen3_8b",
                 validation_passed=True,
                 validation_warnings=[],
@@ -584,8 +670,16 @@ class AgriculturalExplanationService:
         citations = self._extract_citations(current_decision)
         states_summary = self._extract_decision_summary(current_decision)
         follow_ups = current_decision.follow_up_questions
-        fallback_card = TemplateFallbackGenerator.generate_structured_card(current_decision, language=lang)
-        fallback_text = TemplateFallbackGenerator.generate_explanation(current_decision, language=lang)
+
+        mode = determine_response_mode(getattr(req, "response_mode", None), req.message)
+        detected_crop = detect_focus_crop(req.message)
+
+        fallback_card = TemplateFallbackGenerator.generate_structured_card(
+            current_decision, language=lang, focus_crop=detected_crop, response_mode=mode, user_message=req.message
+        )
+        fallback_text = TemplateFallbackGenerator.generate_explanation(
+            current_decision, language=lang, focus_crop=detected_crop, response_mode=mode, user_message=req.message
+        )
 
         # 4. Build centralized grounded farm evidence (with snapshot if provided)
         snap = snapshot or getattr(req, "snapshot", None)
@@ -593,6 +687,7 @@ class AgriculturalExplanationService:
             farm_id=getattr(current_decision, "farm_id", None),
             db=db,
             query=req.message,
+            focus_crop=detected_crop,
             decision=current_decision,
             language=lang,
             snapshot=snap
@@ -606,6 +701,11 @@ class AgriculturalExplanationService:
                 decision_id=current_decision.decision_id,
                 language=lang,
                 explanation_text=fallback_text,
+                response_mode=mode,
+                direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                recommended_action=fallback_card.recommended_action if fallback_card else None,
+                key_reasons=fallback_card.key_reasons or [],
+                limitations=fallback_card.limitations or [],
                 generation_source="deterministic_fallback",
                 validation_passed=True,
                 validation_warnings=["Ollama unavailable for conversational dialogue; executed deterministic fallback"],
@@ -616,9 +716,9 @@ class AgriculturalExplanationService:
             )
 
         # 6. Construct conversational dialogue prompt
-        sys_prompt = ExplanationPromptBuilder.build_system_prompt(language=lang)
+        sys_prompt = ExplanationPromptBuilder.build_system_prompt(language=lang, response_mode=mode)
         user_prompt = ExplanationPromptBuilder.build_user_prompt(
-            current_decision, user_message=req.message, language=lang, farm_context=farm_ctx
+            current_decision, user_message=req.message, language=lang, focus_crop=detected_crop, farm_context=farm_ctx, response_mode=mode
         )
 
         messages: List[Dict[str, str]] = [{"role": "system", "content": sys_prompt}]
@@ -633,13 +733,16 @@ class AgriculturalExplanationService:
         messages.append({"role": "user", "content": user_prompt})
 
         # 7. Invoke Ollama with JSON-Schema-constrained generation
-        req_timeout = 115 if lang == "mr" else 75
+        req_timeout = 35 if lang == "mr" else 25
+        max_tokens = 300 if mode == "QUICK" else (450 if mode == "STANDARD" else 800)
         schema = LlmStructuredAdvisoryPayload.model_json_schema()
         try:
             llm_res = self.ollama.chat_completion(
                 messages=messages,
                 format=schema,
-                timeout=req_timeout
+                max_tokens=max_tokens,
+                timeout=req_timeout,
+                think=False
             )
         except Exception as e:
             llm_res = {"success": False, "error_type": "unspecified_error", "error": str(e), "content": None}
@@ -664,6 +767,11 @@ class AgriculturalExplanationService:
                 decision_id=current_decision.decision_id,
                 language=lang,
                 explanation_text=fallback_text,
+                response_mode=mode,
+                direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                recommended_action=fallback_card.recommended_action if fallback_card else None,
+                key_reasons=fallback_card.key_reasons or [],
+                limitations=fallback_card.limitations or [],
                 generation_source="deterministic_fallback",
                 validation_passed=True,
                 validation_warnings=[f"Ollama conversation failed ({err}); executed deterministic fallback"],
@@ -691,6 +799,11 @@ class AgriculturalExplanationService:
                     decision_id=current_decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=[f"Pydantic schema validation failed: {pe}"],
@@ -702,9 +815,12 @@ class AgriculturalExplanationService:
 
         if parsed_payload is not None:
             direct_ans = parsed_payload.direct_answer.strip()
-            what_means = parsed_payload.what_this_means.strip()
-            what_att = parsed_payload.what_needs_attention or fallback_card.what_needs_attention
-            next_s = parsed_payload.next_steps or fallback_card.next_steps
+            key_reasons = parsed_payload.key_reasons or []
+            rec_action = parsed_payload.recommended_action
+            limitations = parsed_payload.limitations or []
+            what_means = (parsed_payload.what_this_means or "").strip()
+            what_att = parsed_payload.what_needs_attention or limitations or fallback_card.what_needs_attention
+            next_s = parsed_payload.next_steps or ([rec_action] if rec_action else fallback_card.next_steps)
 
             combined_prose = f"{direct_ans}\n\n{what_means}\n\n" + "\n".join(what_att) + "\n\n" + "\n".join(next_s)
             val_result = self.validate_explanation_guardrails(
@@ -718,6 +834,11 @@ class AgriculturalExplanationService:
                     decision_id=current_decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=val_result.violations,
@@ -726,6 +847,37 @@ class AgriculturalExplanationService:
                     follow_up_questions=follow_ups,
                     structured_card=fallback_card
                 )
+
+            # Format final explanation according to mode
+            if mode == "QUICK":
+                if rec_action and rec_action.lower() not in direct_ans.lower():
+                    final_explanation = f"{direct_ans} {rec_action}".strip()
+                else:
+                    final_explanation = direct_ans
+            elif mode == "STANDARD":
+                lines = [direct_ans]
+                if key_reasons:
+                    lines.append("")
+                    for kr in key_reasons[:3]:
+                        lines.append(f"• {kr}")
+                if rec_action and rec_action.lower() not in direct_ans.lower():
+                    lines.append(f"\n{rec_action}")
+                final_explanation = "\n".join(lines).strip()
+            else: # DETAILED
+                lines = [direct_ans]
+                if what_means:
+                    lines.append(f"\n{what_means}")
+                if key_reasons:
+                    lines.append("\nKey Factors:")
+                    for kr in key_reasons:
+                        lines.append(f"• {kr}")
+                if limitations:
+                    lines.append("\nLimitations & Risks:")
+                    for lim in limitations:
+                        lines.append(f"• {lim}")
+                if rec_action:
+                    lines.append(f"\nRecommended Action: {rec_action}")
+                final_explanation = "\n".join(lines).strip()
 
             final_card = StructuredAdvisoryCard(
                 title=str(parsed_payload.title or fallback_card.title),
@@ -736,17 +888,24 @@ class AgriculturalExplanationService:
                 observations=fallback_card.observations,
                 what_needs_attention=what_att or fallback_card.what_needs_attention,
                 next_steps=next_s or fallback_card.next_steps,
-                evidence_references=fallback_card.evidence_references
+                evidence_references=fallback_card.evidence_references,
+                key_reasons=key_reasons,
+                recommended_action=rec_action,
+                limitations=limitations,
+                response_mode=mode
             )
             final_card = self._enrich_card_observations(final_card, farm_ctx, language=lang)
-
-            final_explanation = f"{direct_ans}\n\n{what_means}"
             self._record_live_success(latency=elapsed)
 
             return AgriculturalExplanationResponse(
                 decision_id=current_decision.decision_id,
                 language=lang,
                 explanation_text=final_explanation,
+                response_mode=mode,
+                direct_answer=direct_ans,
+                recommended_action=rec_action,
+                key_reasons=key_reasons,
+                limitations=limitations,
                 generation_source="llm_qwen3_8b",
                 validation_passed=True,
                 validation_warnings=[],
@@ -767,6 +926,11 @@ class AgriculturalExplanationService:
                     decision_id=current_decision.decision_id,
                     language=lang,
                     explanation_text=fallback_text,
+                    response_mode=mode,
+                    direct_answer=fallback_card.direct_answer if fallback_card else fallback_text,
+                    recommended_action=fallback_card.recommended_action if fallback_card else None,
+                    key_reasons=fallback_card.key_reasons or [],
+                    limitations=fallback_card.limitations or [],
                     generation_source="deterministic_fallback",
                     validation_passed=False,
                     validation_warnings=val_result.violations,
@@ -781,6 +945,11 @@ class AgriculturalExplanationService:
                 decision_id=current_decision.decision_id,
                 language=lang,
                 explanation_text=val_result.cleaned_text,
+                response_mode=mode,
+                direct_answer=val_result.cleaned_text,
+                recommended_action=None,
+                key_reasons=[],
+                limitations=[],
                 generation_source="llm_qwen3_8b",
                 validation_passed=True,
                 validation_warnings=[],
