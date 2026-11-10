@@ -77,20 +77,45 @@ export interface CurrentWeather {
   is_cached?: boolean;
 }
 
-export interface WeatherForecastItem {
-  timestamp: string;
-  temperature_c: number;
+export interface DailyForecastSummary {
+  date: string;
+  day_name: string;
+  temp_min_c: number;
+  temp_max_c: number;
   humidity_percent: number;
+  weather_condition: string;
+  weather_description: string;
+  weather_icon: string;
+  total_rain_mm: number;
+  max_pop_pct: number;
+}
+
+export interface WeatherForecastPoint {
+  forecast_time: string;
+  timestamp?: string;
+  temperature_c: number;
+  temp_min_c?: number;
+  temp_max_c?: number;
+  humidity_percent: number;
+  wind_speed_ms?: number;
+  precipitation_probability_pct?: number;
   precipitation_mm: number;
   weather_condition: string;
   weather_description: string;
+  weather_icon?: string;
 }
 
 export interface WeatherForecast {
   farm_id: string;
   source: string;
+  data_type?: string;
+  retrieval_time?: string;
+  forecast_period?: string;
+  daily_summaries?: DailyForecastSummary[];
+  hourly_points?: WeatherForecastPoint[];
+  forecasts?: WeatherForecastPoint[]; // legacy compatibility
   forecast_days_count?: number;
-  forecasts: WeatherForecastItem[];
+  is_cached?: boolean;
 }
 
 export interface ClimateSummary {
@@ -105,6 +130,23 @@ export interface ClimateSummary {
 
 // ── Soil Intelligence ────────────────────────────────────────────────────────
 
+export interface SoilParameterObservation {
+  parameter_key?: string;
+  display_name?: string;
+  value: number | null;
+  unit?: string;
+  source?: string;
+  dataset_version?: string;
+  depth_interval?: string;
+  spatial_resolution?: string;
+  vintage_year?: number | null;
+  uncertainty?: number | null;
+  verification_status?: string;
+  availability_status?: string;
+  farm_coverage_percent?: number;
+  scientific_note?: string | null;
+}
+
 export interface SoilParameter {
   parameter_name: string;
   value: number | null;
@@ -115,19 +157,43 @@ export interface SoilParameter {
 }
 
 export interface SoilProfile {
+  profile_id?: string;
   farm_id: string;
-  source: string;
-  depth: string;
-  ph?: number | null;
-  electrical_conductivity?: number | null;
-  organic_carbon_percentage?: number | null;
-  clay_percentage?: number | null;
-  sand_percentage?: number | null;
-  silt_percentage?: number | null;
+  source?: string;
+  source_dataset?: string;
+  dataset_version?: string;
+  spatial_resolution?: string;
+  depth?: string;
+  depth_interval?: string;
+  taluka?: string | null;
+  district?: string;
+  state?: string;
+  is_map_derived?: boolean;
+  disclaimer?: string;
+  soil_texture_class?: string | null;
   texture_class?: string | null;
-  nitrogen_available_kg_ha?: number | null;
-  phosphorus_available_kg_ha?: number | null;
-  potassium_available_kg_ha?: number | null;
+
+  ph?: SoilParameterObservation | number | null;
+  organic_carbon?: SoilParameterObservation | number | null;
+  organic_carbon_percentage?: SoilParameterObservation | number | null;
+  sand_percent?: SoilParameterObservation | number | null;
+  sand_percentage?: SoilParameterObservation | number | null;
+  silt_percent?: SoilParameterObservation | number | null;
+  silt_percentage?: SoilParameterObservation | number | null;
+  clay_percent?: SoilParameterObservation | number | null;
+  clay_percentage?: SoilParameterObservation | number | null;
+  total_nitrogen?: SoilParameterObservation | number | null;
+  cation_exchange_capacity?: SoilParameterObservation | number | null;
+  electrical_conductivity?: SoilParameterObservation | number | null;
+  available_nitrogen?: SoilParameterObservation | number | null;
+  available_phosphorus?: SoilParameterObservation | number | null;
+  available_potassium?: SoilParameterObservation | number | null;
+  nitrogen_available_kg_ha?: SoilParameterObservation | number | null;
+  phosphorus_available_kg_ha?: SoilParameterObservation | number | null;
+  potassium_available_kg_ha?: SoilParameterObservation | number | null;
+
+  mapped_soil_zones?: any[];
+  additional_parameters?: Record<string, SoilParameterObservation>;
   parameters?: Record<string, SoilParameter>;
   last_analyzed?: string;
   created_at?: string;
@@ -447,6 +513,107 @@ export interface IncomeOpportunity {
 }
 
 // ── Agricultural Intelligence & Advisory ─────────────────────────────────────
+
+export interface AppliedRuleRecord {
+  rule_id: string;
+  domain: string;
+  parameter_checked: string;
+  rule_statement: string;
+  condition_met: boolean;
+  evidence_tier?: string;
+  supporting_statement?: string;
+}
+
+export interface CitationMetadata {
+  source_id: string;
+  organization: string;
+  publication_title: string;
+  publication_year?: number;
+  section_or_pages?: string;
+  evidence_tier?: string;
+}
+
+export interface FollowUpQuestion {
+  question_id: string;
+  target_parameter: string;
+  priority: number;
+  question_text_en: string;
+  question_text_mr: string;
+  question_type: "choice" | "numeric" | "boolean";
+  options?: string[];
+  agronomic_rationale?: string;
+}
+
+export interface CropEvaluationOutcome {
+  crop_id: string;
+  common_name: string;
+  scientific_name: string;
+  marathi_name?: string | null;
+  decision_state: string; // RECOMMENDED | CONDITIONALLY_SUITABLE | REGIONAL_SCREENING_ONLY | NOT_RECOMMENDED | DISQUALIFIED | ABSTAIN_INSUFFICIENT_DATA
+  is_disqualified: boolean;
+  limiting_factors: string[];
+  reproductive_risk_warnings: string[];
+  missing_information: string[];
+  uncertainty_notes: string[];
+  applied_rules?: AppliedRuleRecord[];
+  citations?: CitationMetadata[];
+  explanation: string;
+}
+
+export interface StructuredAdvisoryCard {
+  title: string;
+  direct_answer: string;
+  what_this_means?: string;
+  crop_status_label?: string;
+  crop_status_code?: string;
+  observations?: Array<{ parameter: string; value: string; source: string; status: string }>;
+  what_needs_attention?: string[];
+  next_steps?: string[];
+  evidence_references?: string[];
+}
+
+export interface FarmEvaluationResponse {
+  decision_id: string;
+  evaluated_at: string;
+  input_validation_status: string;
+  contradictions_detected?: string[];
+  missing_parameters_flagged?: string[];
+  taluka_resolved?: string;
+  target_season?: string;
+  language?: string;
+  crop_outcomes: CropEvaluationOutcome[];
+  follow_up_questions: FollowUpQuestion[];
+  governance_notice?: string;
+}
+
+export interface AgriculturalExplanationResponse {
+  decision_id: string;
+  language: string;
+  explanation_text: string;
+  generation_source?: string;
+  validation_passed?: boolean;
+  validation_warnings?: string[];
+  decision_state_summary?: Record<string, string>;
+  structured_card?: StructuredAdvisoryCard;
+  citations?: CitationMetadata[];
+  authoritative_citations?: CitationMetadata[];
+  follow_up_questions?: FollowUpQuestion[];
+  governance_notice?: string;
+}
+
+export interface AgriculturalConversationResponse {
+  decision_id?: string;
+  language?: string;
+  explanation_text?: string;
+  answer?: string;
+  generation_source?: string;
+  validation_passed?: boolean;
+  structured_card?: StructuredAdvisoryCard;
+  citations?: CitationMetadata[];
+  authoritative_citations?: CitationMetadata[];
+  follow_up_questions?: FollowUpQuestion[];
+  governance_notice?: string;
+}
 
 export interface CropSuitabilityOutcome {
   crop_code: string;

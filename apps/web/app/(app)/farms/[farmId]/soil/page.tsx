@@ -14,6 +14,7 @@ import {
   Scale,
   Sparkles,
   TestTubes,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -23,6 +24,14 @@ import { Button } from "@/components/ui/button";
 import { soilApi } from "@/lib/api/client";
 import { useFarm } from "@/lib/farm-context";
 import type { SoilProfile } from "@/lib/api/types";
+import {
+  getSoilParamValue,
+  getSoilParamUnit,
+  getSoilParamSource,
+  interpretSoilPh,
+  interpretSoc,
+  interpretEc,
+} from "@/lib/soil-utils";
 
 export default function SoilPage() {
   const params = useParams();
@@ -94,6 +103,53 @@ export default function SoilPage() {
     );
   }
 
+  // Safe numerical extractions
+  const phVal = profile ? getSoilParamValue(profile.ph) : null;
+  const rawSocVal = profile
+    ? getSoilParamValue(profile.organic_carbon ?? profile.organic_carbon_percentage)
+    : null;
+  const socUnit = profile
+    ? getSoilParamUnit(profile.organic_carbon ?? profile.organic_carbon_percentage, "%")
+    : "%";
+  // Convert g/kg to % if applicable
+  const socPct =
+    rawSocVal !== null
+      ? socUnit.toLowerCase().includes("g/kg")
+        ? rawSocVal / 10.0
+        : rawSocVal
+      : null;
+
+  const ecVal = profile
+    ? getSoilParamValue(
+        profile.electrical_conductivity ?? profile.additional_parameters?.["electrical_conductivity"]
+      )
+    : null;
+  const texture =
+    profile?.soil_texture_class || profile?.texture_class || "Clay Vertisol";
+
+  const sandVal = profile
+    ? getSoilParamValue(profile.sand_percent ?? profile.sand_percentage)
+    : null;
+  const siltVal = profile
+    ? getSoilParamValue(profile.silt_percent ?? profile.silt_percentage)
+    : null;
+  const clayVal = profile
+    ? getSoilParamValue(profile.clay_percent ?? profile.clay_percentage)
+    : null;
+  const cecVal = profile
+    ? getSoilParamValue(profile.cation_exchange_capacity)
+    : null;
+
+  const availN = profile
+    ? getSoilParamValue(profile.available_nitrogen ?? profile.nitrogen_available_kg_ha)
+    : null;
+  const availP = profile
+    ? getSoilParamValue(profile.available_phosphorus ?? profile.phosphorus_available_kg_ha)
+    : null;
+  const availK = profile
+    ? getSoilParamValue(profile.available_potassium ?? profile.potassium_available_kg_ha)
+    : null;
+
   return (
     <div className="space-y-7">
       <PageHeader
@@ -141,6 +197,20 @@ export default function SoilPage() {
         </div>
       ) : profile ? (
         <div className="space-y-6">
+          {/* Transparency Disclaimer Notice */}
+          <div className="rounded-2xl border border-[#cde0ce] bg-[#f1f8f1] p-4 text-xs text-forest flex items-start gap-3">
+            <Info size={18} className="shrink-0 text-leaf mt-0.5" />
+            <div>
+              <p className="font-bold">
+                {profile.source_dataset || "ISRIC SoilGrids 2.0"} Spatial Soil Model ({profile.depth_interval || "0-5cm"})
+              </p>
+              <p className="mt-0.5 leading-relaxed text-[#2d5032]">
+                {profile.disclaimer ||
+                  "These results are spatial estimates derived from geospatial soil datasets. They are not direct laboratory test results. Physical laboratory tests take precedence."}
+              </p>
+            </div>
+          </div>
+
           {/* ── Key Parameters Grid ── */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="bg-white">
@@ -149,20 +219,12 @@ export default function SoilPage() {
                   Soil pH (1:2.5)
                 </span>
                 <p className="mt-2 text-3xl font-extrabold text-ink">
-                  {profile.ph != null ? profile.ph.toFixed(2) : "—"}
+                  {phVal !== null ? phVal.toFixed(2) : "—"}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-muted">
-                    {profile.ph != null
-                      ? profile.ph < 6.5
-                        ? "Acidic"
-                        : profile.ph > 8.2
-                          ? "Calcareous / Alkaline"
-                          : "Neutral / Optimal"
-                      : "Unmeasured"}
-                  </span>
+                  <span className="text-muted">{interpretSoilPh(phVal)}</span>
                   <Badge variant="outline" className="text-[10px]">
-                    {profile.source || "ISRIC"}
+                    {getSoilParamSource(profile.ph)}
                   </Badge>
                 </div>
               </CardContent>
@@ -174,22 +236,12 @@ export default function SoilPage() {
                   Organic Carbon (SOC %)
                 </span>
                 <p className="mt-2 text-3xl font-extrabold text-ink">
-                  {profile.organic_carbon_percentage != null
-                    ? `${profile.organic_carbon_percentage.toFixed(2)}%`
-                    : "—"}
+                  {socPct !== null ? `${socPct.toFixed(2)}%` : "—"}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-muted">
-                    {profile.organic_carbon_percentage != null
-                      ? profile.organic_carbon_percentage < 0.5
-                        ? "Low SOC"
-                        : profile.organic_carbon_percentage > 0.75
-                          ? "High SOC"
-                          : "Medium SOC"
-                      : "Unmeasured"}
-                  </span>
+                  <span className="text-muted">{interpretSoc(socPct)}</span>
                   <Badge variant="outline" className="text-[10px]">
-                    {profile.source || "ISRIC"}
+                    {getSoilParamSource(profile.organic_carbon)}
                   </Badge>
                 </div>
               </CardContent>
@@ -201,20 +253,12 @@ export default function SoilPage() {
                   Electrical Conductivity (EC)
                 </span>
                 <p className="mt-2 text-3xl font-extrabold text-ink">
-                  {profile.electrical_conductivity != null
-                    ? `${profile.electrical_conductivity.toFixed(2)} dS/m`
-                    : "—"}
+                  {ecVal !== null ? `${ecVal.toFixed(2)} dS/m` : "—"}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-muted">
-                    {profile.electrical_conductivity != null
-                      ? profile.electrical_conductivity < 1.0
-                        ? "Normal / Non-saline"
-                        : "Salinity Risk"
-                      : "Lab test required"}
-                  </span>
+                  <span className="text-muted">{interpretEc(ecVal)}</span>
                   <Badge variant="outline" className="text-[10px]">
-                    {profile.electrical_conductivity != null ? "Measured" : "Pending"}
+                    {ecVal !== null ? "Measured" : "Pending Lab"}
                   </Badge>
                 </div>
               </CardContent>
@@ -223,25 +267,26 @@ export default function SoilPage() {
             <Card className="bg-white">
               <CardContent className="p-5">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted">
-                  Soil Texture
+                  Soil Texture Class
                 </span>
                 <p className="mt-2 text-2xl font-extrabold text-ink truncate">
-                  {profile.texture_class || "Clay Loam"}
+                  {texture}
                 </p>
                 <div className="mt-2 flex items-center justify-between text-xs">
                   <span className="text-muted">
-                    Clay: {profile.clay_percentage ? `${profile.clay_percentage.toFixed(0)}%` : "—"} · Sand:{" "}
-                    {profile.sand_percentage ? `${profile.sand_percentage.toFixed(0)}%` : "—"}
+                    Clay: {clayVal !== null ? `${clayVal.toFixed(0)}%` : "—"} · Sand:{" "}
+                    {sandVal !== null ? `${sandVal.toFixed(0)}%` : "—"} · Silt:{" "}
+                    {siltVal !== null ? `${siltVal.toFixed(0)}%` : "—"}
                   </span>
                   <Badge variant="outline" className="text-[10px]">
-                    Texture
+                    {cecVal !== null ? `CEC: ${cecVal.toFixed(1)}` : "USDA"}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* ── Strict Gating: Available Macronutrients (NPK) ── */}
+          {/* ── Strict Evidence Gating: Available Macronutrients (NPK) ── */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-line">
@@ -250,7 +295,7 @@ export default function SoilPage() {
                     Available Macronutrients (NPK)
                   </h3>
                   <p className="text-xs text-muted mt-0.5">
-                    Deterministic Principle: Available NPK is never fabricated or modeled from satellite/spatial estimates.
+                    Deterministic Principle: Available mineral NPK is never fabricated or modeled from global satellite rasters.
                   </p>
                 </div>
                 <Badge className="bg-[#edf5ed] text-forest border-0">Evidence Gated</Badge>
@@ -262,12 +307,10 @@ export default function SoilPage() {
                     Available Nitrogen (N)
                   </span>
                   <p className="mt-2 text-xl font-extrabold text-ink">
-                    {profile.nitrogen_available_kg_ha != null
-                      ? `${profile.nitrogen_available_kg_ha} kg/ha`
-                      : "Not verified"}
+                    {availN !== null ? `${availN} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
-                    {profile.nitrogen_available_kg_ha != null
+                    {availN !== null
                       ? "Lab alkaline permanganate extraction"
                       : "Requires certified soil lab test report"}
                   </p>
@@ -278,12 +321,10 @@ export default function SoilPage() {
                     Available Phosphorus (P)
                   </span>
                   <p className="mt-2 text-xl font-extrabold text-ink">
-                    {profile.phosphorus_available_kg_ha != null
-                      ? `${profile.phosphorus_available_kg_ha} kg/ha`
-                      : "Not verified"}
+                    {availP !== null ? `${availP} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
-                    {profile.phosphorus_available_kg_ha != null
+                    {availP !== null
                       ? "Olsen extraction method"
                       : "Requires certified soil lab test report"}
                   </p>
@@ -294,12 +335,10 @@ export default function SoilPage() {
                     Available Potassium (K)
                   </span>
                   <p className="mt-2 text-xl font-extrabold text-ink">
-                    {profile.potassium_available_kg_ha != null
-                      ? `${profile.potassium_available_kg_ha} kg/ha`
-                      : "Not verified"}
+                    {availK !== null ? `${availK} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
-                    {profile.potassium_available_kg_ha != null
+                    {availK !== null
                       ? "Neutral ammonium acetate extraction"
                       : "Requires certified soil lab test report"}
                   </p>

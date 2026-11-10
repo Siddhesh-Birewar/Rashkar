@@ -31,6 +31,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { FarmSelector } from "@/components/farm-selector";
+import { CropNetChatbot } from "@/components/chatbot";
 import { useAuth } from "@/lib/auth-context";
 import { useFarm } from "@/lib/farm-context";
 import {
@@ -224,9 +225,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Home", href: "/", icon: Home },
     { label: "Farms", href: "/farms", icon: Sprout },
     { label: "Advisory", href: "/advisory", icon: BookOpenText },
+    { label: "Assistant", href: "/assistant", icon: Bot },
   ];
 
   const intelligenceNav: NavItem[] = [
+    { label: "AI Assistant", href: "/assistant", icon: Bot },
     { label: "Soil", href: `/farms/${farmIdParam}/soil`, icon: Leaf },
     { label: "Weather", href: `/farms/${farmIdParam}/weather`, icon: CloudSun },
     { label: "Farm health", href: `/farms/${farmIdParam}/health`, icon: HeartPulse },
@@ -294,6 +297,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Link
+                href="/assistant"
+                className="hidden min-h-11 items-center gap-2 rounded-xl border border-[#c8e6c9] bg-[#e8f5e9] px-3 text-xs font-extrabold text-[#1b5e20] sm:flex"
+              >
+                <Bot size={17} />
+                AI Assistant
+              </Link>
+              <Link
                 href="/crop-doctor"
                 className="hidden min-h-11 items-center gap-2 rounded-xl border border-[#f3d6c4] bg-[#fff7f2] px-3 text-xs font-extrabold text-accent sm:flex"
               >
@@ -341,6 +351,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         })}
         <MoreSheet intelligenceNav={intelligenceNav} />
       </nav>
+
+      {/* Floating Global Agricultural AI Assistant */}
+      <CropNetChatbot />
     </div>
   );
 }

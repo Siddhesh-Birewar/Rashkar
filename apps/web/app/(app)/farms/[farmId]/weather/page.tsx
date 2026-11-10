@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Sun,
   Wind,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -22,7 +23,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { weatherApi } from "@/lib/api/client";
 import { useFarm } from "@/lib/farm-context";
-import type { CurrentWeather, WeatherForecast, ClimateSummary } from "@/lib/api/types";
+import type { CurrentWeather, WeatherForecast, ClimateSummary, DailyForecastSummary } from "@/lib/api/types";
+
+function getWeatherIcon(condition?: string) {
+  const cond = condition?.toLowerCase() || "";
+  if (cond.includes("rain") || cond.includes("drizzle") || cond.includes("thunder")) {
+    return <CloudRain size={22} className="text-calm mx-auto my-2" />;
+  }
+  if (cond.includes("cloud") || cond.includes("overcast")) {
+    return <CloudSun size={22} className="text-leaf mx-auto my-2" />;
+  }
+  return <Sun size={22} className="text-amber-500 mx-auto my-2" />;
+}
 
 export default function WeatherPage() {
   const params = useParams();
@@ -90,6 +102,10 @@ export default function WeatherPage() {
       </div>
     );
   }
+
+  // Get daily summaries from backend
+  const dailySummaries = forecast?.daily_summaries || [];
+  const hourlyPoints = forecast?.hourly_points || forecast?.forecasts || [];
 
   return (
     <div className="space-y-7">
@@ -185,39 +201,114 @@ export default function WeatherPage() {
             </Card>
           )}
 
-          {/* ── 5-Day Forecast Grid ── */}
-          {forecast && forecast.forecasts && forecast.forecasts.length > 0 && (
+          {/* ── 5-Day Forecast Grid (Daily Summaries) ── */}
+          {dailySummaries.length > 0 && (
+            <Card className="border-line shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between pb-4 border-b border-line">
+                  <div>
+                    <h3 className="text-base font-extrabold text-ink">5-Day Agricultural Weather Forecast</h3>
+                    <p className="text-xs text-muted">Daily agro-meteorological projections for field operations & spray planning</p>
+                  </div>
+                  <Badge className="bg-[#edf5ed] text-forest border-0 text-[10px] font-bold">
+                    OpenWeather 5-Day
+                  </Badge>
+                </div>
+
+                <div className="mt-5 grid gap-3 grid-cols-2 sm:grid-cols-5">
+                  {dailySummaries.map((day, idx) => {
+                    const isToday = idx === 0;
+                    return (
+                      <div
+                        key={day.date}
+                        className={`rounded-2xl border p-4 text-center flex flex-col justify-between transition-all ${
+                          isToday
+                            ? "border-leaf/50 bg-[#f4f9f4] shadow-sm"
+                            : "border-line bg-canvas hover:border-leaf/30"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-xs font-bold text-ink">
+                              {isToday ? "Today" : day.day_name}
+                            </span>
+                            {isToday && (
+                              <span className="inline-block size-1.5 rounded-full bg-leaf" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted mt-0.5">{day.date}</p>
+
+                          {getWeatherIcon(day.weather_condition)}
+
+                          <p className="text-xs font-semibold text-ink capitalize truncate">
+                            {day.weather_description}
+                          </p>
+
+                          <div className="mt-2 flex items-baseline justify-center gap-1.5">
+                            <span className="text-lg font-extrabold text-ink">
+                              {day.temp_max_c.toFixed(0)}°
+                            </span>
+                            <span className="text-xs font-medium text-muted">
+                              / {day.temp_min_c.toFixed(0)}°C
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-line/60 grid grid-cols-2 gap-1 text-[10px] text-muted">
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-muted/70">Rain</span>
+                            <strong className="text-ink">{day.total_rain_mm > 0 ? `${day.total_rain_mm}mm` : "0 mm"}</strong>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-muted/70">Humidity</span>
+                            <strong className="text-ink">{day.humidity_percent.toFixed(0)}%</strong>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── 3-Hour Interval Timeline ── */}
+          {hourlyPoints.length > 0 && (
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between pb-4 border-b border-line">
                   <div>
-                    <h3 className="text-base font-extrabold text-ink">5-Day Forecast</h3>
-                    <p className="text-xs text-muted">Upcoming atmospheric conditions for farm management</p>
+                    <h3 className="text-base font-extrabold text-ink">3-Hour Interval Progression</h3>
+                    <p className="text-xs text-muted">Detailed temperature, wind, and rain probability timeline</p>
                   </div>
                   <Badge variant="outline" className="text-[10px]">
-                    3-Hour Intervals
+                    Telemetry Resolution: 3h
                   </Badge>
                 </div>
 
-                <div className="mt-5 grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 overflow-x-auto">
-                  {forecast.forecasts.slice(0, 12).map((item, idx) => {
-                    const date = new Date(item.timestamp);
+                <div className="mt-5 flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                  {hourlyPoints.slice(0, 12).map((item, idx) => {
+                    const timeStr = item.forecast_time || item.timestamp || "";
+                    const date = timeStr ? new Date(timeStr) : new Date();
                     return (
                       <div
                         key={idx}
-                        className="rounded-2xl border border-line bg-canvas p-3 text-center flex flex-col justify-between"
+                        className="min-w-[105px] shrink-0 rounded-2xl border border-line bg-canvas p-3 text-center flex flex-col justify-between"
                       >
                         <div>
                           <p className="text-[10px] font-bold text-muted">
-                            {date.toLocaleDateString(undefined, { weekday: "short", hour: "2-digit" })}
+                            {date.toLocaleDateString(undefined, { weekday: "short" })}{" "}
+                            {date.toLocaleTimeString(undefined, { hour: "numeric" })}
                           </p>
-                          <CloudSun size={20} className="mx-auto my-2 text-leaf" />
+                          {getWeatherIcon(item.weather_condition)}
                           <p className="text-sm font-extrabold text-ink">
                             {item.temperature_c.toFixed(0)}°C
                           </p>
                         </div>
                         <div className="mt-2 pt-2 border-t border-line/60 text-[10px] text-muted">
-                          <span>{item.precipitation_mm > 0 ? `${item.precipitation_mm}mm` : "No rain"}</span>
+                          <span>
+                            {item.precipitation_mm > 0 ? `${item.precipitation_mm}mm` : "No rain"}
+                          </span>
                         </div>
                       </div>
                     );
@@ -244,42 +335,53 @@ export default function WeatherPage() {
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-canvas p-4 border border-line/60">
-                    <span className="text-[10px] font-bold text-muted uppercase block">
+                  <div className="rounded-2xl border border-line bg-canvas p-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
                       Annual Rainfall
                     </span>
                     <p className="mt-2 text-2xl font-extrabold text-ink">
                       {climate.annual_rainfall_mm != null ? `${climate.annual_rainfall_mm} mm` : "—"}
                     </p>
-                    <span className="text-[11px] text-muted mt-1 block">
-                      Monsoon: {climate.monsoon_rainfall_mm ? `${climate.monsoon_rainfall_mm} mm` : "—"}
+                    <span className="mt-1 block text-xs text-muted">
+                      Monsoon: {climate.monsoon_rainfall_mm != null ? `${climate.monsoon_rainfall_mm} mm` : "—"}
                     </span>
                   </div>
 
-                  <div className="rounded-2xl bg-canvas p-4 border border-line/60">
-                    <span className="text-[10px] font-bold text-muted uppercase block">
+                  <div className="rounded-2xl border border-line bg-canvas p-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
                       Mean Annual Temperature
                     </span>
                     <p className="mt-2 text-2xl font-extrabold text-ink">
-                      {climate.mean_temperature_c != null ? `${climate.mean_temperature_c}°C` : "—"}
+                      {climate.mean_temperature_c != null ? `${climate.mean_temperature_c.toFixed(1)}°C` : "—"}
                     </p>
-                    <span className="text-[11px] text-muted mt-1 block">
-                      Pune agro-climatic zone
+                    <span className="mt-1 block text-xs text-muted">
+                      Agro-climatic zone: Plain Zone Vertisols
                     </span>
                   </div>
 
-                  <div className="rounded-2xl bg-canvas p-4 border border-line/60">
-                    <span className="text-[10px] font-bold text-muted uppercase block">
-                      Seasonal Water Stress
+                  <div className="rounded-2xl border border-line bg-canvas p-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                      Water Stress Assessment
                     </span>
-                    <p className="mt-2 text-sm font-extrabold text-ink">
-                      {climate.potential_water_stress_indicator || "Normal"}
+                    <p className="mt-2 text-base font-extrabold text-forest capitalize">
+                      {climate.potential_water_stress_indicator || "Low Risk"}
                     </p>
-                    <span className="text-[11px] text-muted mt-1 block">
-                      Hydrological deficit profile
+                    <span className="mt-1 block text-xs text-muted">
+                      Protective summer irrigation advised
                     </span>
                   </div>
                 </div>
+
+                {climate.notes && climate.notes.length > 0 && (
+                  <div className="mt-5 rounded-xl border border-line bg-[#fdfdfc] p-4 text-xs text-muted">
+                    <strong className="text-ink">Agro-Climatic Insights:</strong>
+                    <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                      {climate.notes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

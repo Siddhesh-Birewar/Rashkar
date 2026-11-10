@@ -27,6 +27,8 @@ import type {
   SchemeAdminStatus,
   IncomeOpportunity,
   CropDecisionResponse,
+  FarmEvaluationResponse,
+  AgriculturalExplanationResponse,
 } from "./types";
 
 export const API_BASE_URL =
@@ -306,12 +308,19 @@ export const incomeApi = {
 
 export const advisoryApi = {
   evaluateFarm: (data: any) =>
-    apiFetch<CropDecisionResponse>("/api/v1/agriculture/evaluate-farm", {
+    apiFetch<FarmEvaluationResponse>("/api/v1/agriculture/evaluate-farm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getDecision: (decisionId: string) =>
+    apiFetch<FarmEvaluationResponse>(`/api/v1/agriculture/decision/${decisionId}`),
+  processFollowup: (data: { decision_id: string; answers: Record<string, any> }) =>
+    apiFetch<FarmEvaluationResponse>("/api/v1/agriculture/follow-up", {
       method: "POST",
       body: JSON.stringify(data),
     }),
   explainDecision: (data: { decision_id: string; language?: string }) =>
-    apiFetch<{ explanation: string; language: string; provider: string }>(
+    apiFetch<AgriculturalExplanationResponse>(
       "/api/v1/agriculture/explain-decision",
       {
         method: "POST",
@@ -320,10 +329,12 @@ export const advisoryApi = {
     ),
   conversation: (data: {
     decision_id: string;
-    question: string;
-    conversation_history?: Array<{ role: string; content: string }>;
+    message: string;
+    language?: string;
+    history?: Array<{ role: string; content: string; timestamp?: string }>;
+    submitted_answers?: Record<string, any>;
   }) =>
-    apiFetch<{ answer: string; references?: string[] }>("/api/v1/agriculture/conversation", {
+    apiFetch<AgriculturalExplanationResponse>("/api/v1/agriculture/conversation", {
       method: "POST",
       body: JSON.stringify(data),
     }),
