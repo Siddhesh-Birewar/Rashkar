@@ -1,0 +1,1191 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-11-11",
+  "jurisdiction": "Maharashtra, India",
+  "categories": [
+    {
+      "key": "CROP_DIVERSIFICATION",
+      "name": "Crop Diversification",
+      "tagline": "High-value vegetables, cash crops, intercropping and fruit orchards"
+    },
+    {
+      "key": "FLORICULTURE",
+      "name": "Floriculture",
+      "tagline": "Open-field and protected commercial flower cultivation"
+    },
+    {
+      "key": "POULTRY",
+      "name": "Poultry Farming",
+      "tagline": "Backyard, commercial broiler and layer egg production"
+    },
+    {
+      "key": "FISHERY",
+      "name": "Fisheries & Aquaculture",
+      "tagline": "Freshwater fish farming in existing farm ponds (shet tale)"
+    },
+    {
+      "key": "LIVESTOCK",
+      "name": "Livestock & Dairy",
+      "tagline": "Goat rearing, indigenous cow dairy and small ruminants"
+    },
+    {
+      "key": "SMALL_SPACE",
+      "name": "Small-Space Enterprises",
+      "tagline": "Mushroom growing, vermicomposting, nurseries and beekeeping"
+    },
+    {
+      "key": "RESOURCE_MONETIZATION",
+      "name": "Farm Resource Monetization",
+      "tagline": "Custom equipment hiring, machinery rental and asset sharing"
+    },
+    {
+      "key": "VALUE_ADDITION",
+      "name": "Value Addition & Processing",
+      "tagline": "Sorting, grading, packaging, aggregation and local processing"
+    }
+  ],
+  "opportunities": [
+    {
+      "opportunity_id": "OPP_VEG_CAPSICUM_05",
+      "name": "High-Value Polyhouse Colored Capsicum Cultivation",
+      "category": "CROP_DIVERSIFICATION",
+      "farmer_friendly_description": "Grow high-demand yellow and red bell peppers under protected shade-net or naturally ventilated polyhouse for premium urban and APMC market prices.",
+      "business_model": "Cultivate hybrid sweet peppers on raised beds with drip fertigation over an 8 to 9 month harvesting period, selling graded produce to metropolitan wholesale buyers.",
+      "suitable_geography": "Pune, Nashik, Satara, Ahmednagar, Kolhapur, Sangli",
+      "suitable_land_acres": 0.25,
+      "unit_of_operation": "1,000 sq. meter (approx 0.25 acre) protected structure",
+      "minimum_scale": 0.1,
+      "typical_scale": 0.25,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Well-drained red loamy or medium black soil with pH 6.0–7.0; requires frost-free climate and temperature under 35°C during flowering.",
+      "initial_setup_requirements": "Naturally ventilated polyhouse (GI pipe structure with 200 micron UV-stabilized polythene), drip irrigation manifold, and raised nursery bed preparation.",
+      "recurring_requirements": "F1 hybrid capsicum seedlings, soluble water-grade fertilizers (19:19:19, 0:52:34), IPM bio-pesticides, and trellising twine.",
+      "equipment_and_infrastructure": "Polyhouse frame, 50% shade net top curtain, drip laterals with inline emitters, motorized spray pump, harvesting crates.",
+      "setup_investment_range": {
+        "min_inr": 350000.0,
+        "max_inr": 480000.0,
+        "typical_inr": 420000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 85000.0,
+        "max_inr": 125000.0,
+        "typical_inr": 105000.0
+      },
+      "production_yield_assumptions": {
+        "low": 8000.0,
+        "base": 12000.0,
+        "high": 15000.0,
+        "unit": "kg per 1,000 sq.m"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 25.0,
+        "base_price_per_unit": 38.0,
+        "high_price_per_unit": 55.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 115000.0,
+        "base_inr": 351000.0,
+        "high_inr": 720000.0
+      },
+      "time_to_first_income_months": 3.5,
+      "production_cycle_days": 270,
+      "labour_requirements": {
+        "daily_hours": 3.0,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "taluka_apmc",
+      "major_risks": [
+        "Mite and thrips pest flare-up during hot dry spells",
+        "Market price volatility between festival peak and harvest glut",
+        "High initial capital outlay if without MIDH/NHB structural assistance"
+      ],
+      "permissions_or_registrations": [
+        "Farmer registration on MahaDBT portal for horticulture subsidy tracking (optional)"
+      ],
+      "source_references": [
+        "National Horticulture Board (NHB) Model Project Report on Polyhouse Capsicum",
+        "MPKV Rahuri Protected Cultivation Technology Package (Bulletin 2024)",
+        "NABARD Unit Cost Estimates for Polyhouse Horticulture in Maharashtra"
+      ],
+      "reference_geography": "Western Maharashtra & Marathwada",
+      "source_publication_date": "2024-03-15",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_CASH_GINGER_INTERCROP_01",
+      "name": "Commercial Ginger Cultivation with Drip Fertigation",
+      "category": "CROP_DIVERSIFICATION",
+      "farmer_friendly_description": "High-cash-return underground rhizome crop well suited for partial shade or open fields with assured seasonal irrigation.",
+      "business_model": "Plant disease-free Mahim or Rio de Janeiro seed rhizomes in April–May on raised beds with drip irrigation, harvesting dried/fresh rhizomes after 8–9 months.",
+      "suitable_geography": "Satara, Sangli, Kolhapur, Aurangabad, Nanded, Wardha",
+      "suitable_land_acres": 0.5,
+      "unit_of_operation": "0.5 acre raised bed plot",
+      "minimum_scale": 0.25,
+      "typical_scale": 0.5,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Rich sandy loam or friable medium black soil with excellent internal drainage; strictly avoids waterlogged parcels prone to rhizome rot.",
+      "initial_setup_requirements": "Deep summer tillage, bed former machine pass, FYM enrichment (8–10 tonnes/acre), and inline drip lateral installation.",
+      "recurring_requirements": "Seed rhizomes (600–800 kg for 0.5 acre), Trichoderma viride seed treatment, FYM, neem cake, and micronutrient spray.",
+      "equipment_and_infrastructure": "Drip irrigation system, mulch film or sugar-cane trash mulch cover, knapsack spray pump.",
+      "setup_investment_range": {
+        "min_inr": 45000.0,
+        "max_inr": 65000.0,
+        "typical_inr": 55000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 35000.0,
+        "max_inr": 52000.0,
+        "typical_inr": 42000.0
+      },
+      "production_yield_assumptions": {
+        "low": 4000.0,
+        "base": 6500.0,
+        "high": 8500.0,
+        "unit": "kg fresh rhizomes per 0.5 acre"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 22.0,
+        "base_price_per_unit": 35.0,
+        "high_price_per_unit": 55.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 53000.0,
+        "base_inr": 185500.0,
+        "high_inr": 415500.0
+      },
+      "time_to_first_income_months": 8.0,
+      "production_cycle_days": 240,
+      "labour_requirements": {
+        "daily_hours": 2.0,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "taluka_apmc",
+      "major_risks": [
+        "Pythium rhizome rot during continuous heavy monsoon spells",
+        "High seed rhizome cost during sowing season"
+      ],
+      "permissions_or_registrations": [
+        "None for fresh sale; APMC cess applies on open mandi trade"
+      ],
+      "source_references": [
+        "ICAR Indian Institute of Spices Research (IISR) Package of Practices",
+        "Vasantrao Naik Marathwada Krishi Vidyapeeth (VNMKV) Spices Advisory",
+        "MSAMB Ginger Market Realization Baseline"
+      ],
+      "reference_geography": "Maharashtra Central & Western Spices Zone",
+      "source_publication_date": "2023-11-20",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    },
+    {
+      "opportunity_id": "OPP_FLORI_MARIGOLD_OPEN_01",
+      "name": "Commercial African Marigold (Zendu) Open-Field Cultivation",
+      "category": "FLORICULTURE",
+      "farmer_friendly_description": "Fast-yielding flower crop targeted at festive festival demand (Ganesh Chaturthi, Navratri, Diwali) with picking every 3 to 4 days.",
+      "business_model": "Transplant hybrid African orange/yellow marigold seedlings in July–August to harvest fresh flower heads during peak festival months (September–November).",
+      "suitable_geography": "Pune, Solapur, Ahmednagar, Nashik, Jalgaon, Nagpur, Amravati",
+      "suitable_land_acres": 0.5,
+      "unit_of_operation": "0.5 acre open field",
+      "minimum_scale": 0.25,
+      "typical_scale": 0.5,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Adaptable to diverse soils from light sandy loam to medium black soil; requires good sunlight and moderate drainage.",
+      "initial_setup_requirements": "Ploughing, ridge and furrow layout at 60x60 cm, basal dose of organic manure and single super phosphate.",
+      "recurring_requirements": "Hybrid seeds or nursery seedlings (4,000 seedlings for 0.5 acre), pinching labour, bio-fertilizers, and picking bags.",
+      "equipment_and_infrastructure": "Existing farm drip or furrow irrigation, weighing balance, plastic crates for flower transport.",
+      "setup_investment_range": {
+        "min_inr": 12000.0,
+        "max_inr": 20000.0,
+        "typical_inr": 16000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 18000.0,
+        "max_inr": 28000.0,
+        "typical_inr": 22000.0
+      },
+      "production_yield_assumptions": {
+        "low": 2500.0,
+        "base": 3800.0,
+        "high": 5000.0,
+        "unit": "kg flower heads per 0.5 acre"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 18.0,
+        "base_price_per_unit": 32.0,
+        "high_price_per_unit": 65.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 27000.0,
+        "base_inr": 99600.0,
+        "high_inr": 303000.0
+      },
+      "time_to_first_income_months": 2.2,
+      "production_cycle_days": 110,
+      "labour_requirements": {
+        "daily_hours": 3.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "taluka_apmc",
+      "major_risks": [
+        "Sudden post-festival price crash if harvesting clashes with market gluts",
+        "Flower drop from unseasonal heavy rains or fungal bud rot"
+      ],
+      "permissions_or_registrations": [
+        "None"
+      ],
+      "source_references": [
+        "MPKV Rahuri Floriculture Extension Handbook (Zendu Lagwad)",
+        "Maharashtra Directorate of Horticulture Open Field Floriculture Estimates",
+        "Pune Market Yard (Phool Bazaar) 5-Year Modal Price Bulletin"
+      ],
+      "reference_geography": "Maharashtra Peri-Urban and Rural Agri Belts",
+      "source_publication_date": "2024-05-10",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "MAHA_AGRI_DEPT"
+    },
+    {
+      "opportunity_id": "OPP_FLORI_POLYHOUSE_ROSE_01",
+      "name": "Dutch Cut-Rose Floriculture under Protected Polyhouse",
+      "category": "FLORICULTURE",
+      "farmer_friendly_description": "Produce long-stem export quality Dutch roses for metro florist markets, weddings, and premium retail florists.",
+      "business_model": "Establish budded Dutch rose plants (Top Secret, Passion, Avalanche) in climate-controlled polyhouse, harvesting daily stems over a 4 to 5 year economic life.",
+      "suitable_geography": "Pune, Satara, Nashik, Kolhapur (Talegaon Dabhade / Maval floriculture belt)",
+      "suitable_land_acres": 0.25,
+      "unit_of_operation": "1,000 sq. meter (0.25 acre) polyhouse unit (7,000 plants)",
+      "minimum_scale": 0.25,
+      "typical_scale": 0.5,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Requires slightly acidic to neutral well-aerated soil (pH 6.2–6.8) or cocopeat substrate; nocturnal temperature 15–18°C ideal.",
+      "initial_setup_requirements": "Naturally ventilated polyhouse with shade screen, soil fumigation, raised planting beds, drip & fogger system, and budded rootstock.",
+      "recurring_requirements": "Specialized water-soluble rose fertigation mix, organic fungicides, bud caps, and corrugated export cartons.",
+      "equipment_and_infrastructure": "Polyhouse, high-pressure fogging system, cold storage pre-cooling room (or shared FPO cooling), secateurs, stem grading table.",
+      "setup_investment_range": {
+        "min_inr": 650000.0,
+        "max_inr": 850000.0,
+        "typical_inr": 740000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 120000.0,
+        "max_inr": 160000.0,
+        "typical_inr": 138000.0
+      },
+      "production_yield_assumptions": {
+        "low": 70000.0,
+        "base": 110000.0,
+        "high": 140000.0,
+        "unit": "cut stems per year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 2.5,
+        "base_price_per_unit": 4.2,
+        "high_price_per_unit": 7.5
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 55000.0,
+        "base_inr": 324000.0,
+        "high_inr": 912000.0
+      },
+      "time_to_first_income_months": 4.5,
+      "production_cycle_days": 365,
+      "labour_requirements": {
+        "daily_hours": 4.0,
+        "skill_level": "skilled"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "urban_direct",
+      "major_risks": [
+        "Powdery mildew and downy mildew during humid rainy season",
+        "Cold chain disruption causing premature petal opening"
+      ],
+      "permissions_or_registrations": [
+        "APEDA registration if targeting international export consignments"
+      ],
+      "source_references": [
+        "National Horticulture Board Cut-Flower Polyhouse Guidelines",
+        "Talegaon Floriculture Park Field Data & Model Unit Cost Report",
+        "NABARD State Focus Paper for Maharashtra (Horticulture Section)"
+      ],
+      "reference_geography": "Western Maharashtra Floriculture Clusters",
+      "source_publication_date": "2023-08-10",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_POULTRY_DESI_BACKYARD_01",
+      "name": "Free-Range Desi & Kadaknath Backyard Poultry (100 Birds)",
+      "category": "POULTRY",
+      "farmer_friendly_description": "Low-risk backyard poultry model feeding on farm kitchen scraps, grains, and insects, producing premium free-range eggs and live birds.",
+      "business_model": "Brood 100 day-old dual-purpose chicks (Srinidhi / Kaveri / Kadaknath / Desi cross) in a simple night shelter, releasing them for scavenging during the day.",
+      "suitable_geography": "All districts of Maharashtra",
+      "suitable_land_acres": 0.05,
+      "unit_of_operation": "100 birds flock with 150 sq.ft night coop",
+      "minimum_scale": 50.0,
+      "typical_scale": 100.0,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Adaptable to all soil types; shaded backyard tree canopy protects birds from midday heat and raptors.",
+      "initial_setup_requirements": "Night shelter made of local bamboo/mesh/wire netting (150 sq.ft), drinker and feeder troughs, brooder heat lamp.",
+      "recurring_requirements": "Day-old chicks (DOCs), starter crumbs for first 4 weeks, grower cracked grains, deworming & Ranikhet (RD) vaccines.",
+      "equipment_and_infrastructure": "Night shelter shed, chicken mesh fencing, galvanized feeders and bell drinkers.",
+      "setup_investment_range": {
+        "min_inr": 12000.0,
+        "max_inr": 20000.0,
+        "typical_inr": 15000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 16000.0,
+        "max_inr": 24000.0,
+        "typical_inr": 19500.0
+      },
+      "production_yield_assumptions": {
+        "low": 75.0,
+        "base": 88.0,
+        "high": 95.0,
+        "unit": "live mature birds (plus ~3,500 brown eggs/year from retainers)"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 380.0,
+        "base_price_per_unit": 450.0,
+        "high_price_per_unit": 600.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 12500.0,
+        "base_inr": 20100.0,
+        "high_inr": 37500.0
+      },
+      "time_to_first_income_months": 4.5,
+      "production_cycle_days": 150,
+      "labour_requirements": {
+        "daily_hours": 1.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Predation by wild animals (feral dogs, foxes, raptors) if fencing is weak",
+        "Ranikhet (Newcastle) or IBD outbreak if vaccination schedule is skipped"
+      ],
+      "permissions_or_registrations": [
+        "None required for under 1,000 birds"
+      ],
+      "source_references": [
+        "ICAR Directorate of Poultry Research (DPR) Rural Backyard Poultry Protocol",
+        "Department of Animal Husbandry, Government of Maharashtra Backyard Poultry Scheme",
+        "NABARD Unit Cost for Rural Poultry Units"
+      ],
+      "reference_geography": "Statewide Maharashtra",
+      "source_publication_date": "2023-05-18",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    },
+    {
+      "opportunity_id": "OPP_POULTRY_COMMERCIAL_BROILER_01",
+      "name": "Commercial Broiler Contract / Independent Farming (1,000 Birds)",
+      "category": "POULTRY",
+      "farmer_friendly_description": "Fast 40-day meat bird production cycle with high turnover, operated independently or under integrator buyback contract.",
+      "business_model": "Raise day-old commercial broiler chicks to 2.0–2.2 kg live market weight over 38–42 days, running 5 to 6 batches per year with 15 days cleanup break between batches.",
+      "suitable_geography": "Pune, Satara, Ahmednagar, Nashik, Kolhapur, Solapur, Nagpur",
+      "suitable_land_acres": 0.1,
+      "unit_of_operation": "1,000 sq.ft semi-pucca broiler shed (1 sq.ft per bird)",
+      "minimum_scale": 1000.0,
+      "typical_scale": 2000.0,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Elevated, well-ventilated dry ground; strictly avoid low-lying flood-prone sites or proximity to industrial zones.",
+      "initial_setup_requirements": "Poultry shed with asbestos/GI sheet roof, wire mesh side walls, curtains, concrete flooring, brooder, feeders, and nipple drinkers.",
+      "recurring_requirements": "Chicks (DOCs), balanced pre-starter/starter/finisher pellet feed, sanitizers, litter (paddy husk/sawdust), and vitamins/vaccines.",
+      "equipment_and_infrastructure": "Automatic/semi-automatic bell or nipple drinkers, tube feeders, infrared brooding heaters, exhaust fans, water storage tank.",
+      "setup_investment_range": {
+        "min_inr": 180000.0,
+        "max_inr": 260000.0,
+        "typical_inr": 220000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 110000.0,
+        "max_inr": 150000.0,
+        "typical_inr": 132000.0
+      },
+      "production_yield_assumptions": {
+        "low": 9400.0,
+        "base": 10800.0,
+        "high": 12000.0,
+        "unit": "kg live broiler meat across 5 batches/year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 82.0,
+        "base_price_per_unit": 96.0,
+        "high_price_per_unit": 118.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 58000.0,
+        "base_inr": 145000.0,
+        "high_inr": 296000.0
+      },
+      "time_to_first_income_months": 1.5,
+      "production_cycle_days": 42,
+      "labour_requirements": {
+        "daily_hours": 3.0,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "taluka_apmc",
+      "major_risks": [
+        "Heat stress mortality exceeding 10% during April–May if shed ventilation is inadequate",
+        "Sharp fluctuation in open-market live bird rates (inter-state bird influx)"
+      ],
+      "permissions_or_registrations": [
+        "Gram Panchayat NOC for commercial poultry unit construction",
+        "Animal Husbandry Department registration"
+      ],
+      "source_references": [
+        "NABARD Model Bankable Project Report on 1,000 Broiler Poultry Unit",
+        "Central Poultry Development Organization (CPDO) Western Region",
+        "Maharashtra Broiler Farmers Association Market Advisory"
+      ],
+      "reference_geography": "Maharashtra Commercial Poultry Belts",
+      "source_publication_date": "2024-01-10",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_FISH_FARM_POND_01",
+      "name": "Freshwater Fish Farming (Carp Aquaculture) in Farm Ponds (Shet Tale)",
+      "category": "FISHERY",
+      "farmer_friendly_description": "Convert farm ponds or irrigation retention tanks (shet tale) into a lucrative dual-use fish production system without wasting water.",
+      "business_model": "Stock fast-growing Indian Major Carps (Catla, Rohu, Mrigal) and Grass Carp in lined/unlined farm ponds (minimum 500–1,000 sq.m), harvesting table-size fish after 8–10 months.",
+      "suitable_geography": "Solapur, Pune, Ahmednagar, Latur, Beed, Osmanabad, Jalna, Wardha",
+      "suitable_land_acres": 0.25,
+      "unit_of_operation": "1,000 sq. meter farm pond (depth 2.5–3.0 meters)",
+      "minimum_scale": 0.1,
+      "typical_scale": 0.25,
+      "water_requirement": "high",
+      "soil_climate_considerations": "Requires existing farm pond with water holding depth > 2 meters for at least 8 months; soil clay content > 20% or HDPE liner installed.",
+      "initial_setup_requirements": "Pre-stocking liming (200 kg), pond netting protection against predatory birds, inlet pipe mesh screen, and organic manuring.",
+      "recurring_requirements": "Fingerling seed (1,200 to 1,500 fingerlings of 80–100 mm), floating supplementary pellet feed, probiotic water conditioner, periodic netting.",
+      "equipment_and_infrastructure": "Farm pond (existing under Magel Tyala Shet Tale scheme), aerator (optional paddle-wheel), cast/drag harvest net, dissolved oxygen test kit.",
+      "setup_investment_range": {
+        "min_inr": 28000.0,
+        "max_inr": 45000.0,
+        "typical_inr": 35000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 38000.0,
+        "max_inr": 55000.0,
+        "typical_inr": 45000.0
+      },
+      "production_yield_assumptions": {
+        "low": 900.0,
+        "base": 1400.0,
+        "high": 1800.0,
+        "unit": "kg harvest fish per 1,000 sq.m pond"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 90.0,
+        "base_price_per_unit": 125.0,
+        "high_price_per_unit": 160.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 43000.0,
+        "base_inr": 130000.0,
+        "high_inr": 243000.0
+      },
+      "time_to_first_income_months": 8.5,
+      "production_cycle_days": 270,
+      "labour_requirements": {
+        "daily_hours": 1.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Pond water drying out before fish attain harvest weight (> 800 grams)",
+        "Dissolved oxygen drop during cloudy muggy monsoon spells causing surface gasping"
+      ],
+      "permissions_or_registrations": [
+        "District Fisheries Office registration for subsidized seed/feed (PMMSY scheme)"
+      ],
+      "source_references": [
+        "ICAR Central Institute of Freshwater Aquaculture (CIFA) Farm Pond Aquaculture Package",
+        "Maharashtra Fisheries Department PMMSY Guidelines for Shet Tale Carp Culture",
+        "NABARD Model Bankable Project on Freshwater Aquaculture in Western Maharashtra"
+      ],
+      "reference_geography": "Maharashtra Rainfed & Farm Pond Irrigation Zones",
+      "source_publication_date": "2023-09-12",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    },
+    {
+      "opportunity_id": "OPP_LIVESTOCK_OSMANABADI_GOAT_10_1",
+      "name": "Stall-Fed Osmanabadi / Sangamneri Goat Rearing (10 Does + 1 Buck)",
+      "category": "LIVESTOCK",
+      "farmer_friendly_description": "Hardy local Maharashtra breed well-adapted to semi-arid drought conditions, offering high twining rate and premium live-weight meat prices.",
+      "business_model": "Maintain 10 breeding does and 1 pedigree buck under semi-stall-fed conditions, producing 20 to 24 marketable kid goats per year for Bakrid and local mutton markets.",
+      "suitable_geography": "Solapur, Ahmednagar, Beed, Osmanabad, Sangli, Pune, Jalna, Parbhani",
+      "suitable_land_acres": 0.25,
+      "unit_of_operation": "10 does + 1 buck with 0.25 acre dedicated green fodder",
+      "minimum_scale": 5.0,
+      "typical_scale": 11.0,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Dry, well-ventilated location; avoids swampy waterlogged sites prone to foot rot and endoparasite infestation.",
+      "initial_setup_requirements": "Low-cost elevated slatted wooden/bamboo or mud-plastered shed (300 sq.ft) with mesh partition and feeding mangers.",
+      "recurring_requirements": "Concentrate feed supplement (maize/chana husk/bran), mineral mixture, PPR & Enterotoxaemia (ET) vaccines, deworming syrups.",
+      "equipment_and_infrastructure": "Shed structure, feeding mangers, water tubs, chaff cutter for green fodder processing.",
+      "setup_investment_range": {
+        "min_inr": 85000.0,
+        "max_inr": 120000.0,
+        "typical_inr": 98000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 28000.0,
+        "max_inr": 42000.0,
+        "typical_inr": 34000.0
+      },
+      "production_yield_assumptions": {
+        "low": 16.0,
+        "base": 22.0,
+        "high": 26.0,
+        "unit": "kids sold per year at 22–25 kg live weight (plus 4–5 tonnes goat manure)"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 5500.0,
+        "base_price_per_unit": 7500.0,
+        "high_price_per_unit": 10500.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 60000.0,
+        "base_inr": 131000.0,
+        "high_inr": 239000.0
+      },
+      "time_to_first_income_months": 7.0,
+      "production_cycle_days": 210,
+      "labour_requirements": {
+        "daily_hours": 2.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "PPR or Enterotoxaemia disease outbreak if annual vaccination is neglected",
+        "Kid mortality during cold winter nights (December–January) without warm bedding"
+      ],
+      "permissions_or_registrations": [
+        "None required for smallholder units under 50 animals"
+      ],
+      "source_references": [
+        "ICAR Central Institute for Research on Goats (CIRG) Osmanabadi Breed Profile",
+        "MPKV Rahuri Goat & Sheep Rearing Project Guidelines (2024)",
+        "NABARD Unit Cost for 10+1 Goat Farming in Maharashtra"
+      ],
+      "reference_geography": "Marathwada & Western Maharashtra Semi-Arid Belt",
+      "source_publication_date": "2024-02-14",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_LIVESTOCK_DAIRY_2COW_01",
+      "name": "Micro-Dairy Unit with Indigenous / Crossbred Cows (2 Animals)",
+      "category": "LIVESTOCK",
+      "farmer_friendly_description": "Daily liquid cash-flow enterprise producing 20 to 28 liters of milk daily with assured purchase by village dairy cooperatives.",
+      "business_model": "Maintain 2 milch cows (Gir / Sahiwal or HF/Jersey cross) in staggered lactation cycles so at least one cow is milking throughout the year.",
+      "suitable_geography": "Kolhapur, Sangli, Pune, Satara, Ahmednagar, Nashik, Jalgaon",
+      "suitable_land_acres": 0.5,
+      "unit_of_operation": "2 cows with 0.5 acre dedicated green fodder (Napier/Lucerne)",
+      "minimum_scale": 2.0,
+      "typical_scale": 4.0,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Cool, shaded shed orientation (East-West); access to clean drinking water (70–100 liters/cow/day).",
+      "initial_setup_requirements": "Open-stall cattle shed with concrete floor and grooved slope (200 sq.ft), cow purchase, milking cans, and fodder chaff cutter.",
+      "recurring_requirements": "Dry stover, compound cattle feed pellets, green fodder cultivation inputs, mineral mixture, AI services, and veterinary care.",
+      "equipment_and_infrastructure": "Cattle shed with manger, stainless steel milk cans, chaff cutter, lactometer / fat testing supplies.",
+      "setup_investment_range": {
+        "min_inr": 130000.0,
+        "max_inr": 175000.0,
+        "typical_inr": 150000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 95000.0,
+        "max_inr": 135000.0,
+        "typical_inr": 112000.0
+      },
+      "production_yield_assumptions": {
+        "low": 5000.0,
+        "base": 6800.0,
+        "high": 8400.0,
+        "unit": "liters of milk per year (plus 12 tonnes farmyard manure)"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 32.0,
+        "base_price_per_unit": 38.0,
+        "high_price_per_unit": 46.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 65000.0,
+        "base_inr": 146400.0,
+        "high_inr": 274400.0
+      },
+      "time_to_first_income_months": 0.5,
+      "production_cycle_days": 300,
+      "labour_requirements": {
+        "daily_hours": 3.0,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Mastitis udder infection reducing milk yield and fat percentage",
+        "Repeat breeding infertility during hot summer months"
+      ],
+      "permissions_or_registrations": [
+        "Village Dairy Cooperative Society (Doodh Utpadak Sanstha) membership"
+      ],
+      "source_references": [
+        "National Dairy Development Board (NDDB) Smallholder Dairy Guidance",
+        "Mahanand & Gokul Dairy Procurement Price Schedules (Maharashtra)",
+        "NABARD Unit Cost for 2-Milch Animal Dairy Units"
+      ],
+      "reference_geography": "Western & Northern Maharashtra Dairy Belts",
+      "source_publication_date": "2024-04-01",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_SMALL_OYSTER_MUSHROOM_01",
+      "name": "Oyster Mushroom (Dhingri) Cultivation in Thatched Room",
+      "category": "SMALL_SPACE",
+      "farmer_friendly_description": "Zero-land enterprise converting surplus soybean/wheat straw into nutritious oyster mushrooms inside a darkened spare room or thatched hut.",
+      "business_model": "Pasteurize chopped straw, pack in poly-bags inoculated with oyster mushroom spawn (Pleurotus florida), and harvest 3 flushes over a 45-day cycle.",
+      "suitable_geography": "All districts of Maharashtra (particularly cool winter months or shaded huts)",
+      "suitable_land_acres": 0.0,
+      "unit_of_operation": "150 sq.ft thatched hut / spare room (100 bags capacity)",
+      "minimum_scale": 50.0,
+      "typical_scale": 100.0,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Requires room temperature between 22°C–28°C and relative humidity 70%–85%; does not require any agricultural field soil.",
+      "initial_setup_requirements": "Room preparation with bamboo hanging racks, black polythene window curtains, hand mister/sprayer, and clean drum for straw boiling.",
+      "recurring_requirements": "Paddy/soybean straw, oyster mushroom spawn bottles, PP bags, rubber bands, Bavistin/formalin or boiling fuel.",
+      "equipment_and_infrastructure": "Hanging ropes, bamboo racks, straw chopper, hand knapsack mister, electronic weighing scale.",
+      "setup_investment_range": {
+        "min_inr": 8000.0,
+        "max_inr": 15000.0,
+        "typical_inr": 11000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 14000.0,
+        "max_inr": 22000.0,
+        "typical_inr": 17500.0
+      },
+      "production_yield_assumptions": {
+        "low": 350.0,
+        "base": 550.0,
+        "high": 750.0,
+        "unit": "kg fresh mushroom across 5 cycles/year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 90.0,
+        "base_price_per_unit": 130.0,
+        "high_price_per_unit": 180.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 17500.0,
+        "base_inr": 54000.0,
+        "high_inr": 117500.0
+      },
+      "time_to_first_income_months": 1.2,
+      "production_cycle_days": 45,
+      "labour_requirements": {
+        "daily_hours": 1.5,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Green mold (Trichoderma) contamination if straw sterilization is incomplete",
+        "Short shelf life (1–2 days) requiring immediate local sale or drying"
+      ],
+      "permissions_or_registrations": [
+        "FSSAI Basic Registration (free for smallholders under ₹12 lakh turnover)"
+      ],
+      "source_references": [
+        "ICAR Directorate of Mushroom Research (DMR) Solan Training Manual",
+        "MPKV Rahuri Mushroom Technology Transfer Bulletin",
+        "KVK Baramati Field Demonstration Report on Oyster Mushroom"
+      ],
+      "reference_geography": "Statewide Maharashtra",
+      "source_publication_date": "2023-10-05",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    },
+    {
+      "opportunity_id": "OPP_SMALL_VERMICOMPOST_HDPE_01",
+      "name": "Commercial Vermicomposting with HDPE Portable Beds",
+      "category": "SMALL_SPACE",
+      "farmer_friendly_description": "Convert cow dung and farm waste into black gold vermicompost and vermiwash, cutting personal fertilizer bills and selling packaged compost.",
+      "business_model": "Install 3 to 5 portable UV-treated HDPE vermicompost beds (12x4x2 ft), stock with Eisenia fetida earthworms, and harvest 8 to 10 tonnes of organic fertilizer annually.",
+      "suitable_geography": "All districts of Maharashtra",
+      "suitable_land_acres": 0.02,
+      "unit_of_operation": "3 portable HDPE beds (12x4x2 ft each) under tree shade",
+      "minimum_scale": 1.0,
+      "typical_scale": 3.0,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Requires shaded area (under mango/neem tree or agro-shade net) to maintain bed temperature below 32°C.",
+      "initial_setup_requirements": "3 HDPE IS-grade vermibeds with aeration nets and vermiwash collection outlets, support bamboo pegs.",
+      "recurring_requirements": "Initial earthworm culture (Eisenia fetida, 15 kg), cow dung slurry, farm crop residue, gunny bags for packaging.",
+      "equipment_and_infrastructure": "3 HDPE vermibeds, garden water hose, manual rotary sieve (chaalni), 25/50kg stitched packaging bags.",
+      "setup_investment_range": {
+        "min_inr": 14000.0,
+        "max_inr": 22000.0,
+        "typical_inr": 17500.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 8000.0,
+        "max_inr": 14000.0,
+        "typical_inr": 10500.0
+      },
+      "production_yield_assumptions": {
+        "low": 6000.0,
+        "base": 9000.0,
+        "high": 12000.0,
+        "unit": "kg vermicompost per year (plus 250 liters vermiwash)"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 5.0,
+        "base_price_per_unit": 7.5,
+        "high_price_per_unit": 10.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 22000.0,
+        "base_inr": 57000.0,
+        "high_inr": 109500.0
+      },
+      "time_to_first_income_months": 2.5,
+      "production_cycle_days": 75,
+      "labour_requirements": {
+        "daily_hours": 1.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Ant or red mite invasion if bed moisture drops below 40%",
+        "Worm mortality if fresh hot cow dung is added directly without pre-curing"
+      ],
+      "permissions_or_registrations": [
+        "Fertilizer Control Order (FCO) testing report if retailing under commercial brand name"
+      ],
+      "source_references": [
+        "NABARD Model Bankable Project on HDPE Vermicomposting Unit",
+        "MPKV Rahuri Organic Input Production Handbook",
+        "National Centre of Organic and Natural Farming (NCONF) Guidelines"
+      ],
+      "reference_geography": "Statewide Maharashtra",
+      "source_publication_date": "2024-01-20",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "NABARD_MODEL_PROJECT"
+    },
+    {
+      "opportunity_id": "OPP_SMALL_PROTRAY_NURSERY_01",
+      "name": "Shade-Net Pro-Tray Vegetable Seedling Nursery",
+      "category": "SMALL_SPACE",
+      "farmer_friendly_description": "Raise disease-free seedling plugs of tomato, chili, cabbage, and brinjal in plastic pro-trays for sale to neighboring vegetable growers.",
+      "business_model": "Operate a 500 sq.ft shade-net seedling house sowing seeds in 104-cavity pro-trays with sterilized cocopeat, selling 25-day-old vigorous root-plug seedlings.",
+      "suitable_geography": "Nashik, Pune, Ahmednagar, Satara, Kolhapur, Solapur, Nagpur, Jalgaon",
+      "suitable_land_acres": 0.02,
+      "unit_of_operation": "500 sq.ft shade net nursery house (capacity 25,000 seedlings/batch)",
+      "minimum_scale": 250.0,
+      "typical_scale": 500.0,
+      "water_requirement": "low",
+      "soil_climate_considerations": "Does not use field soil; seedlings grow in sterile cocopeat matrix inside shade net chamber (50% green agro net).",
+      "initial_setup_requirements": "500 sq.ft shade net house with GI pipe frame, raised galvanized mesh nursery tables, and micro-sprinkler misting line.",
+      "recurring_requirements": "Cocopeat blocks, vermiculite, perlite, 104-cavity reusable plastic pro-trays, certified vegetable seeds, and water-soluble micro-nutrients.",
+      "equipment_and_infrastructure": "Shade net house, micro-sprinklers, knapsack fine misting lance, seedling transport crates.",
+      "setup_investment_range": {
+        "min_inr": 35000.0,
+        "max_inr": 55000.0,
+        "typical_inr": 45000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 42000.0,
+        "max_inr": 65000.0,
+        "typical_inr": 52000.0
+      },
+      "production_yield_assumptions": {
+        "low": 75000.0,
+        "base": 110000.0,
+        "high": 140000.0,
+        "unit": "saleable seedlings across 5 batches/year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 0.9,
+        "base_price_per_unit": 1.4,
+        "high_price_per_unit": 2.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 25500.0,
+        "base_inr": 102000.0,
+        "high_inr": 228000.0
+      },
+      "time_to_first_income_months": 1.0,
+      "production_cycle_days": 28,
+      "labour_requirements": {
+        "daily_hours": 2.0,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Damping-off fungal disease if excessive moisture persists on seedlings",
+        "Advance booking cancellations if farmer clients face delayed monsoon planting"
+      ],
+      "permissions_or_registrations": [
+        "District Agriculture Nursery License under Maharashtra Fruit and Plant Nursery Act"
+      ],
+      "source_references": [
+        "Commissionerate of Agriculture Maharashtra High-Tech Nursery Guidelines",
+        "KVK Narayangaon Commercial Vegetable Nursery Model",
+        "NHB Guidelines for Small Vegetable Seedling Production Units"
+      ],
+      "reference_geography": "Maharashtra Vegetable Production Hubs",
+      "source_publication_date": "2023-12-15",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "MAHA_AGRI_DEPT"
+    },
+    {
+      "opportunity_id": "OPP_SMALL_BEEKEEPING_5BOX_01",
+      "name": "Apiculture / Honey Beekeeping on Field Boundaries (5 Boxes)",
+      "category": "SMALL_SPACE",
+      "farmer_friendly_description": "Keep honeybee colonies (Apis cerana indica) on farm bunds to boost crop pollination and harvest pure bottled wildflower honey.",
+      "business_model": "Install 5 modern ISI-standard wooden bee boxes with foundation combs along orchard or crop margins, extracting honey 3 to 4 times a year.",
+      "suitable_geography": "Western Ghats, Konkan, Pune, Satara (Mahabaleshwar belt), Nashik, Kolhapur, Vidarbha forest belts",
+      "suitable_land_acres": 0.0,
+      "unit_of_operation": "5 modern Langstroth/Newton bee boxes",
+      "minimum_scale": 2.0,
+      "typical_scale": 5.0,
+      "water_requirement": "very_low",
+      "soil_climate_considerations": "Requires flowering forage within a 2 km foraging radius (mustard, sunflower, drumstick, eucalyptus, mango, or wild flora).",
+      "initial_setup_requirements": "5 wooden bee boxes with supers and brood frames, 5 healthy bee colonies with mated queens, bee veil, smoker, and hive tool.",
+      "recurring_requirements": "Wax foundation sheets, sugar for artificial feeding during monsoon dearth, queen cages, and glass honey packaging jars.",
+      "equipment_and_infrastructure": "Stainless steel centrifugal honey extractor (shared or owned), smoker, bee brush, uncapping knife, sting-proof gloves.",
+      "setup_investment_range": {
+        "min_inr": 22000.0,
+        "max_inr": 35000.0,
+        "typical_inr": 28000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 4000.0,
+        "max_inr": 8000.0,
+        "typical_inr": 5500.0
+      },
+      "production_yield_assumptions": {
+        "low": 40.0,
+        "base": 65.0,
+        "high": 90.0,
+        "unit": "kg raw bottled honey per year (plus 2–3 kg beeswax)"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 400.0,
+        "base_price_per_unit": 600.0,
+        "high_price_per_unit": 850.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 12000.0,
+        "base_inr": 33500.0,
+        "high_inr": 71000.0
+      },
+      "time_to_first_income_months": 4.0,
+      "production_cycle_days": 180,
+      "labour_requirements": {
+        "daily_hours": 0.5,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Pesticide drift from neighboring fields spraying organophosphates during flowering",
+        "Absconding of colonies during prolonged monsoon rains or wax moth attack"
+      ],
+      "permissions_or_registrations": [
+        "National Bee Board (NBB) registration for Madhukranti portal tracking (optional)"
+      ],
+      "source_references": [
+        "Maharashtra State Khadi & Village Industries Board (MSKVIB) Honey Directorate Mahabaleshwar",
+        "Central Bee Research and Training Institute (CBRTI) Pune Guidelines",
+        "KVIC Beekeeping Village Enterprise Model"
+      ],
+      "reference_geography": "Maharashtra Horticulture and Forest Border Zones",
+      "source_publication_date": "2023-07-22",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    },
+    {
+      "opportunity_id": "OPP_RENTAL_CUSTOM_HIRING_01",
+      "name": "Farm Machinery & Sprayer Custom Hiring Service",
+      "category": "RESOURCE_MONETIZATION",
+      "farmer_friendly_description": "Rent out owned idle sprayers, water pumps, brush cutters or tractor implements to neighboring farmers on hourly or per-acre rental rates.",
+      "business_model": "Maximize equipment utilization during off-peak farm days by offering equipment with or without an operator to adjacent smallholders.",
+      "suitable_geography": "All districts of Maharashtra",
+      "suitable_land_acres": 0.0,
+      "unit_of_operation": "1 battery sprayer, 1 motorized power weeder, or portable 5HP diesel pump",
+      "minimum_scale": 1.0,
+      "typical_scale": 2.0,
+      "water_requirement": "none",
+      "soil_climate_considerations": "Requires no land; operates across neighbor holdings during sowing, weeding, and spraying seasons.",
+      "initial_setup_requirements": "Reliable commercial-grade farm machinery (e.g., 2-stroke/4-stroke power weeder, 16L battery sprayer, portable pump).",
+      "recurring_requirements": "Fuel (petrol/diesel), routine oil changes, replacement nozzles, spark plugs, battery recharging.",
+      "equipment_and_infrastructure": "Owned equipment, basic tool kit for field maintenance, contact directory of neighbor farmers.",
+      "setup_investment_range": {
+        "min_inr": 0.0,
+        "max_inr": 35000.0,
+        "typical_inr": 18000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 6000.0,
+        "max_inr": 12000.0,
+        "typical_inr": 8500.0
+      },
+      "production_yield_assumptions": {
+        "low": 120.0,
+        "base": 200.0,
+        "high": 300.0,
+        "unit": "service hours billed per season"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 200.0,
+        "base_price_per_unit": 300.0,
+        "high_price_per_unit": 450.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 18000.0,
+        "base_inr": 51500.0,
+        "high_inr": 126500.0
+      },
+      "time_to_first_income_months": 0.5,
+      "production_cycle_days": 30,
+      "labour_requirements": {
+        "daily_hours": 2.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Equipment breakdown or wear caused by negligent borrower usage",
+        "Delayed payment collections from fellow villagers"
+      ],
+      "permissions_or_registrations": [
+        "None for informal peer-to-peer rental"
+      ],
+      "source_references": [
+        "Sub-Mission on Agricultural Mechanization (SMAM) Maharashtra Custom Hiring Guidelines",
+        "MPKV Rahuri Farm Machinery Economics Bulletin",
+        "NABARD Farm Mechanization Model Projects"
+      ],
+      "reference_geography": "Statewide Maharashtra",
+      "source_publication_date": "2024-02-05",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "MAHA_AGRI_DEPT"
+    },
+    {
+      "opportunity_id": "OPP_VALUE_PRODUCE_GRADING_01",
+      "name": "Produce Sorting, Grading & Direct APMC Lot Aggregation",
+      "category": "VALUE_ADDITION",
+      "farmer_friendly_description": "Clean, sort and grade harvested soybean, onion, or grains at farm-gate using manual sieves to eliminate distress mandi deductions.",
+      "business_model": "Sort harvested crop into Grade-A, Grade-B, and culls before mandi dispatch, pooling transport with local FPO to earn 8% to 15% price premium.",
+      "suitable_geography": "All districts of Maharashtra",
+      "suitable_land_acres": 0.0,
+      "unit_of_operation": "Farm threshing floor / covered shed",
+      "minimum_scale": 20.0,
+      "typical_scale": 50.0,
+      "water_requirement": "none",
+      "soil_climate_considerations": "Requires dry covered yard or tarpaulin to prevent moisture absorption during grading.",
+      "initial_setup_requirements": "Heavy-duty HDPE tarpaulins (24x18 ft), manual grain sieves (chaalni) of calibrated mesh sizes, moisture meter.",
+      "recurring_requirements": "New stitched jute/HDPE bags, stencil ink, twine, manual stitching needle.",
+      "equipment_and_infrastructure": "Digital platform weighing scale (300 kg capacity), moisture meter, manual bag stitching machine.",
+      "setup_investment_range": {
+        "min_inr": 0.0,
+        "max_inr": 12000.0,
+        "typical_inr": 5000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 4000.0,
+        "max_inr": 8000.0,
+        "typical_inr": 6000.0
+      },
+      "production_yield_assumptions": {
+        "low": 40.0,
+        "base": 80.0,
+        "high": 140.0,
+        "unit": "quintals graded produce per harvest season"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 350.0,
+        "base_price_per_unit": 480.0,
+        "high_price_per_unit": 650.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 10000.0,
+        "base_inr": 32400.0,
+        "high_inr": 85000.0
+      },
+      "time_to_first_income_months": 0.5,
+      "production_cycle_days": 15,
+      "labour_requirements": {
+        "daily_hours": 2.0,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "fpo",
+      "major_risks": [
+        "Inaccurate grading causing mandi inspector dispute",
+        "Grain moisture exceeding 12% leading to mandi deduction despite grading"
+      ],
+      "permissions_or_registrations": [
+        "None required for farm-level grading of own produce"
+      ],
+      "source_references": [
+        "Maharashtra State Agricultural Marketing Board (MSAMB) APMC Grading Protocols",
+        "NABARD Farmer Producer Organization Value Addition Handbook",
+        "Agmark Produce Quality Grading Standards"
+      ],
+      "reference_geography": "Statewide Maharashtra APMC Mandis",
+      "source_publication_date": "2023-11-12",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "MAHA_AGRI_DEPT"
+    },
+    {
+      "opportunity_id": "OPP_VALUE_SPICE_PROCESSING_01",
+      "name": "Farm-Level Chili & Turmeric Grinding, Packaging & Direct Retail",
+      "category": "VALUE_ADDITION",
+      "farmer_friendly_description": "Convert sun-dried chili or turmeric into hygienic spice powders, packaged in branded 250g/500g pouches for direct retail and local markets.",
+      "business_model": "Pulverize cleaned, dried farm turmeric rhizomes or red chilies using a small multi-purpose pulverizer, packaging into sealed pouches with nutrition label.",
+      "suitable_geography": "Satara, Sangli, Kolhapur, Nanded, Hingoli, Wardha, Nagpur",
+      "suitable_land_acres": 0.0,
+      "unit_of_operation": "200 sq.ft clean hygienic processing shed",
+      "minimum_scale": 100.0,
+      "typical_scale": 500.0,
+      "water_requirement": "very_low",
+      "soil_climate_considerations": "Requires dry covered processing shed with zero dust ingress and pest proofing.",
+      "initial_setup_requirements": "2HP commercial stainless steel impact pulverizer, continuous band sealer, electronic precision balance (0.1g accuracy).",
+      "recurring_requirements": "Clean dried turmeric/chili raw material, multi-layer printed standup pouches, desiccant sachets, batch coding ink.",
+      "equipment_and_infrastructure": "Stainless steel pulverizer, vibratory sieve, impulse/band pouch sealer, stainless steel preparation tables.",
+      "setup_investment_range": {
+        "min_inr": 48000.0,
+        "max_inr": 75000.0,
+        "typical_inr": 62000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 35000.0,
+        "max_inr": 55000.0,
+        "typical_inr": 44000.0
+      },
+      "production_yield_assumptions": {
+        "low": 600.0,
+        "base": 1200.0,
+        "high": 2000.0,
+        "unit": "kg packaged pure spice powder per year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 160.0,
+        "base_price_per_unit": 220.0,
+        "high_price_per_unit": 300.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 61000.0,
+        "base_inr": 220000.0,
+        "high_inr": 556000.0
+      },
+      "time_to_first_income_months": 1.0,
+      "production_cycle_days": 30,
+      "labour_requirements": {
+        "daily_hours": 2.5,
+        "skill_level": "moderate"
+      },
+      "electricity_requirements": "single_phase",
+      "market_access_requirements": "urban_direct",
+      "major_risks": [
+        "Curcumin / color degradation if powder is exposed to sunlight or moisture",
+        "Packaging seal failure during monsoon transit causing powder caking"
+      ],
+      "permissions_or_registrations": [
+        "FSSAI Basic Food Business License",
+        "Udyam Aadhar MSME registration"
+      ],
+      "source_references": [
+        "Ministry of Food Processing Industries (PMFME Scheme) Model Project on Micro Spice Processing",
+        "Spices Board of India Post-Harvest Quality Manual",
+        "VNMKV Parbhani Home Science Processing Guidelines"
+      ],
+      "reference_geography": "Maharashtra Spices Hubs (Sangli, Nanded, Hingoli)",
+      "source_publication_date": "2024-03-01",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "MAHA_AGRI_DEPT"
+    },
+    {
+      "opportunity_id": "OPP_CROP_FODDER_NAPIER_01",
+      "name": "Super Napier (Pakchong 1) Perennial Green Fodder Production",
+      "category": "CROP_DIVERSIFICATION",
+      "farmer_friendly_description": "Fast-growing high-protein perennial fodder grass giving 7 to 8 cuts per year, cutting dairy feed costs or sold to local cattle owners.",
+      "business_model": "Plant root slips or stem cuttings of hybrid Super Napier on 0.5 acre with drip/furrow irrigation, harvesting fresh green biomass every 45 days for 4 years.",
+      "suitable_geography": "All irrigated dairy districts of Maharashtra",
+      "suitable_land_acres": 0.5,
+      "unit_of_operation": "0.5 acre dedicated fodder plot",
+      "minimum_scale": 0.25,
+      "typical_scale": 0.5,
+      "water_requirement": "moderate",
+      "soil_climate_considerations": "Adaptable to all soils except poorly drained waterlogged soils; thrives under hot humid sunshine.",
+      "initial_setup_requirements": "Deep ploughing, 60x60 cm ridge and furrow layout, 4,000 root slips/stem cuttings, basal FYM application.",
+      "recurring_requirements": "Urea / nitrogen top dressing after every cutting, weeding in initial 60 days, irrigation every 10–12 days.",
+      "equipment_and_infrastructure": "Existing farm irrigation, sickles, mechanical chaff cutter.",
+      "setup_investment_range": {
+        "min_inr": 8000.0,
+        "max_inr": 15000.0,
+        "typical_inr": 11000.0
+      },
+      "recurring_operating_cost_range": {
+        "min_inr": 12000.0,
+        "max_inr": 18000.0,
+        "typical_inr": 14500.0
+      },
+      "production_yield_assumptions": {
+        "low": 35.0,
+        "base": 55.0,
+        "high": 75.0,
+        "unit": "tonnes fresh green biomass across 7 cuts/year"
+      },
+      "expected_sales_revenue_assumptions": {
+        "low_price_per_unit": 1200.0,
+        "base_price_per_unit": 1800.0,
+        "high_price_per_unit": 2500.0
+      },
+      "estimated_operating_surplus": {
+        "low_inr": 30000.0,
+        "base_inr": 84500.0,
+        "high_inr": 173000.0
+      },
+      "time_to_first_income_months": 2.5,
+      "production_cycle_days": 45,
+      "labour_requirements": {
+        "daily_hours": 1.5,
+        "skill_level": "basic"
+      },
+      "electricity_requirements": "none",
+      "market_access_requirements": "local_village",
+      "major_risks": [
+        "Crude protein drop and stem woodiness if cutting is delayed beyond 55 days",
+        "Frost damage in cold northern Maharashtra winters"
+      ],
+      "permissions_or_registrations": [
+        "None"
+      ],
+      "source_references": [
+        "ICAR Indian Grassland and Fodder Research Institute (IGFRI) Fodder Handbook",
+        "MPKV Rahuri Forage Research Station Project Bulletin",
+        "NABARD Unit Cost for Green Fodder Production"
+      ],
+      "reference_geography": "Maharashtra Dairy and Irrigated Agricultural Belts",
+      "source_publication_date": "2023-08-30",
+      "last_verified_date": "2026-11-01",
+      "confidence_classification": "ICAR_KVK_VERIFIED"
+    }
+  ]
+}

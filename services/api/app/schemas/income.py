@@ -221,3 +221,126 @@ class SavedIncomePlan(BaseModel):
     break_even_reached: bool = True
     notes: Optional[str] = None
     created_at_utc: str
+
+
+# -----------------------------------------------------------------------------
+# 7. Extended Farm Income Diversification Schemas
+# -----------------------------------------------------------------------------
+class FeasibilityStatus(str):
+    GOOD_POTENTIAL_FIT = "GOOD_POTENTIAL_FIT"
+    POTENTIALLY_SUITABLE = "POTENTIALLY_SUITABLE"
+    MORE_INFORMATION_REQUIRED = "MORE_INFORMATION_REQUIRED"
+    NOT_SUITABLE = "NOT_SUITABLE"
+
+
+class DetailedOpportunityItem(BaseModel):
+    opportunity_id: str
+    name: str
+    category: str
+    category_name: str = ""
+    farmer_friendly_description: str
+    business_model: str
+    suitable_geography: str
+    suitable_land_acres: float = 0.0
+    unit_of_operation: str
+    minimum_scale: float = 0.0
+    typical_scale: float = 1.0
+    water_requirement: str = "none"
+    soil_climate_considerations: str = ""
+    initial_setup_requirements: str = ""
+    recurring_requirements: str = ""
+    equipment_and_infrastructure: str = ""
+    setup_investment_range: Dict[str, float] = Field(default_factory=dict)
+    recurring_operating_cost_range: Dict[str, float] = Field(default_factory=dict)
+    production_yield_assumptions: Dict[str, Any] = Field(default_factory=dict)
+    expected_sales_revenue_assumptions: Dict[str, Any] = Field(default_factory=dict)
+    estimated_operating_surplus: Dict[str, float] = Field(default_factory=dict)
+    time_to_first_income_months: float = 1.0
+    production_cycle_days: int = 30
+    labour_requirements: Dict[str, Any] = Field(default_factory=dict)
+    electricity_requirements: str = "none"
+    market_access_requirements: str = "local_village"
+    major_risks: List[str] = Field(default_factory=list)
+    permissions_or_registrations: List[str] = Field(default_factory=list)
+    source_references: List[str] = Field(default_factory=list)
+    reference_geography: str = "Maharashtra"
+    last_verified_date: str = "2026-11-01"
+    confidence_classification: str = "NABARD_MODEL_PROJECT"
+    # Personalized Matching additions
+    feasibility_status: str = "POTENTIALLY_SUITABLE"
+    why_recommended: List[str] = Field(default_factory=list)
+    supporting_resources: List[str] = Field(default_factory=list)
+    missing_requirements: List[str] = Field(default_factory=list)
+    what_to_arrange: List[str] = Field(default_factory=list)
+    risks_to_consider: List[str] = Field(default_factory=list)
+
+
+class OpportunityCategoryItem(BaseModel):
+    key: str
+    name: str
+    tagline: str
+    count: int = 0
+
+
+class FarmResourceProfileUpdateRequest(BaseModel):
+    available_diversification_acres: float = Field(default=0.5, ge=0.0)
+    available_investment_inr: float = Field(default=0.0, ge=0.0)
+    monthly_operating_budget_inr: float = Field(default=0.0, ge=0.0)
+    water_source: str = Field(default="seasonal_canal")
+    has_electricity: bool = Field(default=True)
+    electricity_type: str = Field(default="single_phase")
+    family_labor_hours_day: float = Field(default=2.0, ge=0.0, le=16.0)
+    has_animal_shed: bool = Field(default=False)
+    has_storage_room: bool = Field(default=False)
+    has_farm_pond: bool = Field(default=False)
+    existing_equipment: List[str] = Field(default_factory=list)
+    existing_livestock: List[str] = Field(default_factory=list)
+    market_access_type: str = Field(default="taluka_apmc")
+    preferred_category: Optional[str] = None
+
+
+class FinancialScenarioSimulateRequest(BaseModel):
+    opportunity_id: str
+    allocated_scale: float = Field(default=1.0, gt=0.0)
+    custom_setup_investment_inr: Optional[float] = Field(default=None, ge=0.0)
+    custom_annual_opex_inr: Optional[float] = Field(default=None, ge=0.0)
+    custom_yield: Optional[float] = Field(default=None, ge=0.0)
+    custom_sale_price: Optional[float] = Field(default=None, ge=0.0)
+    scenario_mode: str = Field(default="BASE", description="LOW, BASE, HIGH")
+
+
+class FinancialScenarioSimulateResponse(BaseModel):
+    opportunity_id: str
+    opportunity_name: str
+    category: str
+    scale_unit: str
+    allocated_scale: float
+    initial_setup_investment_inr: float
+    recurring_operating_expenses_inr: float
+    expected_gross_revenue_inr: float
+    estimated_operating_surplus_inr: float
+    break_even_estimate: str
+    estimated_payback_months: Optional[float] = None
+    scenario_mode: str
+    scenarios: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    assumptions_applied: List[str] = Field(default_factory=list)
+    key_risks: List[str] = Field(default_factory=list)
+    source_attribution: str = ""
+    disclaimer: str = ""
+
+
+class CompareOpportunitiesPostRequest(BaseModel):
+    opportunity_ids: List[str]
+    allocated_acres: float = Field(default=0.5, ge=0.0)
+    available_budget_inr: float = Field(default=50000.0, ge=0.0)
+
+
+class SaveFarmPlanRequest(BaseModel):
+    opportunity_id: str
+    allocated_scale: float = Field(default=1.0, gt=0.0)
+    scale_unit: str = "acre"
+    custom_budget_inr: float = Field(default=0.0, ge=0.0)
+    projected_operating_surplus_inr: float = Field(default=0.0)
+    scenario_mode: str = Field(default="BASE")
+    notes: Optional[str] = None
+

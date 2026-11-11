@@ -541,13 +541,30 @@ EXTENDED_OPPORTUNITY_CATALOG: List[OpportunityCatalogItem] = [
     )
 ]
 
+def _load_all_merged_catalog() -> List[OpportunityCatalogItem]:
+    catalog_map = {o.opportunity_id: o for o in EXTENDED_OPPORTUNITY_CATALOG}
+    try:
+        from cropnet.services.api.app.services.income.data_loader import (
+            get_all_raw_opportunities,
+            convert_raw_to_catalog_item,
+        )
+        for raw in get_all_raw_opportunities():
+            item = convert_raw_to_catalog_item(raw)
+            if item.opportunity_id not in catalog_map:
+                catalog_map[item.opportunity_id] = item
+    except Exception:
+        pass
+    return list(catalog_map.values())
+
+ALL_OPPORTUNITIES_LIST: List[OpportunityCatalogItem] = _load_all_merged_catalog()
+
 def get_income_catalog() -> List[OpportunityCatalogItem]:
-    return list(EXTENDED_OPPORTUNITY_CATALOG)
+    return list(ALL_OPPORTUNITIES_LIST)
 
 def get_catalog_by_category(category: str) -> List[OpportunityCatalogItem]:
     if category == "all":
-        return list(EXTENDED_OPPORTUNITY_CATALOG)
-    return [o for o in EXTENDED_OPPORTUNITY_CATALOG if o.category == category]
+        return list(ALL_OPPORTUNITIES_LIST)
+    return [o for o in ALL_OPPORTUNITIES_LIST if o.category.lower() == category.lower()]
 
 def get_opportunity_by_id(opportunity_id: str) -> Optional[OpportunityCatalogItem]:
-    return next((o for o in EXTENDED_OPPORTUNITY_CATALOG if o.opportunity_id == opportunity_id), None)
+    return next((o for o in ALL_OPPORTUNITIES_LIST if o.opportunity_id == opportunity_id), None)

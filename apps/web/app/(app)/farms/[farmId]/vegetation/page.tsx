@@ -455,8 +455,22 @@ export default function VegetationPage() {
                   <p className="font-bold text-red-200">Raster Extraction Notice</p>
                   <p className="mt-1">{rasterError}</p>
                   <p className="mt-3 text-[11px] text-white/60">
-                    Tap &quot;Sync Sentinel-2&quot; on the vegetation page first to download and clip the latest overpass for this boundary.
+                    Satellite raster is generated upon Sentinel-2 overpass synchronization.
                   </p>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!activeRaster) return;
+                      const currentType = activeRaster;
+                      await handleSyncSentinel();
+                      await handleOpenRaster(currentType);
+                    }}
+                    disabled={syncing}
+                    className="mt-4 bg-forest text-xs gap-1.5 text-white"
+                  >
+                    <RefreshCw size={13} className={syncing ? "animate-spin" : ""} />
+                    {syncing ? "Synchronizing Sentinel-2..." : "Sync Sentinel-2 & Load Raster"}
+                  </Button>
                 </div>
               ) : rasterUrl ? (
                 <div className="space-y-3">
