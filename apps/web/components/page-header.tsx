@@ -1,6 +1,5 @@
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { BackButton } from "@/components/back-button";
 
 export function PageHeader({
   title,
@@ -8,24 +7,26 @@ export function PageHeader({
   eyebrow,
   backHref,
   actions,
+  confirmDirty,
+  isDirty,
 }: {
   title: string;
   description?: string;
   eyebrow?: string;
   backHref?: string;
   actions?: React.ReactNode;
+  confirmDirty?: boolean;
+  isDirty?: boolean;
 }) {
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {backHref && (
-          <Link
-            href={backHref}
-            className="mt-0.5 grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-forest shadow-sm"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={19} />
-          </Link>
+          <BackButton
+            fallbackHref={backHref}
+            confirmDirty={confirmDirty}
+            isDirty={isDirty}
+          />
         )}
         <div>
           {eyebrow && <Badge className="mb-3">{eyebrow}</Badge>}

@@ -60,6 +60,7 @@ export function IntelligenceWorkspace({
   steps,
   actionLabel,
   actionHref,
+  backHref = "/",
   children,
 }: {
   eyebrow: string;
@@ -70,6 +71,7 @@ export function IntelligenceWorkspace({
   steps: string[];
   actionLabel?: string;
   actionHref?: string;
+  backHref?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -78,6 +80,7 @@ export function IntelligenceWorkspace({
         eyebrow={eyebrow}
         title={title}
         description={description}
+        backHref={backHref}
         actions={
           actionLabel && actionHref ? (
             <Button asChild>
