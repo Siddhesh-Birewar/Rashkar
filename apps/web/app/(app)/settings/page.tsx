@@ -8,6 +8,7 @@ export default function SettingsPage() {
       title="App settings"
       description="Keep CropNet readable, comfortable and easy to use outdoors."
       icon={Settings}
+      backHref="/profile"
       steps={[
         "Choose a preference",
         "Preview the change",

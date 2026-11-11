@@ -29,6 +29,7 @@ export default function FarmsPage() {
       <PageHeader
         title="Your farms"
         description="Manage mapped parcel boundaries and keep each field’s verified intelligence in one place."
+        backHref="/"
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => refreshFarms()} disabled={loading}>

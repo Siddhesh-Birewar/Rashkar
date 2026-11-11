@@ -176,12 +176,20 @@ export default function EditFarmPage() {
     );
   }
 
+  const isDirty = farm
+    ? name !== farm.name ||
+      village !== (farm.village || "") ||
+      taluka !== (farm.taluka || "Baramati")
+    : false;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={`Edit ${farm.name}`}
         description="Update parcel identification, boundary coordinates, irrigation, and water source."
         backHref={`/farms/${farm.id}`}
+        confirmDirty={true}
+        isDirty={isDirty}
       />
 
       {error && (
