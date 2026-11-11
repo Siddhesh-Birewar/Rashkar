@@ -148,7 +148,7 @@ export function RashkarShell({
           eyebrow={eyebrow}
           title={title}
           description={description}
-          backHref={activeTab === "overview" ? undefined : "/rashkar"}
+          backHref={activeTab === "overview" ? "/" : "/rashkar"}
           actions={actions}
         />
 

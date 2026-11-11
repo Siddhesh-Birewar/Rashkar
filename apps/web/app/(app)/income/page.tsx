@@ -354,14 +354,14 @@ export default function IncomePage() {
       {activeTab === "calculator" && (
         <div className="space-y-6">
           {/* Opportunity Selector Dropdown */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-line bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-line bg-white p-4">
             <div>
-              <span className="block text-[11px] font-bold text-muted uppercase">
-                Enterprise to Simulate
+              <span className="block text-[11px] font-bold text-muted uppercase tracking-wider">
+                Select Enterprise to Simulate
               </span>
-              <span className="text-sm font-extrabold text-ink">
-                {calculatorOpp?.name ?? "Select an Enterprise"}
-              </span>
+              <p className="text-xs text-muted">
+                Choose an enterprise below to test custom scale, operating expenses, and market prices.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ export default function IncomePage() {
                   const found = opportunities.find((o) => o.opportunity_id === e.target.value);
                   if (found) setCalculatorOpp(found);
                 }}
-                className="rounded-xl border border-line bg-canvas p-2 text-xs font-bold text-ink focus:border-forest focus:outline-none"
+                className="w-full sm:w-auto rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-bold text-ink focus:border-forest focus:outline-none"
               >
                 {opportunities.map((o) => (
                   <option key={o.opportunity_id} value={o.opportunity_id}>

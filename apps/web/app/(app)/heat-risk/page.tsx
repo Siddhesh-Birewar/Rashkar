@@ -172,6 +172,7 @@ export default function HeatRiskPage() {
         eyebrow="Climate resilience"
         title="Heat Risk Intelligence"
         description="Forecast-linked crop thermal stress evaluations (ICAR-CRIDA phenology) and wet-bulb globe temperature (ISO 7243 / ACGIH) worker safety."
+        backHref="/"
       />
 
       {/* Scientific Integrity Banner */}

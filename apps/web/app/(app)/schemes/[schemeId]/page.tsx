@@ -20,6 +20,7 @@ import {
 import { schemesApi } from "@/lib/api/client";
 import type { GovernmentScheme } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/components/back-button";
 
 export default function SchemeDetailPage() {
   const params = useParams();
@@ -66,12 +67,12 @@ export default function SchemeDetailPage() {
         <AlertTriangle size={32} className="mx-auto text-red-600" />
         <h2 className="mt-2 text-base font-bold text-red-800">Scheme not found</h2>
         <p className="mt-1 text-xs text-red-700">{error || "Could not find details for this scheme."}</p>
-        <Link
-          href="/schemes"
-          className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#1b5e20] px-4 py-2 text-xs font-bold text-white hover:bg-[#2e7d32]"
-        >
-          <ArrowLeft size={14} /> Back to all schemes
-        </Link>
+        <BackButton
+          fallbackHref="/schemes"
+          variant="pill"
+          label="Back to all schemes"
+          className="mt-4 bg-[#1b5e20] text-white hover:bg-[#2e7d32]"
+        />
       </div>
     );
   }
@@ -80,12 +81,11 @@ export default function SchemeDetailPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Back button */}
       <div>
-        <Link
-          href="/schemes"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4b5563] hover:text-[#1b5e20]"
-        >
-          <ArrowLeft size={15} /> Back to Government Schemes
-        </Link>
+        <BackButton
+          fallbackHref="/schemes"
+          variant="pill"
+          label="Back to Government Schemes"
+        />
       </div>
 
       {/* Main Card Header */}

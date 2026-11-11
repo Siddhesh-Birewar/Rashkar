@@ -20,6 +20,7 @@ import {
 import { schemesApi } from "@/lib/api/client";
 import type { GovernmentScheme, SchemeFilters } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/components/back-button";
 
 export default function SchemesPage() {
   const [schemes, setSchemes] = useState<GovernmentScheme[]>([]);
@@ -80,17 +81,20 @@ export default function SchemesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f5e9] px-3 py-1 text-xs font-bold text-[#1b5e20]">
-          <Landmark size={14} />
-          Government Support
+      <div className="flex items-start gap-3">
+        <BackButton fallbackHref="/" className="mt-1" />
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f5e9] px-3 py-1 text-xs font-bold text-[#1b5e20]">
+            <Landmark size={14} />
+            Government Support
+          </div>
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-[#111827] sm:text-3xl">
+            Government Schemes
+          </h1>
+          <p className="mt-1 text-sm text-[#4b5563]">
+            Find verified central and state welfare schemes, eligibility criteria, required documents, and official application portals.
+          </p>
         </div>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-[#111827] sm:text-3xl">
-          Government Schemes
-        </h1>
-        <p className="mt-1 text-sm text-[#4b5563]">
-          Find verified central and state welfare schemes, eligibility criteria, required documents, and official application portals.
-        </p>
       </div>
 
       {/* Verified Banner */}

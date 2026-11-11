@@ -8,6 +8,7 @@ export default function SchemeAdminPage() {
       title="Scheme administration"
       description="Create and review source-backed scheme records. Access control will be enforced by the connected backend."
       icon={Landmark}
+      backHref="/schemes"
       steps={[
         "Verify administrator access",
         "Add official source information",

@@ -3,6 +3,7 @@
 import { CircleDollarSign, SlidersHorizontal, MapPin, Droplets, Sprout } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/back-button";
 import type { FarmResourceProfile } from "../types";
 
 interface IncomeHeaderProps {
@@ -25,22 +26,25 @@ export function IncomeHeader({
   return (
     <div className="rounded-2xl border border-line bg-gradient-to-br from-white via-[#f8faf8] to-[#edf5ed] p-5 shadow-sm sm:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex size-9 items-center justify-center rounded-xl bg-forest text-white shadow-sm">
-              <CircleDollarSign size={20} />
-            </span>
-            <Badge variant="green" className="font-extrabold uppercase tracking-wider text-[10px]">
-              Diversification Advisory
-            </Badge>
+        <div className="flex items-start gap-3">
+          <BackButton fallbackHref="/" className="mt-1" />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-9 items-center justify-center rounded-xl bg-forest text-white shadow-sm">
+                <CircleDollarSign size={20} />
+              </span>
+              <Badge variant="green" className="font-extrabold uppercase tracking-wider text-[10px]">
+                Diversification Advisory
+              </Badge>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+              Farm Income Diversification
+            </h1>
+            <p className="max-w-2xl text-xs text-muted sm:text-sm">
+              Discover new ways to earn from the land, water, crop residue, and farm assets you already
+              have — with realistic, evidence-backed financial models and zero fabricated returns.
+            </p>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
-            Farm Income Diversification
-          </h1>
-          <p className="max-w-2xl text-xs text-muted sm:text-sm">
-            Discover new ways to earn from the land, water, crop residue, and farm assets you already
-            have — with realistic, evidence-backed financial models and zero fabricated returns.
-          </p>
         </div>
 
         <Button
