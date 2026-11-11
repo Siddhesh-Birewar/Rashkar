@@ -113,7 +113,7 @@ export default function WeatherPage() {
         eyebrow="Weather & climate"
         title={`Weather & Forecast · ${currentFarm?.name || "Farm"}`}
         description="Observed current conditions, 5-day forecast, and NASA POWER climate normals."
-        backHref={`/farms/${actualFarmId}`}
+        backHref={actualFarmId ? `/farms/${actualFarmId}` : "/farms"}
         actions={
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || loading}>
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh Observation

@@ -143,7 +143,7 @@ export default function VegetationPage() {
         eyebrow="Satellite & vegetation"
         title="Field observations from space"
         description="Sentinel-2 multispectral surface reflectance (10m resolution) for canopy vigor and moisture dynamics."
-        backHref={`/farms/${actualFarmId}`}
+        backHref={actualFarmId ? `/farms/${actualFarmId}` : "/farms"}
         actions={
           <Button onClick={handleSyncSentinel} disabled={syncing} className="gap-2 bg-forest">
             {syncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}

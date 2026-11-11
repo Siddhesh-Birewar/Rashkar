@@ -109,7 +109,7 @@ export default function FarmHealthPage() {
         eyebrow="Evidence-gated multi-domain health"
         title={`Farm Health Snapshot · ${currentFarm?.name || "Farm"}`}
         description="Unified evidence gating across Soil, Water, Weather, Satellite, and Crop suitability."
-        backHref={`/farms/${actualFarmId}`}
+        backHref={actualFarmId ? `/farms/${actualFarmId}` : "/farms"}
         actions={
           <Button
             variant="outline"

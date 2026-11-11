@@ -119,7 +119,7 @@ export default function WaterPage() {
         eyebrow="Hydrology & irrigation"
         title={`Water Intelligence · ${currentFarm?.name || "Farm"}`}
         description="Registered irrigation sources and BIS/CSSRI water quality compliance evaluations."
-        backHref={`/farms/${actualFarmId}`}
+        backHref={actualFarmId ? `/farms/${actualFarmId}` : "/farms"}
         actions={
           <Button onClick={() => setShowAddForm((v) => !v)} className="bg-forest">
             <Plus size={16} /> {showAddForm ? "Close Form" : "Add Water Source"}
