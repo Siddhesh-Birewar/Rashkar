@@ -24,6 +24,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/section-header";
+import { cn } from "@/lib/utils";
 import { useFarm } from "@/lib/farm-context";
 import { weatherApi, farmHealthApi } from "@/lib/api/client";
 import type { CurrentWeather, FarmHealthSnapshot } from "@/lib/api/types";
@@ -51,6 +52,57 @@ const quickActions = [
     tone: "brown",
   },
 ] as const;
+
+function getDomainBadge(state?: string) {
+  switch (state) {
+    case "AVAILABLE":
+      return (
+        <Badge
+          variant="green"
+          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+        >
+          Available
+        </Badge>
+      );
+    case "PARTIALLY_AVAILABLE":
+      return (
+        <Badge
+          variant="orange"
+          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+        >
+          Partial
+        </Badge>
+      );
+    case "STALE":
+      return (
+        <Badge
+          variant="orange"
+          className="mt-1 h-5 min-h-0 bg-yellow-50 text-soil px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+        >
+          Stale
+        </Badge>
+      );
+    case "INSUFFICIENT_EVIDENCE":
+      return (
+        <Badge
+          variant="neutral"
+          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+        >
+          Low Data
+        </Badge>
+      );
+    case "NOT_AVAILABLE":
+    default:
+      return (
+        <Badge
+          variant="neutral"
+          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+        >
+          Missing
+        </Badge>
+      );
+  }
+}
 
 export default function HomePage() {
   const { selectedFarm, selectedFarmId, farms, loading: farmsLoading } = useFarm();
@@ -395,27 +447,29 @@ export default function HomePage() {
                       {health.overall_evidence_overview.domains_available > 0 ? "Evidence Active" : "Pending Data"}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                    <div className="p-2 rounded-lg bg-canvas border border-line">
-                      <span className="block text-muted text-[10px]">Soil</span>
-                      <span className="font-bold text-ink">{health.soil.availability_state}</span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-canvas border border-line">
-                      <span className="block text-muted text-[10px]">Weather</span>
-                      <span className="font-bold text-ink">{health.weather.availability_state}</span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-canvas border border-line">
-                      <span className="block text-muted text-[10px]">Water</span>
-                      <span className="font-bold text-ink">{health.water.availability_state}</span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-canvas border border-line">
-                      <span className="block text-muted text-[10px]">Satellite</span>
-                      <span className="font-bold text-ink">{health.satellite.availability_state}</span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-canvas border border-line">
-                      <span className="block text-muted text-[10px]">Crops</span>
-                      <span className="font-bold text-ink">{health.crop_context.availability_state}</span>
-                    </div>
+                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-center text-xs">
+                    {[
+                      { label: "Soil", state: health.soil.availability_state, icon: Leaf, iconClass: "text-leaf" },
+                      { label: "Weather", state: health.weather.availability_state, icon: CloudSun, iconClass: "text-accent" },
+                      { label: "Water", state: health.water.availability_state, icon: Droplets, iconClass: "text-calm" },
+                      { label: "Satellite", state: health.satellite.availability_state, icon: Satellite, iconClass: "text-forest" },
+                      { label: "Crops", state: health.crop_context.availability_state, icon: Wheat, iconClass: "text-soil" },
+                    ].map((d) => {
+                      const Icon = d.icon;
+                      return (
+                        <div
+                          key={d.label}
+                          title={`${d.label}: ${d.state || "NOT_AVAILABLE"}`}
+                          className="flex min-w-0 flex-col items-center justify-between rounded-xl border border-line/70 bg-canvas p-2 sm:p-2.5 transition-colors"
+                        >
+                          <Icon size={14} className={cn("shrink-0", d.iconClass)} />
+                          <span className="mt-1 block truncate text-[10px] font-bold text-muted sm:text-[11px]">
+                            {d.label}
+                          </span>
+                          {getDomainBadge(d.state)}
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-muted italic">
                     {health.governance_notice}
