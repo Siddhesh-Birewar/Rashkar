@@ -743,17 +743,38 @@ def _fuse_confirmed_laboratory_measurements(
             logger.warning("Skipping scientifically invalid laboratory soil_ph: %s (must be 3.0-11.0)", val)
 
     # 2. Precedence: organic_carbon (Strict agronomic bounds: 0.0 to 15.0%)
+    oc_for_n: Optional[float] = None
     if "organic_carbon" in latest_by_param:
         m = latest_by_param["organic_carbon"]
         val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
             m.normalized_value if m.normalized_value is not None else m.original_value
         )
         if val is not None and 0.0 <= val <= 15.0:
+            oc_for_n = val
             if profile.organic_carbon and profile.organic_carbon.verification_status != VerificationStatus.LABORATORY_VERIFIED:
                 profile.additional_parameters["isric_soc"] = profile.organic_carbon
             profile.organic_carbon = _make_lab_obs("soc", m, "Soil Organic Carbon (Laboratory Measured)", "Farmer-confirmed laboratory measurement.")
         else:
             logger.warning("Skipping scientifically invalid laboratory organic_carbon: %s", val)
+    elif "organic_matter" in latest_by_param:
+        m = latest_by_param["organic_matter"]
+        val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        if val is not None and 0.0 <= val <= 25.0:
+            # Standard Van Bemmelen agronomic conversion: SOC % = SOM % / 1.724
+            oc_val = round(val / 1.724, 2)
+            oc_for_n = oc_val
+            if profile.organic_carbon and profile.organic_carbon.verification_status != VerificationStatus.LABORATORY_VERIFIED:
+                profile.additional_parameters["isric_soc"] = profile.organic_carbon
+            profile.organic_carbon = _make_lab_obs(
+                "soc", m, "Soil Organic Carbon (from Organic Matter)",
+                f"Calculated from farmer-confirmed Organic Matter ({val}%) using Van Bemmelen factor (OM / 1.724)."
+            )
+            profile.organic_carbon.value = oc_val
+            profile.organic_carbon.unit = "%"
+        else:
+            logger.warning("Skipping scientifically invalid laboratory organic_matter: %s", val)
 
     # 3. Precedence: electrical_conductivity (Strict agronomic bounds: 0.0 to 30.0 dS/m)
     if "electrical_conductivity" in latest_by_param:
@@ -774,6 +795,18 @@ def _fuse_confirmed_laboratory_measurements(
         profile.available_nitrogen = _make_lab_obs(
             "available_nitrogen", m, "Available Nitrogen (Laboratory Measured)", "Farmer-confirmed laboratory measurement (alkaline permanganate)."
         )
+    elif oc_for_n is not None and oc_for_n > 0:
+        # Agronomic standard (ICAR / Indian Soil Health Card):
+        # Available N is estimated from Organic Carbon when mineralized N is not directly tested.
+        derived_n = round(min(max(oc_for_n * 500.0, 50.0), 1200.0), 1)
+        source_m = latest_by_param.get("organic_carbon") or latest_by_param.get("organic_matter")
+        if source_m:
+            profile.available_nitrogen = _make_lab_obs(
+                "available_nitrogen", source_m, "Available Nitrogen (Estimated from Organic Carbon)",
+                f"Agronomically estimated from verified Soil Organic Carbon ({oc_for_n}%) using ICAR conversion standard (Available N = OC% * 500)."
+            )
+            profile.available_nitrogen.value = derived_n
+            profile.available_nitrogen.unit = "kg/ha"
 
     # 5. Precedence: available_phosphorus
     if "available_phosphorus" in latest_by_param:
@@ -781,6 +814,25 @@ def _fuse_confirmed_laboratory_measurements(
         profile.available_phosphorus = _make_lab_obs(
             "available_phosphorus", m, "Available Phosphorus (Laboratory Measured)", "Farmer-confirmed laboratory measurement (Olsen P2O5)."
         )
+    elif "phosphorus" in latest_by_param:
+        m = latest_by_param["phosphorus"]
+        p_val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        p_unit = (m.normalized_unit or m.original_unit or "").lower()
+        if p_val is not None:
+            if "ppm" in p_unit or "mg/kg" in p_unit:
+                conv_val = round(p_val * 2.24, 1)
+                profile.available_phosphorus = _make_lab_obs(
+                    "available_phosphorus", m, "Available Phosphorus (Laboratory Measured)",
+                    f"Converted from verified laboratory measurement ({p_val} ppm * 2.24 = {conv_val} kg/ha)."
+                )
+                profile.available_phosphorus.value = conv_val
+                profile.available_phosphorus.unit = "kg/ha"
+            else:
+                profile.available_phosphorus = _make_lab_obs(
+                    "available_phosphorus", m, "Available Phosphorus (Laboratory Measured)", "Farmer-confirmed laboratory measurement."
+                )
 
     # 6. Precedence: available_potassium
     if "available_potassium" in latest_by_param:
@@ -788,6 +840,25 @@ def _fuse_confirmed_laboratory_measurements(
         profile.available_potassium = _make_lab_obs(
             "available_potassium", m, "Available Potassium (Laboratory Measured)", "Farmer-confirmed laboratory measurement (neutral ammonium acetate)."
         )
+    elif "potassium" in latest_by_param:
+        m = latest_by_param["potassium"]
+        k_val = m.farmer_corrected_value if m.farmer_corrected_value is not None else (
+            m.normalized_value if m.normalized_value is not None else m.original_value
+        )
+        k_unit = (m.normalized_unit or m.original_unit or "").lower()
+        if k_val is not None:
+            if "ppm" in k_unit or "mg/kg" in k_unit:
+                conv_val = round(k_val * 2.24, 1)
+                profile.available_potassium = _make_lab_obs(
+                    "available_potassium", m, "Available Potassium (Laboratory Measured)",
+                    f"Converted from verified laboratory measurement ({k_val} ppm * 2.24 = {conv_val} kg/ha)."
+                )
+                profile.available_potassium.value = conv_val
+                profile.available_potassium.unit = "kg/ha"
+            else:
+                profile.available_potassium = _make_lab_obs(
+                    "available_potassium", m, "Available Potassium (Laboratory Measured)", "Farmer-confirmed laboratory measurement."
+                )
 
     # 7. Dual-Source Preservation: keep all baseline SoilGrids modelled estimates
     if profile.sand_percent and "isric_sand_percent" not in profile.additional_parameters:
@@ -803,7 +874,7 @@ def _fuse_confirmed_laboratory_measurements(
 
     # 8. Preserve micronutrients, heavy metals, and secondary parameters in additional_parameters
     for key, m in latest_by_param.items():
-        if key not in ("soil_ph", "organic_carbon", "available_nitrogen", "available_phosphorus", "available_potassium"):
+        if key not in ("soil_ph", "organic_carbon", "organic_matter", "available_nitrogen", "available_phosphorus", "phosphorus", "available_potassium", "potassium"):
             param_meta = CANONICAL_SOIL_PARAMETERS.get(key, {})
             disp = param_meta.get("display_name", key.replace("_", " ").title())
             profile.additional_parameters[key] = _make_lab_obs(key, m, f"{disp} (Laboratory Measured)")
@@ -997,14 +1068,32 @@ async def evaluate_farm_advisory(
             ctx_dict["soil_ph"] = _val("soil_ph")
         if "organic_carbon" in latest_meas:
             ctx_dict["soil_organic_carbon_pct"] = _val("organic_carbon")
+        elif "organic_matter" in latest_meas and _val("organic_matter") is not None:
+            ctx_dict["soil_organic_carbon_pct"] = round(_val("organic_matter") / 1.724, 2)
+
         if "electrical_conductivity" in latest_meas:
             ctx_dict["electrical_conductivity_ds_m"] = _val("electrical_conductivity")
+
         if "available_nitrogen" in latest_meas:
             ctx_dict["available_nitrogen_kg_ha"] = _val("available_nitrogen")
+        elif ctx_dict.get("soil_organic_carbon_pct") is not None:
+            ctx_dict["available_nitrogen_kg_ha"] = round(min(max(ctx_dict["soil_organic_carbon_pct"] * 500.0, 50.0), 1200.0), 1)
+
         if "available_phosphorus" in latest_meas:
             ctx_dict["available_phosphorus_kg_ha"] = _val("available_phosphorus")
+        elif "phosphorus" in latest_meas:
+            p_val = _val("phosphorus")
+            if p_val is not None:
+                p_unit = (latest_meas["phosphorus"].normalized_unit or latest_meas["phosphorus"].original_unit or "").lower()
+                ctx_dict["available_phosphorus_kg_ha"] = round(p_val * 2.24, 1) if ("ppm" in p_unit or "mg/kg" in p_unit) else p_val
+
         if "available_potassium" in latest_meas:
             ctx_dict["available_potassium_kg_ha"] = _val("available_potassium")
+        elif "potassium" in latest_meas:
+            k_val = _val("potassium")
+            if k_val is not None:
+                k_unit = (latest_meas["potassium"].normalized_unit or latest_meas["potassium"].original_unit or "").lower()
+                ctx_dict["available_potassium_kg_ha"] = round(k_val * 2.24, 1) if ("ppm" in k_unit or "mg/kg" in k_unit) else k_val
         if "total_nitrogen" in latest_meas:
             ctx_dict["total_nitrogen_pct"] = _val("total_nitrogen")
 

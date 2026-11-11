@@ -199,6 +199,8 @@ class SoilCollector(BaseDomainCollector):
             soc_val = _val(latest_meas_by_param["organic_carbon"])
         elif "soc" in latest_meas_by_param:
             soc_val = _val(latest_meas_by_param["soc"])
+        elif "organic_matter" in latest_meas_by_param and _val(latest_meas_by_param["organic_matter"]) is not None:
+            soc_val = round(_val(latest_meas_by_param["organic_matter"]) / 1.724, 2)
         elif "organic_carbon" in spatial_params and spatial_params["organic_carbon"].value is not None:
             val = spatial_params["organic_carbon"].value
             # SoilGrids SOC unit conversion if in g/kg or >10%
@@ -222,16 +224,30 @@ class SoilCollector(BaseDomainCollector):
         # 4. NPK
         if "available_nitrogen" in latest_meas_by_param:
             n_val = _val(latest_meas_by_param["available_nitrogen"])
+        elif soc_val is not None and soc_val > 0:
+            n_val = round(min(max(soc_val * 500.0, 50.0), 1200.0), 1)
         elif "available_nitrogen" in spatial_params and spatial_params["available_nitrogen"].value is not None:
             n_val = spatial_params["available_nitrogen"].value
 
         if "available_phosphorus" in latest_meas_by_param:
             p_val = _val(latest_meas_by_param["available_phosphorus"])
+        elif "phosphorus" in latest_meas_by_param:
+            meas_p = latest_meas_by_param["phosphorus"]
+            raw_p = _val(meas_p)
+            if raw_p is not None:
+                p_unit = (getattr(meas_p, "normalized_unit", None) or getattr(meas_p, "original_unit", "") or "").lower()
+                p_val = round(raw_p * 2.24, 1) if ("ppm" in p_unit or "mg/kg" in p_unit) else raw_p
         elif "available_phosphorus" in spatial_params and spatial_params["available_phosphorus"].value is not None:
             p_val = spatial_params["available_phosphorus"].value
 
         if "available_potassium" in latest_meas_by_param:
             k_val = _val(latest_meas_by_param["available_potassium"])
+        elif "potassium" in latest_meas_by_param:
+            meas_k = latest_meas_by_param["potassium"]
+            raw_k = _val(meas_k)
+            if raw_k is not None:
+                k_unit = (getattr(meas_k, "normalized_unit", None) or getattr(meas_k, "original_unit", "") or "").lower()
+                k_val = round(raw_k * 2.24, 1) if ("ppm" in k_unit or "mg/kg" in k_unit) else raw_k
         elif "available_potassium" in spatial_params and spatial_params["available_potassium"].value is not None:
             k_val = spatial_params["available_potassium"].value
 

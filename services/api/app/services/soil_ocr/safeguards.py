@@ -35,7 +35,9 @@ AGRONOMIC_BOUNDARIES = {
     "available_nitrogen": (0.0, 1500.0),         # kg/ha
     "total_nitrogen": (0.0, 5.0),                # %
     "available_phosphorus": (0.0, 300.0),        # kg/ha (P2O5)
+    "phosphorus": (0.0, 500.0),                  # ppm or kg/ha
     "available_potassium": (0.0, 2500.0),        # kg/ha (K2O)
+    "potassium": (0.0, 3000.0),                  # ppm or kg/ha
     "sulphur": (0.0, 500.0),                     # ppm or mg/kg
     "zinc": (0.0, 100.0),                        # ppm or mg/kg
     "iron": (0.0, 250.0),                        # ppm or mg/kg

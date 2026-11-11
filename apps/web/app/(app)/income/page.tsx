@@ -69,15 +69,40 @@ export default function IncomePage() {
         incomeApi.getSavedPlans(farmId),
       ]);
 
-      if (catsRes.status === "fulfilled") setCategories(catsRes.value);
+      if (catsRes.status === "fulfilled" && catsRes.value && catsRes.value.length > 0) {
+        setCategories(catsRes.value);
+      } else {
+        setCategories([
+          { key: "CROP_DIVERSIFICATION", name: "Crop Diversification", tagline: "High-value vegetables, cash crops, and intercropping", count: 3 },
+          { key: "FLORICULTURE", name: "Floriculture", tagline: "Commercial flower cultivation", count: 2 },
+          { key: "POULTRY", name: "Poultry Farming", tagline: "Backyard and commercial poultry", count: 2 },
+          { key: "FISHERY", name: "Fisheries & Aquaculture", tagline: "Farm pond aquaculture", count: 1 },
+          { key: "LIVESTOCK", name: "Livestock & Dairy", tagline: "Goat rearing and dairy", count: 2 },
+          { key: "SMALL_SPACE", name: "Small-Space Enterprises", tagline: "Mushroom, vermicomposting, nurseries and beekeeping", count: 4 },
+          { key: "RESOURCE_MONETIZATION", name: "Farm Resource Monetization", tagline: "Custom hiring and machinery rental", count: 1 },
+          { key: "VALUE_ADDITION", name: "Value Addition & Processing", tagline: "Sorting, grading, and aggregation", count: 2 },
+        ]);
+      }
+
       if (profRes.status === "fulfilled") setProfile(profRes.value);
       if (plansRes.status === "fulfilled") setSavedPlans(plansRes.value);
 
-      // Match opportunities for current farm
-      const opps = await incomeApi.matchOpportunities(farmId);
-      setOpportunities(opps);
-      if (opps.length > 0 && !calculatorOpp) {
-        setCalculatorOpp(opps[0]);
+      // Match opportunities for current farm with safe catalog fallback
+      try {
+        const opps = await incomeApi.matchOpportunities(farmId);
+        if (opps && opps.length > 0) {
+          setOpportunities(opps);
+          if (!calculatorOpp) setCalculatorOpp(opps[0]);
+        } else {
+          const catalog = await incomeApi.getCatalog();
+          setOpportunities(catalog);
+          if (!calculatorOpp && catalog.length > 0) setCalculatorOpp(catalog[0]);
+        }
+      } catch (oppErr) {
+        console.warn("Farm matching unavailable, loading enterprise catalog fallback", oppErr);
+        const catalog = await incomeApi.getCatalog();
+        setOpportunities(catalog);
+        if (!calculatorOpp && catalog.length > 0) setCalculatorOpp(catalog[0]);
       }
     } catch (e) {
       console.error("Failed to load income opportunities", e);
