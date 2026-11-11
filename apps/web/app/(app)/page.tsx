@@ -59,7 +59,7 @@ function getDomainBadge(state?: string) {
       return (
         <Badge
           variant="green"
-          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+          className="mt-1 h-5 min-h-0 w-full max-w-[68px] justify-center truncate px-1 text-[9px] font-extrabold leading-none sm:px-1.5 sm:text-[10px]"
         >
           Available
         </Badge>
@@ -68,7 +68,7 @@ function getDomainBadge(state?: string) {
       return (
         <Badge
           variant="orange"
-          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+          className="mt-1 h-5 min-h-0 w-full max-w-[68px] justify-center truncate px-1 text-[9px] font-extrabold leading-none sm:px-1.5 sm:text-[10px]"
         >
           Partial
         </Badge>
@@ -77,7 +77,7 @@ function getDomainBadge(state?: string) {
       return (
         <Badge
           variant="orange"
-          className="mt-1 h-5 min-h-0 bg-yellow-50 text-soil px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+          className="mt-1 h-5 min-h-0 w-full max-w-[68px] justify-center truncate bg-yellow-50 px-1 text-[9px] font-extrabold leading-none text-soil sm:px-1.5 sm:text-[10px]"
         >
           Stale
         </Badge>
@@ -86,7 +86,7 @@ function getDomainBadge(state?: string) {
       return (
         <Badge
           variant="neutral"
-          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+          className="mt-1 h-5 min-h-0 w-full max-w-[68px] justify-center truncate px-1 text-[8px] font-extrabold leading-none sm:px-1 sm:text-[9px]"
         >
           Low Data
         </Badge>
@@ -96,7 +96,7 @@ function getDomainBadge(state?: string) {
       return (
         <Badge
           variant="neutral"
-          className="mt-1 h-5 min-h-0 px-1.5 text-[10px] font-extrabold leading-none sm:px-2 sm:text-[11px]"
+          className="mt-1 h-5 min-h-0 w-full max-w-[68px] justify-center truncate px-1 text-[9px] font-extrabold leading-none sm:px-1.5 sm:text-[10px]"
         >
           Missing
         </Badge>

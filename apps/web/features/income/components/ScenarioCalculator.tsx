@@ -19,12 +19,16 @@ import type { DetailedOpportunity, FinancialSimulation } from "../types";
 
 interface ScenarioCalculatorProps {
   opportunity: DetailedOpportunity;
+  allOpportunities?: DetailedOpportunity[];
+  onSelectOpportunity?: (opp: DetailedOpportunity) => void;
   farmId: string;
   onPlanSaved?: () => void;
 }
 
 export function ScenarioCalculator({
   opportunity,
+  allOpportunities,
+  onSelectOpportunity,
   farmId,
   onPlanSaved,
 }: ScenarioCalculatorProps) {
@@ -104,26 +108,54 @@ export function ScenarioCalculator({
   return (
     <div className="rounded-3xl border border-line bg-white p-5 shadow-sm sm:p-7">
       {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-4">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-line pb-5">
+        <div className="space-y-2 flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="green" className="font-extrabold text-[10px] uppercase">
               Financial Simulator
             </Badge>
+            <Badge variant="outline" className="text-[10px] font-bold">
+              {opp.category_name || opp.category?.replace(/_/g, " ")}
+            </Badge>
             <span className="text-xs text-muted font-bold">
-              {opp.confidence_classification.replace(/_/g, " ")}
+              {opp.confidence_classification?.replace(/_/g, " ")}
             </span>
           </div>
-          <h2 className="text-xl font-extrabold text-ink mt-1">
-            {opp.name}
-          </h2>
-          <p className="text-xs text-muted">{opp.farmer_friendly_description}</p>
+
+          {allOpportunities && allOpportunities.length > 1 ? (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+              <label htmlFor="enterprise-selector" className="text-xs font-bold text-muted shrink-0">
+                Enterprise:
+              </label>
+              <select
+                id="enterprise-selector"
+                value={opp.opportunity_id}
+                onChange={(e) => {
+                  const selected = allOpportunities.find((o) => o.opportunity_id === e.target.value);
+                  if (selected && onSelectOpportunity) onSelectOpportunity(selected);
+                }}
+                className="w-full sm:w-auto rounded-xl border border-line bg-canvas px-3.5 py-2 text-sm sm:text-base font-extrabold text-forest focus:border-forest focus:outline-none"
+              >
+                {allOpportunities.map((o) => (
+                  <option key={o.opportunity_id} value={o.opportunity_id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <h2 className="text-xl font-extrabold text-ink mt-1">
+              {opp.name}
+            </h2>
+          )}
+
+          <p className="text-xs text-muted leading-relaxed max-w-2xl">{opp.farmer_friendly_description}</p>
         </div>
 
         <button
           type="button"
           onClick={handleReset}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-ink self-start sm:self-auto shrink-0 mt-1"
         >
           <RotateCcw size={13} />
           Reset Defaults

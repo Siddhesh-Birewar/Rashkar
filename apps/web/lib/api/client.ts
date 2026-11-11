@@ -258,11 +258,20 @@ export const cropsApi = {
 
 export const cropDoctorApi = {
   getStatus: () => apiFetch<CropDoctorStatus>("/api/v1/crop-doctor/status"),
+  getDiseases: () =>
+    apiFetch<{ total_diseases: number; diseases: import("./types").CropDoctorDiseaseItem[] }>(
+      "/api/v1/crop-doctor/diseases"
+    ),
   predict: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     return apiUpload<CropDoctorPrediction>("/api/v1/crop-doctor/predict", formData);
   },
+  diagnoseSymptoms: (payload: { crop: string; symptoms?: string; disease_key?: string }) =>
+    apiFetch<CropDoctorPrediction>("/api/v1/crop-doctor/diagnose-symptoms", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const heatRiskApi = {

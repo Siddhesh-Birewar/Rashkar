@@ -195,6 +195,9 @@ export interface SoilProfile {
   mapped_soil_zones?: any[];
   additional_parameters?: Record<string, SoilParameterObservation>;
   parameters?: Record<string, SoilParameter>;
+  available_parameters_count?: number;
+  total_requested_parameters?: number;
+  data_completeness_ratio?: number;
   last_analyzed?: string;
   created_at?: string;
 }
@@ -351,6 +354,33 @@ export interface SatelliteObservation {
 
 // ── Crop Doctor ──────────────────────────────────────────────────────────────
 
+export interface ChemicalTreatment {
+  product: string;
+  dosage_per_liter: string;
+  dosage_per_acre: string;
+  application_type?: string;
+  spray_interval?: string;
+  pre_harvest_interval_days?: number;
+  notes?: string;
+}
+
+export interface BiologicalControl {
+  agent: string;
+  dosage: string;
+  application_method: string;
+  benefits?: string;
+}
+
+export interface CropDoctorDiseaseItem {
+  key: string;
+  crop: string;
+  common_name: string;
+  pathogen_type: string;
+  causal_agent: string;
+  severity_level: string;
+  severity_score: number;
+}
+
 export interface CropDoctorStatus {
   loaded: boolean;
   model_id: string;
@@ -362,7 +392,19 @@ export interface CropDoctorPrediction {
   diagnosis: string;
   confidence_percent: number;
   is_healthy: boolean;
-  actionable_advice: string;
+  raw_label?: string;
+  pathogen_type?: string;
+  causal_agent?: string;
+  severity_level?: string;
+  severity_score?: number;
+  yield_loss_risk?: string;
+  damage_symptoms?: string;
+  favorable_conditions?: string;
+  chemical_control?: ChemicalTreatment[];
+  organic_control?: BiologicalControl[];
+  cultural_ipm?: string[];
+  actionable_advice?: string | string[];
+  differential_diagnosis?: string;
   disclaimer: string;
 }
 

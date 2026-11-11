@@ -63,10 +63,12 @@ export default function IncomePage() {
   const loadData = async () => {
     try {
       setLoading(true);
+      const isRealFarm = currentFarm?.id && currentFarm.id !== "default_farm";
+
       const [catsRes, profRes, plansRes] = await Promise.allSettled([
         incomeApi.getCategories(),
-        incomeApi.getFarmProfile(farmId),
-        incomeApi.getSavedPlans(farmId),
+        isRealFarm ? incomeApi.getFarmProfile(farmId) : Promise.reject("no_farm"),
+        isRealFarm ? incomeApi.getSavedPlans(farmId) : Promise.resolve([]),
       ]);
 
       if (catsRes.status === "fulfilled" && catsRes.value && catsRes.value.length > 0) {
@@ -89,10 +91,16 @@ export default function IncomePage() {
 
       // Match opportunities for current farm with safe catalog fallback
       try {
-        const opps = await incomeApi.matchOpportunities(farmId);
-        if (opps && opps.length > 0) {
-          setOpportunities(opps);
-          if (!calculatorOpp) setCalculatorOpp(opps[0]);
+        if (isRealFarm) {
+          const opps = await incomeApi.matchOpportunities(farmId);
+          if (opps && opps.length > 0) {
+            setOpportunities(opps);
+            if (!calculatorOpp) setCalculatorOpp(opps[0]);
+          } else {
+            const catalog = await incomeApi.getCatalog();
+            setOpportunities(catalog);
+            if (!calculatorOpp && catalog.length > 0) setCalculatorOpp(catalog[0]);
+          }
         } else {
           const catalog = await incomeApi.getCatalog();
           setOpportunities(catalog);
@@ -106,16 +114,21 @@ export default function IncomePage() {
       }
     } catch (e) {
       console.error("Failed to load income opportunities", e);
+      try {
+        const catalog = await incomeApi.getCatalog();
+        setOpportunities(catalog);
+        if (!calculatorOpp && catalog.length > 0) setCalculatorOpp(catalog[0]);
+      } catch {
+        // preserve existing
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (farmId) {
-      loadData();
-    }
-  }, [farmId]);
+    loadData();
+  }, [currentFarm?.id]);
 
   // Handle Profile Update
   const handleSaveProfile = async (updated: Partial<FarmResourceProfile>) => {
@@ -204,7 +217,7 @@ export default function IncomePage() {
             }`}
           >
             <Lightbulb size={16} />
-            Explore Catalogue ({opportunities.length})
+            Explore Catalogue {loading && opportunities.length === 0 ? "" : `(${opportunities.length})`}
           </button>
 
           <button
@@ -266,7 +279,7 @@ export default function IncomePage() {
                     : "border border-line bg-white text-ink hover:bg-canvas"
                 }`}
               >
-                All Categories ({opportunities.length})
+                All Categories {loading && opportunities.length === 0 ? "" : `(${opportunities.length})`}
               </button>
               {categories.map((c) => (
                 <button
@@ -378,43 +391,24 @@ export default function IncomePage() {
 
       {activeTab === "calculator" && (
         <div className="space-y-6">
-          {/* Opportunity Selector Dropdown */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-line bg-white p-4">
-            <div>
-              <span className="block text-[11px] font-bold text-muted uppercase tracking-wider">
-                Select Enterprise to Simulate
-              </span>
-              <p className="text-xs text-muted">
-                Choose an enterprise below to test custom scale, operating expenses, and market prices.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={calculatorOpp?.opportunity_id ?? ""}
-                onChange={(e) => {
-                  const found = opportunities.find((o) => o.opportunity_id === e.target.value);
-                  if (found) setCalculatorOpp(found);
-                }}
-                className="w-full sm:w-auto rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-bold text-ink focus:border-forest focus:outline-none"
-              >
-                {opportunities.map((o) => (
-                  <option key={o.opportunity_id} value={o.opportunity_id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {calculatorOpp && (
+          {calculatorOpp ? (
             <ScenarioCalculator
               opportunity={calculatorOpp}
+              allOpportunities={opportunities}
+              onSelectOpportunity={(opp) => setCalculatorOpp(opp)}
               farmId={farmId}
               onPlanSaved={() => {
                 incomeApi.getSavedPlans(farmId).then((res) => setSavedPlans(res));
               }}
             />
+          ) : (
+            <div className="rounded-2xl border border-line bg-white p-12 text-center text-xs text-muted">
+              <p className="font-extrabold text-ink text-sm">No Enterprise Selected</p>
+              <p className="mt-1">Choose an opportunity from the catalogue below to start simulation.</p>
+              <Button onClick={() => setActiveTab("catalog")} className="mt-4 bg-forest">
+                Explore Catalogue
+              </Button>
+            </div>
           )}
         </div>
       )}

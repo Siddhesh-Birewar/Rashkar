@@ -29,13 +29,13 @@ import type { FarmHealthSnapshot } from "@/lib/api/types";
 function getStatusBadge(status?: string) {
   switch (status) {
     case "AVAILABLE":
-      return <Badge className="bg-[#edf5ed] text-forest border-0 font-bold">Available</Badge>;
+      return <Badge className="bg-[#edf5ed] text-forest border-0 font-bold truncate max-w-full justify-center text-[10px]">Available</Badge>;
     case "PARTIALLY_AVAILABLE":
-      return <Badge className="bg-orange-50 text-accent border-0 font-bold">Partial</Badge>;
+      return <Badge className="bg-orange-50 text-accent border-0 font-bold truncate max-w-full justify-center text-[10px]">Partial</Badge>;
     case "STALE":
-      return <Badge className="bg-yellow-50 text-soil border-0 font-bold">Stale</Badge>;
+      return <Badge className="bg-yellow-50 text-soil border-0 font-bold truncate max-w-full justify-center text-[10px]">Stale</Badge>;
     default:
-      return <Badge variant="outline" className="text-muted border-line font-bold">Missing</Badge>;
+      return <Badge variant="outline" className="text-muted border-line font-bold truncate max-w-full justify-center text-[10px]">Missing</Badge>;
   }
 }
 

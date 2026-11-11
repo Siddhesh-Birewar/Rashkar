@@ -28,6 +28,8 @@ import {
   getSoilParamValue,
   getSoilParamUnit,
   getSoilParamSource,
+  getSoilParamStatus,
+  getSoilParamNote,
   interpretSoilPh,
   interpretSoc,
   interpretEc,
@@ -149,6 +151,16 @@ export default function SoilPage() {
   const availK = profile
     ? getSoilParamValue(profile.available_potassium ?? profile.potassium_available_kg_ha)
     : null;
+
+  const isNVerified = availN !== null && getSoilParamStatus(profile?.available_nitrogen) === "laboratory_verified";
+  const isPVerified = availP !== null && getSoilParamStatus(profile?.available_phosphorus) === "laboratory_verified";
+  const isKVerified = availK !== null && getSoilParamStatus(profile?.available_potassium) === "laboratory_verified";
+  const hasLabVerifiedNPK = isNVerified || isPVerified || isKVerified;
+  const labSourceName =
+    getSoilParamSource(profile?.available_phosphorus, "") ||
+    getSoilParamSource(profile?.available_nitrogen, "") ||
+    getSoilParamSource(profile?.ph, "") ||
+    "Confirmed Soil Laboratory Report";
 
   return (
     <div className="space-y-7">
@@ -298,48 +310,102 @@ export default function SoilPage() {
                     Deterministic Principle: Available mineral NPK is never fabricated or modeled from global satellite rasters.
                   </p>
                 </div>
-                <Badge className="bg-[#edf5ed] text-forest border-0">Evidence Gated</Badge>
+                <Badge className={hasLabVerifiedNPK ? "bg-[#edf5ed] text-forest border-0 font-bold" : "bg-[#f4f7f4] text-muted border-0"}>
+                  {hasLabVerifiedNPK ? "Laboratory Certified" : "Evidence Gated"}
+                </Badge>
               </div>
+
+              {hasLabVerifiedNPK && (
+                <div className="mt-4 rounded-xl bg-[#edf5ed] border border-[#c4e3c4] p-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 size={18} className="text-leaf shrink-0" />
+                    <div className="text-xs">
+                      <span className="font-extrabold text-forest">Laboratory Certified Macronutrients Active</span>
+                      <p className="text-forest/80 text-[11px] mt-0.5">
+                        Available N, P, and K values have been verified from {labSourceName.replace("Laboratory Report: ", "")} and fused into your farm profile.
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild className="shrink-0 text-xs font-bold text-forest hover:bg-forest/10">
+                    <Link href={`/farms/${actualFarmId}/soil/reports`}>
+                      View Reports →
+                    </Link>
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-5 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-line bg-canvas p-4">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
-                    Available Nitrogen (N)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                      Available Nitrogen (N)
+                    </span>
+                    {isNVerified ? (
+                      <Badge className="bg-[#edf5ed] text-forest border-0 text-[9px] font-bold">
+                        Lab Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted text-[9px]">
+                        Unverified
+                      </Badge>
+                    )}
+                  </div>
                   <p className="mt-2 text-xl font-extrabold text-ink">
                     {availN !== null ? `${availN} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
                     {availN !== null
-                      ? "Lab alkaline permanganate extraction"
+                      ? getSoilParamNote(profile?.available_nitrogen, "Lab alkaline permanganate extraction")
                       : "Requires certified soil lab test report"}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-line bg-canvas p-4">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
-                    Available Phosphorus (P)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                      Available Phosphorus (P)
+                    </span>
+                    {isPVerified ? (
+                      <Badge className="bg-[#edf5ed] text-forest border-0 text-[9px] font-bold">
+                        Lab Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted text-[9px]">
+                        Unverified
+                      </Badge>
+                    )}
+                  </div>
                   <p className="mt-2 text-xl font-extrabold text-ink">
                     {availP !== null ? `${availP} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
                     {availP !== null
-                      ? "Olsen extraction method"
+                      ? getSoilParamNote(profile?.available_phosphorus, "Olsen extraction method")
                       : "Requires certified soil lab test report"}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-line bg-canvas p-4">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
-                    Available Potassium (K)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                      Available Potassium (K)
+                    </span>
+                    {isKVerified ? (
+                      <Badge className="bg-[#edf5ed] text-forest border-0 text-[9px] font-bold">
+                        Lab Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted text-[9px]">
+                        Unverified
+                      </Badge>
+                    )}
+                  </div>
                   <p className="mt-2 text-xl font-extrabold text-ink">
                     {availK !== null ? `${availK} kg/ha` : "Not verified"}
                   </p>
                   <p className="mt-1 text-[11px] text-muted">
                     {availK !== null
-                      ? "Neutral ammonium acetate extraction"
+                      ? getSoilParamNote(profile?.available_potassium, "Neutral ammonium acetate extraction")
                       : "Requires certified soil lab test report"}
                   </p>
                 </div>
@@ -349,17 +415,29 @@ export default function SoilPage() {
                 <FlaskConical size={18} className="text-soil shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <p className="font-extrabold text-soil">
-                    Have a Physical Soil Health Card or Lab Report?
+                    {hasLabVerifiedNPK
+                      ? "Have a New or Updated Soil Lab Report?"
+                      : "Have a Physical Soil Health Card or Lab Report?"}
                   </p>
                   <p className="mt-0.5 text-muted">
                     Upload your Government Soil Health Card (SHC) or private lab report. CropNet extracts NPK, EC, and micronutrients with automated OCR and asks you to confirm.
                   </p>
-                  <Link
-                    href={`/farms/${actualFarmId}/soil/reports/new`}
-                    className="inline-block mt-2 font-bold text-forest hover:underline"
-                  >
-                    Upload Laboratory Report →
-                  </Link>
+                  <div className="mt-2 flex items-center gap-3">
+                    <Link
+                      href={`/farms/${actualFarmId}/soil/reports/new`}
+                      className="font-bold text-forest hover:underline"
+                    >
+                      Upload Laboratory Report →
+                    </Link>
+                    {hasLabVerifiedNPK && (
+                      <Link
+                        href={`/farms/${actualFarmId}/soil/reports`}
+                        className="font-bold text-soil hover:underline"
+                      >
+                        Manage Existing Reports ({profile?.available_parameters_count || "Active"}) →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -51,6 +51,16 @@ export function getSoilParamStatus(param: any, defaultStatus = "map_derived_esti
 }
 
 /**
+ * Safely extracts scientific explanatory note.
+ */
+export function getSoilParamNote(param: any, defaultNote = ""): string {
+  if (param && typeof param === "object" && param.scientific_note) {
+    return param.scientific_note;
+  }
+  return defaultNote;
+}
+
+/**
  * Categorizes soil pH based on MPKV agronomic ranges.
  */
 export function interpretSoilPh(ph: number | null): string {

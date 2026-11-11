@@ -53,6 +53,17 @@ const CLIENT_BOUNDARIES: Record<string, [number, number]> = {
   boron: [0.0, 30.0],
 };
 
+function formatIsoDate(dateString?: string | null): string {
+  if (!dateString) return "Not specified";
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return String(dateString).slice(0, 10);
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return String(dateString).slice(0, 10);
+  }
+}
+
 export default function SoilReportDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -438,15 +449,11 @@ export default function SoilReportDetailPage() {
             <div>
               <span className="text-muted block text-[10px] font-bold uppercase tracking-wider">Sample Date</span>
               <span className="font-extrabold text-ink text-sm">
-                {report?.sample_collection_date
-                  ? new Date(report.sample_collection_date).toLocaleDateString()
-                  : report?.sample_date || report?.report_date
-                    ? new Date(report.report_date || report.sample_date!).toLocaleDateString()
-                    : "Not specified"}
+                {formatIsoDate(report?.sample_collection_date || report?.sample_date || report?.report_date)}
               </span>
               {report?.date_received && (
                 <span className="text-[10px] text-muted block mt-0.5">
-                  Received: {new Date(report.date_received).toLocaleDateString()}
+                  Received: {formatIsoDate(report.date_received)}
                 </span>
               )}
             </div>
@@ -486,7 +493,7 @@ export default function SoilReportDetailPage() {
             <div className="flex items-center gap-2 text-xs text-muted">
               <FileText size={15} className="text-leaf" />
               <span className="font-medium text-ink">{report?.original_filename || "Document"}</span>
-              {report?.file_size_bytes && (
+              {typeof report?.file_size_bytes === "number" && (
                 <span>({(report.file_size_bytes / 1024).toFixed(1)} KB)</span>
               )}
             </div>
@@ -592,7 +599,22 @@ export default function SoilReportDetailPage() {
               {measurements.map((m, idx) => {
                 const isCorrected = m.verification_status === "FARMER_CORRECTED" || m.farmer_corrected_value != null;
                 const isFlagged = m.is_ambiguous;
-                const rating = m.lab_rating;
+                const rating =
+                  typeof m.lab_rating === "string"
+                    ? m.lab_rating
+                    : typeof m.lab_rating === "number"
+                      ? String(m.lab_rating)
+                      : null;
+                const analyticalMethod =
+                  typeof m.analytical_method === "string" ? m.analytical_method : null;
+                const originalParamName =
+                  typeof m.original_parameter_name === "string" ? m.original_parameter_name : null;
+                const farmerNotes =
+                  typeof m.farmer_notes === "string" ? m.farmer_notes : null;
+                const displayName =
+                  typeof (m.display_name || m.parameter_name || m.original_parameter_name) === "string"
+                    ? String(m.display_name || m.parameter_name || m.original_parameter_name)
+                    : "Parameter";
 
                 return (
                   <div
@@ -602,16 +624,16 @@ export default function SoilReportDetailPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-extrabold text-ink">
-                          {m.display_name || m.parameter_name || m.original_parameter_name}
+                          {displayName}
                         </p>
                         {m.parameter_category && (
                           <Badge variant="outline" className="text-[10px] capitalize">
-                            {m.parameter_category}
+                            {String(m.parameter_category)}
                           </Badge>
                         )}
                         {m.sample_designation && (
                           <Badge className="bg-leaf/10 text-forest border-0 text-[10px]">
-                            {m.sample_designation} {m.sample_id ? `(#${m.sample_id})` : ""}
+                            {String(m.sample_designation)} {m.sample_id ? `(#${m.sample_id})` : ""}
                           </Badge>
                         )}
                         {isCorrected && (
@@ -629,25 +651,25 @@ export default function SoilReportDetailPage() {
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                         <span>Unit: <strong className="text-ink">{m.unit || "—"}</strong></span>
                         {m.extraction_confidence != null && (
-                          <span>· OCR Confidence: {(m.extraction_confidence * 100).toFixed(0)}%</span>
+                          <span>· OCR Confidence: {(Number(m.extraction_confidence) * 100).toFixed(0)}%</span>
                         )}
                         {rating && (
                           <span>· Rating: <span className="font-semibold text-ink">{rating}</span></span>
                         )}
-                        {m.analytical_method && (
-                          <span>· Method: <em>{m.analytical_method}</em></span>
+                        {analyticalMethod && (
+                          <span>· Method: <em>{analyticalMethod}</em></span>
                         )}
                       </div>
 
-                      {m.original_parameter_name && m.original_parameter_name !== (m.display_name || m.parameter_name) && (
+                      {originalParamName && originalParamName !== displayName && (
                         <p className="text-[10px] text-muted italic">
-                          Report text: "{m.original_parameter_name}"
+                          Report text: "{originalParamName}"
                         </p>
                       )}
 
-                      {m.farmer_notes && (
+                      {farmerNotes && (
                         <p className="text-[11px] text-amber-800 bg-amber-50 rounded px-2 py-0.5 inline-block">
-                          Note: {m.farmer_notes}
+                          Note: {farmerNotes}
                         </p>
                       )}
                     </div>
