@@ -20,6 +20,7 @@ import {
   Menu,
   Settings,
   Satellite,
+  ShieldAlert,
   Sprout,
   Stethoscope,
   UserRound,
@@ -240,6 +241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Heat Risk", href: "/heat-risk", icon: Flame },
     { label: "Schemes", href: "/schemes", icon: Landmark },
     { label: "Income", href: "/income", icon: CircleDollarSign },
+    { label: "Rashkar Risk & Yield", href: "/rashkar", icon: ShieldAlert },
     { label: "History", href: "/history", icon: FileClock },
     { label: "Profile & settings", href: "/profile", icon: Settings },
   ];

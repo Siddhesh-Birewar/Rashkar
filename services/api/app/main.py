@@ -80,9 +80,15 @@ try:
 except ImportError:
     from .api.v1.endpoints.satellite import router as satellite_router
 
+try:
+    from cropnet.services.api.app.rashkar.router import rashkar_router
+except ImportError:
+    from .rashkar.router import rashkar_router
+
 app.include_router(soil_reports_router, prefix=settings.API_V1_PREFIX)
 app.include_router(water_router, prefix=settings.API_V1_PREFIX)
 app.include_router(satellite_router, prefix=settings.API_V1_PREFIX)
+app.include_router(rashkar_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

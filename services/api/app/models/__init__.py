@@ -13,3 +13,17 @@ from .satellite import SatelliteVegetationObservationModel
 from .weather import FarmWeatherSnapshotModel, FarmClimateSummaryModel
 from .crops import CropCatalogModel
 from .government_schemes import GovernmentSchemeModel
+from ..rashkar.models import (
+    RashkarAdvisoryCatalogueModel,
+    RashkarAgronomicThresholdModel,
+    RashkarCanonicalCropModel,
+    RashkarCropCycleModel,
+    RashkarCropHeatLogModel,
+    RashkarCropStageModel,
+    RashkarFarmerResourceProfileModel,
+    RashkarIncomeOpportunityModel,
+    RashkarIncomeScenarioModel,
+    RashkarSavedIncomePlanModel,
+    RashkarWorkerHazardAuditLogModel,
+    RashkarYieldAssessmentLogModel,
+)
