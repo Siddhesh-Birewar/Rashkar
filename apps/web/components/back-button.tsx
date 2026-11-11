@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export interface BackButtonProps {
@@ -10,12 +11,12 @@ export interface BackButtonProps {
   className?: string;
   confirmDirty?: boolean;
   isDirty?: boolean;
-  onNavigate?: () => void;
 }
 
 /**
- * Reusable BackButton component conforming to CropNet design tokens.
- * Features 44px minimum touch targets, keyboard accessibility, and variant styling.
+ * Reusable BackButton component with smart history navigation and fallback handling.
+ * Inspects browser history index to safely return to prior in-app screens or fall back
+ * to verified module destinations on direct URL entry.
  */
 export function BackButton({
   fallbackHref = "/",
@@ -24,9 +25,10 @@ export function BackButton({
   className,
   confirmDirty = false,
   isDirty = false,
-  onNavigate,
 }: BackButtonProps) {
-  const handleClick = () => {
+  const router = useRouter();
+
+  const handleBack = () => {
     if (confirmDirty && isDirty && typeof window !== "undefined") {
       const confirmLeave = window.confirm(
         "You have unsaved changes. Are you sure you want to leave this page?"
@@ -34,13 +36,16 @@ export function BackButton({
       if (!confirmLeave) return;
     }
 
-    if (onNavigate) {
-      onNavigate();
-      return;
-    }
+    // Check if user has legitimate in-app navigation history
+    const hasInAppHistory =
+      typeof window !== "undefined" &&
+      window.history.length > 1 &&
+      (window.history.state?.idx ?? 0) > 0;
 
-    if (typeof window !== "undefined") {
-      window.location.href = fallbackHref;
+    if (hasInAppHistory) {
+      router.back();
+    } else {
+      router.push(fallbackHref);
     }
   };
 
@@ -48,7 +53,7 @@ export function BackButton({
     return (
       <button
         type="button"
-        onClick={handleClick}
+        onClick={handleBack}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-bold text-forest shadow-sm transition-colors hover:bg-[#f3f8f3] focus-visible:outline-2 focus-visible:outline-forest min-h-[36px]",
           className
@@ -65,7 +70,7 @@ export function BackButton({
     return (
       <button
         type="button"
-        onClick={handleClick}
+        onClick={handleBack}
         className={cn(
           "inline-flex items-center gap-1.5 text-xs font-bold text-muted transition-colors hover:text-forest focus-visible:outline-2 focus-visible:outline-forest min-h-[36px]",
           className
@@ -82,7 +87,7 @@ export function BackButton({
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={handleBack}
       className={cn(
         "mt-0.5 grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-forest shadow-sm transition-colors hover:bg-[#f3f8f3] focus-visible:outline-2 focus-visible:outline-forest min-w-[44px] min-h-[44px]",
         className
