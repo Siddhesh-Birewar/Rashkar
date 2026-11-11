@@ -39,6 +39,7 @@ export default function NewSoilReportPage() {
       title="Upload a soil report"
       description="Add a complete, readable Soil Health Card or laboratory test certificate (PDF, JPG or PNG ≤15 MB)."
       icon={FileUp}
+      backHref={actualFarmId ? `/farms/${actualFarmId}/soil/reports` : "/farms"}
       steps={[
         "Choose a clear report document",
         "Review OCR extractions and units",
