@@ -107,6 +107,7 @@ export default function CropDoctorPage() {
         eyebrow="Vision intelligence"
         title="Crop Doctor"
         description="Photograph visible leaf symptoms to diagnose plant diseases using verified PlantVillage MobileNetV2 neural classification."
+        backHref="/"
         actions={
           <div className="flex items-center gap-2">
             {checkingStatus ? (

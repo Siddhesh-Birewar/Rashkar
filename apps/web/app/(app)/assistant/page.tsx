@@ -21,6 +21,7 @@ import type {
 } from "@/lib/api/types";
 import { useFarm } from "@/lib/farm-context";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/components/back-button";
 
 interface ChatMessage {
   id: string;
@@ -175,6 +176,7 @@ export default function AssistantPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dde7df] bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
+          <BackButton fallbackHref="/" />
           <div className="flex size-11 items-center justify-center rounded-2xl bg-[#1b5e20] text-white">
             <Bot size={24} />
           </div>
