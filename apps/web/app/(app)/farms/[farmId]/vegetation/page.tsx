@@ -86,9 +86,19 @@ export default function VegetationPage() {
     setSyncMessage(null);
     try {
       const result = await satelliteApi.sync(actualFarmId);
-      setSyncMessage(
-        result?.agronomic_interpretation || "Sentinel-2 overpass synchronization completed."
-      );
+      if (result?.success) {
+        const ndviVal = result.latest_observation?.mean_ndvi;
+        setSyncMessage(
+          `Sentinel-2 overpass synchronized: ${ndviVal != null ? `Canopy NDVI ${ndviVal.toFixed(2)}` : "Observation recorded"} (${result.latest_observation?.product_id || "Copernicus S2A"})`
+        );
+        if (result.latest_observation) {
+          setLatestObs(result.latest_observation);
+        }
+      } else {
+        setError(
+          result?.message || "Live Sentinel-2 pass unavailable. Preserving latest observation."
+        );
+      }
       await loadData();
     } catch (err: any) {
       setError(err?.message || "Satellite sync failed. ESA Copernicus services may be busy.");

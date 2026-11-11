@@ -338,11 +338,25 @@ export interface SatelliteObservation {
   id?: string;
   farm_id: string;
   observation_date: string;
-  canopy_ndvi: number | null;
-  canopy_ndmi: number | null;
+  canopy_ndvi?: number | null;
+  canopy_ndmi?: number | null;
+  mean_ndvi?: number | null;
+  mean_ndmi?: number | null;
+  median_ndvi?: number | null;
+  min_ndvi?: number | null;
+  max_ndvi?: number | null;
+  std_ndvi?: number | null;
+  product_id?: string;
+  tile_id?: string;
+  valid_pixel_count?: number;
+  total_pixel_count?: number;
+  farm_coverage_percent?: number;
   vegetation_coverage_percent?: number | null;
   cloud_masked_percent?: number | null;
   sensor?: string;
+  quality_status?: string;
+  quality_notes?: string;
+  is_small_farm_warning?: boolean;
   raster_maps?: {
     ndvi_map_url?: string | null;
     ndmi_map_url?: string | null;
@@ -350,6 +364,16 @@ export interface SatelliteObservation {
   };
   agronomic_interpretation?: string;
   scientific_disclaimer?: string;
+}
+
+export interface SatelliteSyncResponse {
+  success: boolean;
+  farm_id: string;
+  synced_observations_count: number;
+  latest_observation?: SatelliteObservation | null;
+  copernicus_provider_status: string;
+  message: string;
+  agronomic_interpretation?: string;
 }
 
 // ── Crop Doctor ──────────────────────────────────────────────────────────────

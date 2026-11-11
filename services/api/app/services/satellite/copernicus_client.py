@@ -12,6 +12,7 @@ Implements:
 6. Deterministic offline/dev fallback with non-fabrication provenance tags.
 """
 import os
+import re
 import math
 import logging
 from datetime import datetime, timedelta
@@ -615,7 +616,7 @@ class CopernicusClient:
                 end_dt = (observation_date + timedelta(days=15)).strftime("%Y-%m-%dT23:59:59Z")
                 payload["datetime"] = f"{start_dt}/{end_dt}"
 
-            feature = None
+            feats = []
             try:
                 with httpx.Client(timeout=15.0) as client:
                     resp = client.post(stac_url, json=payload)
@@ -623,51 +624,96 @@ class CopernicusClient:
                         feats = resp.json().get("features", [])
                         if feats:
                             feats.sort(key=lambda f: f.get("properties", {}).get("eo:cloud_cover", 100.0))
-                            feature = feats[0]
             except Exception as e:
                 logger.warning("Earth Search STAC search failed: %s", e)
 
-            if not feature:
+            if not feats:
                 logger.warning("No usable Sentinel-2 L2A STAC scene found covering farm geometry.")
                 return None
 
-            props = feature.get("properties", {})
-            assets = feature.get("assets", {})
-            b04_url = assets.get("red", {}).get("href")
-            b08_url = assets.get("nir", {}).get("href")
-            b11_url = assets.get("swir16", {}).get("href")
-            scl_url = assets.get("scl", {}).get("href")
+            gdal_env = {
+                "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+                "AWS_NO_SIGN_REQUEST": "YES",
+                "AWS_DEFAULT_REGION": "us-west-2",
+                "GDAL_HTTP_MAX_RETRY": "5",
+                "GDAL_HTTP_TIMEOUT": "30",
+                "CPL_VSIL_CURL_TIMEOUT": "30",
+                "VSI_CACHE": "TRUE",
+                "VSI_CACHE_SIZE": "50000000",
+                "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
+                "GDAL_HTTP_MERGE_CONSECUTIVE_RANGES": "YES",
+            }
 
-            if not (b04_url and b08_url and b11_url and scl_url):
-                logger.warning("Required band URLs missing in STAC feature")
+            def _to_vsi(u: Optional[str]) -> Optional[str]:
+                if not u:
+                    return u
+                return re.sub(r"^https://([^.]+)\.s3\.([^.]+)\.amazonaws\.com/", r"/vsis3/\1/", u)
+
+            feature = None
+            out_b04 = None
+            out_b08 = None
+            out_b11 = None
+            out_scl = None
+            transform_b04 = None
+            transform_b08 = None
+            transform_b11 = None
+            transform_scl = None
+            raster_crs = "EPSG:32643"
+            scales = None
+            offsets = None
+            props = {}
+            assets = {}
+
+            with rasterio.Env(**gdal_env):
+                for candidate in feats[:3]:
+                    c_props = candidate.get("properties", {})
+                    c_assets = candidate.get("assets", {})
+                    b04_url = _to_vsi(c_assets.get("red", {}).get("href"))
+                    b08_url = _to_vsi(c_assets.get("nir", {}).get("href"))
+                    b11_url = _to_vsi(c_assets.get("swir16", {}).get("href"))
+                    scl_url = _to_vsi(c_assets.get("scl", {}).get("href"))
+
+                    if not (b04_url and b08_url and b11_url and scl_url):
+                        continue
+
+                    try:
+                        with rasterio.open(b04_url) as src_b04:
+                            raster_crs = src_b04.crs.to_string() if src_b04.crs else "EPSG:32643"
+                            scales = src_b04.scales
+                            offsets = src_b04.offsets
+
+                            transformer = pyproj.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
+
+                            def reproject_coords(coords):
+                                x, y = transformer.transform(coords[:, 0], coords[:, 1])
+                                return np.column_stack([x, y])
+
+                            poly_proj = shapely.transform(poly, reproject_coords)
+                            geom_proj = [mapping(poly_proj)]
+
+                            out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True, all_touched=True)
+
+                        with rasterio.open(b08_url) as src_b08:
+                            out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True, all_touched=True)
+
+                        with rasterio.open(b11_url) as src_b11:
+                            out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True, all_touched=True)
+
+                        with rasterio.open(scl_url) as src_scl:
+                            out_scl, transform_scl = mask(src_scl, geom_proj, crop=True, all_touched=True)
+
+                        feature = candidate
+                        props = c_props
+                        assets = c_assets
+                        logger.info("Successfully streamed and clipped Sentinel-2 bands from scene %s", candidate.get("id"))
+                        break
+                    except Exception as band_err:
+                        logger.warning("Failed streaming candidate scene %s: %s", candidate.get("id"), band_err)
+                        continue
+
+            if not feature or out_b04 is None:
+                logger.warning("Could not successfully stream band imagery from any candidate STAC scenes.")
                 return None
-
-            with rasterio.Env(GDAL_HTTP_TIMEOUT="15", GDAL_HTTP_MAX_RETRY="2", CPL_VSIL_CURL_TIMEOUT="15"):
-                # 2. Open B04 to get CRS, transform, and embedded scales/offsets
-                with rasterio.open(b04_url) as src_b04:
-                    raster_crs = src_b04.crs.to_string() if src_b04.crs else "EPSG:32643"
-                    scales = src_b04.scales
-                    offsets = src_b04.offsets
-
-                    transformer = pyproj.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
-
-                    def reproject_coords(coords):
-                        x, y = transformer.transform(coords[:, 0], coords[:, 1])
-                        return np.column_stack([x, y])
-
-                    poly_proj = shapely.transform(poly, reproject_coords)
-                    geom_proj = [mapping(poly_proj)]
-
-                    out_b04, transform_b04 = mask(src_b04, geom_proj, crop=True, all_touched=False)
-
-                with rasterio.open(b08_url) as src_b08:
-                    out_b08, transform_b08 = mask(src_b08, geom_proj, crop=True, all_touched=False)
-
-                with rasterio.open(b11_url) as src_b11:
-                    out_b11, transform_b11 = mask(src_b11, geom_proj, crop=True, all_touched=False)
-
-                with rasterio.open(scl_url) as src_scl:
-                    out_scl, transform_scl = mask(src_scl, geom_proj, crop=True, all_touched=False)
 
             # 3. Resample B11 (20m -> 10m grid) using Bilinear interpolation
             b11_resampled = np.empty_like(out_b08, dtype=np.float32)

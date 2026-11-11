@@ -12,6 +12,7 @@ import type {
   WaterSource,
   WaterEvaluation,
   SatelliteObservation,
+  SatelliteSyncResponse,
   CropDoctorStatus,
   CropDoctorPrediction,
   HeatRiskCropsResponse,
@@ -237,7 +238,7 @@ export const waterApi = {
 
 export const satelliteApi = {
   sync: (farmId: string) =>
-    apiFetch<SatelliteObservation>(`/api/v1/farms/${farmId}/satellite/sync`, {
+    apiFetch<SatelliteSyncResponse>(`/api/v1/farms/${farmId}/satellite/sync`, {
       method: "POST",
     }),
   getLatest: (farmId: string) => apiFetch<SatelliteObservation>(`/api/v1/farms/${farmId}/satellite/latest`),
