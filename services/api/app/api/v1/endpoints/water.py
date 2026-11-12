@@ -555,6 +555,7 @@ async def confirm_water_report(
 # INSTITUTIONAL WATER QUALITY EVALUATION
 # ---------------------------------------------------------------------------
 
+@router.get("", response_model=WaterQualityEvaluationResponse)
 @router.get("/evaluation", response_model=WaterQualityEvaluationResponse)
 async def evaluate_water_quality(
     farm_id: uuid.UUID,

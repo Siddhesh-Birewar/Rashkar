@@ -1,7 +1,7 @@
 """Heat Risk — crop, worker and farm-context heat-stress endpoints."""
 import uuid
 from datetime import date, datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -73,6 +73,26 @@ def assess_worker_heat(request: WorkerHeatRequest):
         is_acclimatised=request.is_acclimatised,
         sun_exposure=request.sun_exposure,
     )
+
+
+@router.get("/farm/{farm_id}", response_model=FarmHeatRiskResponse)
+def assess_farm_heat_risk_get(
+    farm_id: uuid.UUID,
+    crop_code: str = "soybean",
+    growth_stage: Optional[str] = None,
+    sowing_date: Optional[str] = None,
+    days_after_sowing: Optional[int] = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Convenience GET endpoint defaulting to standard localized crops."""
+    req = FarmHeatRiskRequest(
+        crop_code=crop_code,
+        growth_stage=growth_stage,
+        sowing_date=sowing_date,
+        days_after_sowing=days_after_sowing,
+    )
+    return assess_farm_heat_risk(farm_id=farm_id, request=req, current_user=current_user, db=db)
 
 
 @router.post("/farm/{farm_id}", response_model=FarmHeatRiskResponse)

@@ -343,6 +343,18 @@ def compare_opportunities_endpoint(request: CompareOpportunitiesPostRequest):
 # -----------------------------------------------------------------------------
 # 4. Saved Farm Business Plans Endpoints
 # -----------------------------------------------------------------------------
+@router.get("/plans", response_model=List[Dict[str, Any]])
+def get_saved_farm_plans_query(
+    farm_id: Optional[str] = Query(None),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieves saved diversification plans with optional farm_id filter."""
+    if not farm_id:
+        return []
+    return get_saved_farm_plans(farm_id=farm_id, current_user=current_user, db=db)
+
+
 @router.get("/farms/{farm_id}/plans", response_model=List[Dict[str, Any]])
 def get_saved_farm_plans(
     farm_id: str,
